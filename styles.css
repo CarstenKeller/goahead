@@ -283,13 +283,7 @@ html, body {
   font-size: 15px;
 }
 
-/* Bedienelemente unten rücken über das Infofenster */
-body.info-open .map-btn {
-  bottom: calc(var(--info-height) + 16px);
-}
-body.info-open .leaflet-bottom {
-  bottom: var(--info-height);
-}
+/* Positions-Knopf und Kartenleiste bleiben an ihrem Platz; das Infofenster liegt darüber (z-index 1500) */
 
 /* Markierung der Tippstelle */
 .tap-dot {

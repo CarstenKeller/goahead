@@ -31,10 +31,10 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   Schlägt die Abfrage fehl, fragt die App die Overpass-API (zwei Server). Sind beide Wege-Ebenen an,
   zeigt das Infofenster beide Quellen getrennt.
 - **Infofenster:** Es erscheint nur, wenn an der Tippstelle Wege gefunden wurden. Während der Suche pulsiert ein
-  oranger Kreis an der Tippstelle. Das Fenster sitzt fest im unteren Drittel über die volle Breite und ist scrollbar.
+  oranger Kreis an der Tippstelle. Das Fenster sitzt fest im unteren Drittel über die volle Breite und ist scrollbar. Es liegt
+  über Positions-Knopf und Quellenangabe.
   Tippen ins Leere schließt es. Durch Ziehen am Kopf wird es größer oder kleiner; ganz nach unten gezogen
-  schließt es. Die Höhe wird gespeichert. Jede Abfrage hat ein Zeitlimit von 12 s. Bei OSM wird bei Problemen ein
-  zweiter Overpass-Server versucht.
+  schließt es. Die Höhe wird gespeichert. Jede Abfrage hat ein Zeitlimit (10–12 s).
 - **Größe der Wegemarkierungen** (Knopf unter der Kartenwahl): Regler von 100 bis 300 %, wird gespeichert.
   - TFIS (WMS): stufenlos. Für dieselbe Fläche wird ein kleineres Bild angefordert und vergrößert angezeigt.
     Dadurch wird es etwas unschärfer. Möglicherweise blendet der Server dann Inhalte aus, die er nur bei
@@ -53,15 +53,10 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
 Laut Metadaten gilt für die BKG-Maßstäbe DTK250/DTK500 stattdessen
 „Datenlizenz Deutschland – Namensnennung 2.0“.
 
-**Offen bzw. ungeprüft:** Die Layer-Namen `nw_dtk_col` und `nw_dop_rgb` sowie die Unterstützung
-von EPSG:3857 konnten während der Entwicklung nicht gegen die GetCapabilities geprüft werden.
-Die Entwicklungsumgebung hatte keinen Netzzugang zu `*.nrw.de`. Deshalb fragt die App beim
-Start die Capabilities ab. Fehlt der eingetragene Layer, weicht sie auf einen passenden Layer aus.
-Das klappt aber nur, wenn der Dienst CORS erlaubt. Die Ergebnisse stehen in der Browser-Konsole.
-Bleibt die DTK grau, die Layer-Namen in `config.js` prüfen.
-
-Beim TFIS-Dienst ist kein Layer-Name eingetragen. Die App nimmt alle Ebenen, deren Name oder Titel
-„wander“ enthält. Gibt der Dienst seine Capabilities nicht frei (CORS), bleibt die Ebene leer.
+**Geprüft (02.11.2026, per `?diagnose`):** Die Layer-Namen `nw_dtk_col`, `nw_dop_rgb` und `nw_tfis` sind korrekt.
+Alle drei Dienste unterstützen EPSG:3857 und erlauben Abfragen aus dem Browser (CORS). Der TFIS-Dienst
+hat nur die eine Ebene `nw_tfis` und ist abfragbar (GetFeatureInfo). Die App prüft die Namen bei jedem Start
+weiter und weicht auf einen vorhandenen Layer aus, falls einer verschwindet.
 
 **Diagnose:** Die App mit `?diagnose` aufrufen (https://carstenkeller.github.io/goahead/?diagnose).
 Sie zeigt dann je Dienst, ob die Capabilities lesbar waren, welche Layer es gibt und welche verwendet werden.

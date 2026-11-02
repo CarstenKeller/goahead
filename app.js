@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "10";
+  var APP_VERSION = "11";
   var STORAGE_KEY = "goahead.view.v1";
 
   // ---------- kleine Helfer ----------
