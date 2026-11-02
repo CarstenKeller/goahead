@@ -4,6 +4,9 @@ on:
   push:
     branches: [main, ccr-a56f7acc-f6tzvw]
   workflow_dispatch:
+  # monatlich neu bauen, damit neue Wegzeichen (TFIS-Signaturen) übernommen werden
+  schedule:
+    - cron: "17 3 4 * *"
 
 permissions:
   contents: read
@@ -23,6 +26,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # Wegzeichen der Wanderwege (SVG, benannt nach Signaturnummer) aus dem offiziellen
+      # TFIS-Paket von Geobasis NRW (dl-de/zero-2.0). Schlägt das fehl, wird die App
+      # trotzdem veröffentlicht – dann eben ohne Wegzeichen.
+      - name: TFIS-Wegzeichen holen
+        continue-on-error: true
+        run: |
+          set -e
+          curl -fsSL --retry 3 -o /tmp/tfis.zip https://www.opengeodata.nrw.de/produkte/geobasis/tfis_nrw/tfis_EPSG25832_GeoPackage.zip
+          mkdir -p /tmp/tfis symbols/tfis
+          unzip -q -o /tmp/tfis.zip 'svg_Dateien/Wanderwege/*' -d /tmp/tfis
+          find /tmp/tfis/svg_Dateien/Wanderwege -name '*.svg' -exec cp {} symbols/tfis/ \;
+          python3 .github/scripts/fix_svg_viewbox.py symbols/tfis
+          echo "Wegzeichen: $(ls symbols/tfis | wc -l), Größe: $(du -sh symbols/tfis | cut -f1)"
       # Statische Seite ohne Build: Repository-Inhalt wird direkt ausgeliefert
       # (.git und .github werden von upload-pages-artifact ausgelassen)
       - uses: actions/upload-pages-artifact@v3

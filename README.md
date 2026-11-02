@@ -57,8 +57,9 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     löschen. Die App bittet deshalb um dauerhaften Speicher (`navigator.storage.persist`).
 - **TFIS-Infos:** Der Wegname ist die Überschrift, die Felder haben deutsche Bezeichnungen (Kategorie, Verein,
   Verlauf, Länge, Streckenvariante, Signaturnummer, Schlüssel).
-  Wegzeichen: Versuch über `GetLegendGraphic` mit `RULE=<signaturnummer>`. **Ungeprüft**, ob der Dienst das
-  unterstützt; schlägt es fehl, erscheint kein Bild. Ein Link „Legende des Dienstes“ zeigt die Gesamtlegende.
+  Wegzeichen: Das offizielle TFIS-Paket von Geobasis NRW (OpenGeodata.NRW, dl-de/zero-2.0) enthält die
+  Wegzeichen als SVG, benannt nach Signaturnummer. Der Deploy-Workflow lädt sie bei jedem Veröffentlichen und
+  einmal im Monat nach `symbols/tfis/<Signaturnummer>.svg`. Die App zeigt das passende Zeichen im Infofenster.
 - Die App lässt sich zum Startbildschirm hinzufügen. Die App-Hülle funktioniert dann auch offline, die Kartenkacheln **noch nicht**.
 
 ## Kartendienste und Lizenz

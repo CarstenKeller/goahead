@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "13";
+  var APP_VERSION = "14";
   var STORAGE_KEY = "goahead.view.v1";
 
   // ---------- kleine Helfer ----------
@@ -709,16 +709,11 @@
     return t.charAt(0).toUpperCase() + t.slice(1);
   }
 
-  // Versuch: Wegzeichen über GetLegendGraphic mit der Signaturnummer als Regel.
-  // UNGEPRÜFT – ob der Dienst das unterstützt, ist nicht bekannt; schlägt das Laden
-  // fehl, wird das Bild einfach weggelassen.
-  function tfisLegendUrl(def, rule) {
-    var params = {
-      SERVICE: "WMS", VERSION: "1.3.0", REQUEST: "GetLegendGraphic",
-      LAYER: def.layers, FORMAT: "image/png", SLD_VERSION: "1.1.0"
-    };
-    if (rule) params.RULE = rule;
-    return def.url + L.Util.getParamString(params, def.url, true);
+  // Wegzeichen: SVG aus dem offiziellen TFIS-Paket von Geobasis NRW, beim Veröffentlichen
+  // nach symbols/tfis/<Signaturnummer>.svg kopiert (siehe .github/workflows/pages.yml)
+  function tfisSymbolUrl(signaturnummer) {
+    var n = String(signaturnummer).trim();
+    return /^\d+$/.test(n) ? "symbols/tfis/" + n + ".svg" : null;
   }
 
   function prettifyTfisFeature(def, f) {
@@ -735,7 +730,7 @@
       return [prettyLabel(kv[0]), v];
     });
     var symbol = f.symbol;
-    if (!symbol && byKey.signaturnummer) symbol = tfisLegendUrl(def, byKey.signaturnummer);
+    if (!symbol && byKey.signaturnummer) symbol = tfisSymbolUrl(byKey.signaturnummer);
     return {
       type: byKey.name || f.type,
       props: out,
@@ -996,8 +991,7 @@
         html += "</div>";
       });
       if (res.htmlUrl) {
-        html += '<p class="fi-raw"><a href="' + escapeHtml(res.htmlUrl) + '" target="_blank" rel="noopener">Original-Antwort des Servers öffnen</a>' +
-          (res.legendUrl ? ' · <a href="' + escapeHtml(res.legendUrl) + '" target="_blank" rel="noopener">Legende des Dienstes</a>' : "") + "</p>";
+        html += '<p class="fi-raw"><a href="' + escapeHtml(res.htmlUrl) + '" target="_blank" rel="noopener">Original-Antwort des Servers öffnen</a></p>';
       }
     });
     var details = "";
@@ -1148,7 +1142,6 @@
             def: def,
             features: features.map(function (f) { return prettifyTfisFeature(def, f); }),
             htmlUrl: htmlUrl,
-            legendUrl: tfisLegendUrl(def),
             log: log
           };
         })
