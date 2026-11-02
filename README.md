@@ -40,6 +40,16 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     Dadurch wird es etwas unschärfer. Möglicherweise blendet der Server dann Inhalte aus, die er nur bei
     feineren Maßstäben zeigt.
   - OSM (Waymarked Trails): nur 100/200/400 %. Es werden Kacheln einer gröberen Zoomstufe vergrößert angezeigt.
+- **GPX-Tracks** (Knopf mit Linien-Symbol oben rechts):
+  - Eine oder mehrere GPX-Dateien importieren. Gelesen werden Tracks, Routen und Wegpunkte.
+  - Gespeichert wird die Original-Datei lokal im Browser (IndexedDB), sie ist auch nach einem Neustart
+    wieder da. Je Track: ein-/ausblenden (Zustand wird gespeichert), hinzoomen, GPX herunterladen, löschen.
+  - Angezeigt werden Länge, Anstieg (aus den Höhenwerten der Datei, daher nur „ca.“) und die Zahl der Wegpunkte.
+  - Antippen eines Wegpunkts zeigt Name und Beschreibung. Die Tracklinien reagieren nicht auf Antippen, damit
+    das Antippen von Wanderwegen weiter funktioniert.
+  - Die Daten liegen nur auf diesem Gerät und in diesem Browser. Bei Speichermangel kann der Browser sie
+    löschen. Die App bittet deshalb um dauerhaften Speicher (`navigator.storage.persist`).
+- **Wegzeichen bei TFIS:** Enthält ein Feld der TFIS-Antwort eine Bild-Adresse, wird sie als Wegzeichen angezeigt.
 - Die App lässt sich zum Startbildschirm hinzufügen. Die App-Hülle funktioniert dann auch offline, die Kartenkacheln **noch nicht**.
 
 ## Kartendienste und Lizenz
@@ -83,6 +93,7 @@ Einmalig nötig: unter *Settings → Pages → Build and deployment → Source* 
 ## Dateien
 
 - `index.html`, `styles.css`, `app.js`: die App
+- `tracks.js`: GPX-Import, lokale Speicherung, Track-Liste
 - `config.js`: Kartendienste, Startansicht, Zoomstufe
 - `sw.js`, `manifest.webmanifest`, `icons/`: PWA (installierbar, App-Hülle offline)
 - `vendor/leaflet/`: Leaflet 1.9.4 (BSD-2-Clause), lokal eingebunden

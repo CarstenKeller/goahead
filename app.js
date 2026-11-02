@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "11";
+  var APP_VERSION = "12";
   var STORAGE_KEY = "goahead.view.v1";
 
   // ---------- kleine Helfer ----------
@@ -592,7 +592,12 @@
           }
         }
       })(f);
-      return { type: f.localName, props: props };
+      // Enthält ein Feld eine Bild-Adresse, wird sie als Wegzeichen angezeigt
+      var symbol = null;
+      for (var q = 0; q < props.length && !symbol; q++) {
+        if (/^https?:\/\/\S+\.(png|svg|gif|jpe?g|webp)(\?\S*)?$/i.test(props[q][1])) symbol = props[q][1];
+      }
+      return { type: f.localName, props: props, symbol: symbol };
     });
   }
 
@@ -817,7 +822,11 @@
     function table(rows) {
       var t = "<table>";
       rows.forEach(function (kv) {
-        t += "<tr><th>" + escapeHtml(kv[0]) + "</th><td>" + escapeHtml(kv[1]) + "</td></tr>";
+        var v = String(kv[1]);
+        var cell = /^https?:\/\/\S+$/i.test(v)
+          ? '<a href="' + escapeHtml(v) + '" target="_blank" rel="noopener">' + escapeHtml(v) + "</a>"
+          : escapeHtml(v);
+        t += "<tr><th>" + escapeHtml(kv[0]) + "</th><td>" + cell + "</td></tr>";
       });
       return t + "</table>";
     }
@@ -1142,6 +1151,14 @@
   });
 
   startWatching();
+
+  // ---------- Schnittstelle für weitere Module (z. B. tracks.js) ----------
+
+  window.GOAHEAD = {
+    map: map,
+    showStatus: showStatus,
+    escapeHtml: escapeHtml
+  };
 
   // ---------- Service Worker (App-Hülle offline verfügbar) ----------
 
