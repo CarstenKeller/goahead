@@ -83,7 +83,8 @@ window.GOAHEAD_CONFIG = {
       attribution:
         '&copy; Geobasis NRW / Wandervereine, ' +
         '<a href="https://www.govdata.de/dl-de/zero-2-0" target="_blank" rel="noopener">dl-de/zero-2-0</a>',
-      visible: true
+      visible: true,
+      featureInfo: true                   // Antippen liefert Weg-Informationen (GetFeatureInfo)
     },
     {
       id: "osm-hiking",

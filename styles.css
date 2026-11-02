@@ -165,3 +165,40 @@ html, body {
   font-size: 12px;
   color: #666666;
 }
+
+/* Infofenster beim Antippen eines Weges */
+.fi-popup .leaflet-popup-content {
+  margin: 12px 14px;
+  font-size: 14px;
+}
+.fi-feature {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #dddddd;
+}
+.fi-type {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.fi table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.fi th, .fi td {
+  text-align: left;
+  vertical-align: top;
+  padding: 2px 6px 2px 0;
+  word-break: break-word;
+}
+.fi th {
+  font-weight: normal;
+  color: #666666;
+  white-space: nowrap;
+}
+.fi-error {
+  color: #b00020;
+}
+.fi-raw {
+  margin: 6px 0 0;
+  font-size: 12px;
+}

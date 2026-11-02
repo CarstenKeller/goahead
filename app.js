@@ -485,6 +485,177 @@
     document.body.appendChild(box);
   }
 
+  // ---------- Antippen: Informationen zu Wegen (WMS GetFeatureInfo) ----------
+
+  var infoDefs = (cfg.overlays || []).filter(function (d) { return d.type === "wms" && d.featureInfo; });
+  var GML_NS = /opengis\.net\/gml/;
+
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  // windowPx: Größe des abgefragten Bereichs auf dem Bildschirm (CSS-Pixel)
+  // imgPx:    Bildgröße, die dem Server genannt wird. Ein kleines Bild für einen großen
+  //           Bereich vergrößert die Fangtoleranz des Servers (ein Fingertipp ist ungenau).
+  function featureInfoUrl(def, latlng, windowPx, imgPx, infoFormat) {
+    var zoom = map.getZoom();
+    var p = map.project(latlng, zoom);
+    var half = windowPx / 2;
+    var a = L.CRS.EPSG3857.project(map.unproject(p.add([-half, half]), zoom));
+    var b = L.CRS.EPSG3857.project(map.unproject(p.add([half, -half]), zoom));
+    var center = Math.floor(imgPx / 2);
+    var params = {
+      SERVICE: "WMS",
+      VERSION: "1.3.0",
+      REQUEST: "GetFeatureInfo",
+      LAYERS: def.layers,
+      QUERY_LAYERS: def.layers,
+      STYLES: "",
+      CRS: "EPSG:3857",
+      BBOX: [a.x, a.y, b.x, b.y].join(","),
+      WIDTH: imgPx,
+      HEIGHT: imgPx,
+      I: center,
+      J: center,
+      FORMAT: "image/png",
+      INFO_FORMAT: infoFormat,
+      FEATURE_COUNT: 20
+    };
+    return def.url + L.Util.getParamString(params, def.url, true);
+  }
+
+  // Liest Objekte und ihre Sacheigenschaften aus einer GML-Antwort (Geometrien werden ignoriert)
+  function parseGmlFeatures(xmlText) {
+    var doc = new DOMParser().parseFromString(xmlText, "text/xml");
+    if (doc.getElementsByTagName("parsererror").length) throw new Error("Antwort ist kein gültiges XML");
+    var root = doc.documentElement;
+    if (root && /ExceptionReport|ServiceExceptionReport/.test(root.localName)) {
+      throw new Error("Server meldet: " + root.textContent.trim().slice(0, 200));
+    }
+
+    var features = [];
+    var all = doc.getElementsByTagName("*");
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (/^(member|featureMember|featureMembers)$/.test(el.localName)) {
+        for (var j = 0; j < el.children.length; j++) features.push(el.children[j]);
+      }
+    }
+    if (!features.length) {
+      // Rückfall: Elemente mit gml:id gelten als Objekte (nur die äußersten)
+      for (var k = 0; k < all.length; k++) {
+        var cand = all[k];
+        if (cand === root || GML_NS.test(cand.namespaceURI || "")) continue;
+        if (cand.getAttributeNS && (cand.getAttributeNS("http://www.opengis.net/gml/3.2", "id") || cand.getAttribute("gml:id"))) {
+          var nested = features.some(function (f) { return f.contains(cand); });
+          if (!nested) features.push(cand);
+        }
+      }
+    }
+
+    return features.map(function (f) {
+      var props = [];
+      (function walk(node) {
+        for (var c = 0; c < node.children.length; c++) {
+          var child = node.children[c];
+          if (GML_NS.test(child.namespaceURI || "")) continue;   // Geometrie, gml:name usw.
+          if (child.children.length) {
+            var isGeom = false;
+            for (var g = 0; g < child.children.length; g++) {
+              if (GML_NS.test(child.children[g].namespaceURI || "")) isGeom = true;
+            }
+            if (!isGeom) walk(child);
+          } else {
+            var v = child.textContent.trim();
+            if (v) props.push([child.localName, v]);
+          }
+        }
+      })(f);
+      return { type: f.localName, props: props };
+    });
+  }
+
+  function fetchFeatures(def, latlng, windowPx, imgPx) {
+    var url = featureInfoUrl(def, latlng, windowPx, imgPx, "text/xml;subtype=gml/3.2.1");
+    return fetch(url, { mode: "cors" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.text();
+      })
+      .then(parseGmlFeatures);
+  }
+
+  function renderFeatures(results) {
+    var html = "";
+    var count = 0;
+    results.forEach(function (res) {
+      if (res.error) {
+        html += '<p class="fi-error">' + escapeHtml(res.def.name) + ": Abfrage fehlgeschlagen (" + escapeHtml(res.error) + ")</p>";
+      }
+      (res.features || []).forEach(function (f) {
+        count++;
+        html += '<div class="fi-feature"><div class="fi-type">' + escapeHtml(f.type) + "</div>";
+        if (f.props.length) {
+          html += "<table>";
+          f.props.forEach(function (kv) {
+            html += "<tr><th>" + escapeHtml(kv[0]) + "</th><td>" + escapeHtml(kv[1]) + "</td></tr>";
+          });
+          html += "</table>";
+        } else {
+          html += "<p>(keine Sachdaten)</p>";
+        }
+        html += "</div>";
+      });
+      if (res.htmlUrl) {
+        html += '<p class="fi-raw"><a href="' + escapeHtml(res.htmlUrl) + '" target="_blank" rel="noopener">Original-Antwort des Servers öffnen</a></p>';
+      }
+    });
+    if (!count && html.indexOf("fi-error") < 0) {
+      html = "<p>Hier wurde kein Weg gefunden. Genauer auf die Linie tippen oder weiter hineinzoomen.</p>" + html;
+    }
+    return '<div class="fi">' + html + "</div>";
+  }
+
+  var infoRequest = 0;
+
+  function queryFeatureInfo(latlng) {
+    var active = infoDefs.filter(function (d) { return d.layers && map.hasLayer(layerById[d.id]); });
+    if (!active.length) return;
+
+    var requestId = ++infoRequest;
+    var popup = L.popup({ maxWidth: 320, minWidth: 220, maxHeight: 340, autoPanPadding: [20, 70], className: "fi-popup" })
+      .setLatLng(latlng)
+      .setContent('<div class="fi"><p>Frage Wegedaten ab …</p></div>')
+      .openOn(map);
+
+    Promise.all(active.map(function (def) {
+      // erst mit großzügiger Fangtoleranz, bei leerem Ergebnis noch einmal genau
+      return fetchFeatures(def, latlng, 48, 13)
+        .then(function (features) {
+          return features.length ? features : fetchFeatures(def, latlng, 101, 101);
+        })
+        .then(function (features) {
+          return { def: def, features: features, htmlUrl: featureInfoUrl(def, latlng, 48, 13, "text/html") };
+        })
+        .catch(function (err) {
+          return { def: def, error: err.message, htmlUrl: featureInfoUrl(def, latlng, 48, 13, "text/html") };
+        });
+    })).then(function (results) {
+      if (requestId !== infoRequest || !map.hasLayer(popup)) return;
+      popup.setContent(renderFeatures(results));
+    });
+  }
+
+  // Einzelnes Antippen abfragen, Doppeltipp (Zoom) dagegen nicht
+  var clickTimer = null;
+  map.on("click", function (e) {
+    clearTimeout(clickTimer);
+    clickTimer = setTimeout(function () { queryFeatureInfo(e.latlng); }, 300);
+  });
+  map.on("dblclick zoomstart", function () { clearTimeout(clickTimer); });
+
   // ---------- Ansicht merken ----------
 
   var saveTimer = null;
