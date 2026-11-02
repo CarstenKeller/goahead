@@ -5,6 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
+  var APP_VERSION = "7";
   var STORAGE_KEY = "goahead.view.v1";
 
   // ---------- kleine Helfer ----------
@@ -434,7 +435,7 @@
   }
 
   function showDiagnostics() {
-    var lines = [];
+    var lines = ["App-Version " + APP_VERSION, ""];
     Object.keys(diagnostics).forEach(function (id) {
       var d = diagnostics[id];
       lines.push("■ " + d.name);
@@ -577,14 +578,30 @@
     });
   }
 
-  function fetchFeatures(def, latlng, windowPx, imgPx) {
+  // log: Liste, in die Anfrage und Antwort für die technischen Details geschrieben werden
+  function fetchFeatures(def, latlng, windowPx, imgPx, log) {
     var url = featureInfoUrl(def, latlng, windowPx, imgPx, "text/xml;subtype=gml/3.2.1");
+    var entry = { url: url, status: "läuft" };
+    log.push(entry);
+    var t0 = Date.now();
     return fetch(url, { mode: "cors" })
       .then(function (r) {
+        entry.status = "HTTP " + r.status + " (" + (r.headers.get("content-type") || "?") + ")";
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.text();
       })
-      .then(parseGmlFeatures);
+      .then(function (text) {
+        entry.ms = Date.now() - t0;
+        entry.bytes = text.length;
+        entry.snippet = text.slice(0, 1500);
+        var features = parseGmlFeatures(text);
+        entry.features = features.length;
+        return features;
+      })
+      .catch(function (err) {
+        entry.error = err.message;
+        throw err;
+      });
   }
 
   function renderFeatures(results) {
@@ -615,6 +632,20 @@
     if (!count && html.indexOf("fi-error") < 0) {
       html = "<p>Hier wurde kein Weg gefunden. Genauer auf die Linie tippen oder weiter hineinzoomen.</p>" + html;
     }
+    var details = "";
+    results.forEach(function (res) {
+      (res.log || []).forEach(function (e, i) {
+        details += "Anfrage " + (i + 1) + ": " + e.status +
+          (e.ms != null ? ", " + e.ms + " ms, " + e.bytes + " Zeichen" : "") +
+          (e.features != null ? ", " + e.features + " Objekte erkannt" : "") +
+          (e.error ? ", Fehler: " + e.error : "") + "\n" + e.url + "\n" +
+          (e.snippet ? "Antwort (Anfang):\n" + e.snippet + "\n" : "") + "\n";
+      });
+    });
+    if (details) {
+      details = "App-Version " + APP_VERSION + "\n\n" + details;
+      html += '<details class="fi-details"><summary>Technische Details</summary><pre>' + escapeHtml(details) + "</pre></details>";
+    }
     return '<div class="fi">' + html + "</div>";
   }
 
@@ -622,7 +653,10 @@
 
   function queryFeatureInfo(latlng) {
     var active = infoDefs.filter(function (d) { return d.layers && map.hasLayer(layerById[d.id]); });
-    if (!active.length) return;
+    if (!active.length) {
+      showStatus("Zum Abfragen von Wegen die Ebene „" + (infoDefs[0] ? infoDefs[0].name : "Wanderwege") + "“ einschalten.", 4000);
+      return;
+    }
 
     var requestId = ++infoRequest;
     var popup = L.popup({ maxWidth: 320, minWidth: 220, maxHeight: 340, autoPanPadding: [20, 70], className: "fi-popup" })
@@ -631,16 +665,18 @@
       .openOn(map);
 
     Promise.all(active.map(function (def) {
+      var log = [];
+      var htmlUrl = featureInfoUrl(def, latlng, 48, 13, "text/html");
       // erst mit großzügiger Fangtoleranz, bei leerem Ergebnis noch einmal genau
-      return fetchFeatures(def, latlng, 48, 13)
+      return fetchFeatures(def, latlng, 48, 13, log)
         .then(function (features) {
-          return features.length ? features : fetchFeatures(def, latlng, 101, 101);
+          return features.length ? features : fetchFeatures(def, latlng, 101, 101, log);
         })
         .then(function (features) {
-          return { def: def, features: features, htmlUrl: featureInfoUrl(def, latlng, 48, 13, "text/html") };
+          return { def: def, features: features, htmlUrl: htmlUrl, log: log };
         })
         .catch(function (err) {
-          return { def: def, error: err.message, htmlUrl: featureInfoUrl(def, latlng, 48, 13, "text/html") };
+          return { def: def, error: err.message, htmlUrl: htmlUrl, log: log };
         });
     })).then(function (results) {
       if (requestId !== infoRequest || !map.hasLayer(popup)) return;

@@ -202,3 +202,18 @@ html, body {
   margin: 6px 0 0;
   font-size: 12px;
 }
+.fi-details {
+  margin-top: 8px;
+  font-size: 12px;
+}
+.fi-details pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 11px;
+  max-height: 200px;
+  overflow: auto;
+  background: #f4f4f4;
+  padding: 6px;
+  user-select: text;
+  -webkit-user-select: text;
+}
