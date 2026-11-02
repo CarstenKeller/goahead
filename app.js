@@ -305,7 +305,7 @@
     var crs = {};
     var layers = doc.getElementsByTagName("Layer");
     for (var i = 0; i < layers.length; i++) {
-      var entry = { name: null, title: null, leaf: true };
+      var entry = { name: null, title: null, leaf: true, queryable: layers[i].getAttribute("queryable") === "1" };
       var children = layers[i].children;
       for (var j = 0; j < children.length; j++) {
         var tag = children[j].localName;
@@ -317,7 +317,14 @@
       }
       result.push(entry);
     }
-    return { layers: result, crs: Object.keys(crs) };
+    var gfi = [];
+    var gfiEl = doc.getElementsByTagName("GetFeatureInfo")[0];
+    if (gfiEl) {
+      for (var g = 0; g < gfiEl.children.length; g++) {
+        if (gfiEl.children[g].localName === "Format") gfi.push(gfiEl.children[g].textContent.trim());
+      }
+    }
+    return { layers: result, crs: Object.keys(crs), featureInfoFormats: gfi };
   }
 
   function chooseLayers(def, caps) {
@@ -367,6 +374,7 @@
         diag.state = "ok";
         diag.layers = caps.layers;
         diag.has3857 = caps.crs.indexOf("EPSG:3857") >= 0;
+        diag.featureInfoFormats = caps.featureInfoFormats;
 
         var pick = chooseLayers(def, caps);
         diag.used = pick || "(keiner gefunden)";
@@ -390,8 +398,39 @@
     .map(function (def) { return checkWmsCapabilities(def, layerById[def.id]); });
 
   // Diagnose-Anzeige: Seite mit ?diagnose aufrufen
+  var wfsDiagnostics = [];
   if (/[?&]diagnose\b/.test(window.location.search)) {
-    Promise.all(capsChecks).then(showDiagnostics);
+    var wfsChecks = (cfg.diagnoseWfs || []).map(probeWfs);
+    Promise.all(capsChecks.concat(wfsChecks)).then(showDiagnostics);
+  }
+
+  function probeWfs(url) {
+    var d = { url: url, state: "läuft" };
+    wfsDiagnostics.push(d);
+    return fetch(url + "?SERVICE=WFS&REQUEST=GetCapabilities", { mode: "cors" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.text();
+      })
+      .then(function (xmlText) {
+        var doc = new DOMParser().parseFromString(xmlText, "text/xml");
+        var types = doc.getElementsByTagName("FeatureType");
+        d.types = [];
+        for (var i = 0; i < types.length; i++) {
+          var t = { name: "", title: "" };
+          for (var j = 0; j < types[i].children.length; j++) {
+            var c = types[i].children[j];
+            if (c.localName === "Name") t.name = c.textContent.trim();
+            if (c.localName === "Title") t.title = c.textContent.trim();
+          }
+          d.types.push(t);
+        }
+        var root = doc.documentElement;
+        d.state = "ok (" + (root ? root.localName + " " + (root.getAttribute("version") || "") : "?") + ")";
+      })
+      .catch(function (err) {
+        d.state = "nicht lesbar: " + err.message;
+      });
   }
 
   function showDiagnostics() {
@@ -404,10 +443,22 @@
       lines.push("  eingetragen: " + d.configured + "  →  verwendet: " + d.used);
       if (d.layers) {
         lines.push("  EPSG:3857: " + (d.has3857 ? "ja" : "NEIN"));
+        lines.push("  GetFeatureInfo-Formate: " + ((d.featureInfoFormats || []).join(", ") || "keine"));
         lines.push("  Layer (Name – Titel):");
         d.layers.forEach(function (l) {
-          lines.push("    " + (l.name || "–") + " – " + (l.title || ""));
+          lines.push("    " + (l.name || "–") + " – " + (l.title || "") + (l.queryable ? "  [abfragbar]" : ""));
         });
+      }
+      lines.push("");
+    });
+
+    wfsDiagnostics.forEach(function (d) {
+      lines.push("■ WFS-Test");
+      lines.push("  Dienst: " + d.url);
+      lines.push("  Capabilities: " + d.state);
+      if (d.types) {
+        lines.push("  Objektarten (Name – Titel):");
+        d.types.forEach(function (t) { lines.push("    " + t.name + " – " + t.title); });
       }
       lines.push("");
     });

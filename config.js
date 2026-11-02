@@ -6,10 +6,9 @@
  * Ausnahme laut Metadaten: DTK250/DTK500 (Daten des BKG) –
  * dort gilt "Datenlizenz Deutschland – Namensnennung – Version 2.0".
  *
- * HINWEIS: Die Layer-Namen unten konnten bei der Entwicklung nicht gegen
- * die GetCapabilities der Dienste geprüft werden. Deshalb fragt die App
- * beim Start die Capabilities ab und wählt automatisch einen vorhandenen
- * Layer, falls der eingetragene Name nicht existiert (siehe app.js).
+ * Layer-Namen geprüft am 02.11.2026 per ?diagnose gegen die GetCapabilities.
+ * Die App prüft sie weiterhin bei jedem Start und weicht auf einen vorhandenen
+ * Layer aus, falls ein Name einmal nicht mehr existiert (siehe app.js).
  */
 window.GOAHEAD_CONFIG = {
   // Startansicht, solange noch keine GPS-Position vorliegt (Sauerland)
@@ -24,7 +23,7 @@ window.GOAHEAD_CONFIG = {
       name: "Topografische Karte NRW (DTK)",
       type: "wms",
       url: "https://www.wms.nrw.de/geobasis/wms_nw_dtk",
-      layers: "nw_dtk_col",               // ungeprüft, siehe Hinweis oben
+      layers: "nw_dtk_col",               // "DTK Farbe" (Alternative: nw_dtk_sw)
       preferLayerMatch: /dtk.*col|col.*dtk|farb/i,
       format: "image/png",
       transparent: false,
@@ -39,7 +38,7 @@ window.GOAHEAD_CONFIG = {
       name: "Luftbild NRW (DOP)",
       type: "wms",
       url: "https://www.wms.nrw.de/geobasis/wms_nw_dop",
-      layers: "nw_dop_rgb",               // ungeprüft, siehe Hinweis oben
+      layers: "nw_dop_rgb",               // "DOP Farbe"
       preferLayerMatch: /rgb/i,
       format: "image/jpeg",
       transparent: false,
@@ -65,9 +64,8 @@ window.GOAHEAD_CONFIG = {
    * "Wanderwege NRW (amtlich)": Touristik- und Freizeitinformationssystem (TFIS NRW)
    * von Geobasis NRW. Laut Geobasis NRW liefern die Wandervereine (Kooperation mit dem
    * Landeswanderverband NRW) ihre markierten Wege mindestens jährlich zu.
-   * Die Layer-Namen des Dienstes sind nicht hinterlegt: Die App ermittelt beim Start
-   * alle Ebenen, deren Name oder Titel "wander" enthält (layerMatch). Ergebnis
-   * prüfen: App mit ?diagnose aufrufen.
+   * Der Dienst hat nur eine Ebene ("nw_tfis", Titel "TFIS"). Sie enthält alle
+   * Touristik-/Freizeitinhalte, nicht nur Wanderwege; filtern lässt sie sich nicht.
    *
    * "Wanderwege OSM": Waymarked Trails, Daten aus OpenStreetMap (von Freiwilligen
    * erfasst, nicht amtlich) – nützlich zum Vergleich.
@@ -78,8 +76,7 @@ window.GOAHEAD_CONFIG = {
       name: "Wanderwege NRW (amtlich, TFIS)",
       type: "wms",
       url: "https://www.wms.nrw.de/geobasis/wms_nw_tfis",
-      layers: null,                        // wird zur Laufzeit ermittelt
-      layerMatch: /wander/i,
+      layers: "nw_tfis",
       format: "image/png",
       transparent: true,
       maxZoom: 20,
@@ -100,5 +97,11 @@ window.GOAHEAD_CONFIG = {
         '(<a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noopener">CC BY-SA</a>)',
       visible: false
     }
+  ],
+
+  // Nur für ?diagnose: WFS-Dienste (Vektordaten), die probehalber abgefragt werden.
+  // Adresse nach dem Muster der übrigen NRW-Dienste vermutet, nicht bestätigt.
+  diagnoseWfs: [
+    "https://www.wfs.nrw.de/geobasis/wfs_nw_tfis"
   ]
 };
