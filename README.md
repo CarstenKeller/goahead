@@ -42,8 +42,13 @@ python3 -m http.server 8000
 # dann http://localhost:8000 öffnen
 ```
 
-Zum Testen auf dem Handy die Dateien über einen HTTPS-Host ausliefern, z. B. GitHub Pages.
-Es gibt keinen Build-Schritt: Die Dateien werden so ausgeliefert, wie sie im Repository liegen.
+Auf dem Handy: **https://carstenkeller.github.io/goahead/**
+
+Die Seite wird per GitHub Actions (`.github/workflows/pages.yml`) bei jedem Push auf `main`
+oder den Entwicklungs-Branch veröffentlicht. Es gibt keinen Build-Schritt: Die Dateien werden
+so ausgeliefert, wie sie im Repository liegen.
+
+Einmalig nötig: unter *Settings → Pages → Build and deployment → Source* die Option **GitHub Actions** wählen.
 
 ## Dateien
 

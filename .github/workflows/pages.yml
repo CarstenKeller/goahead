@@ -1,0 +1,32 @@
+name: GitHub Pages
+
+on:
+  push:
+    branches: [main, ccr-a56f7acc-f6tzvw]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      # Statische Seite ohne Build: Repository-Inhalt wird direkt ausgeliefert
+      # (.git und .github werden von upload-pages-artifact ausgelassen)
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
