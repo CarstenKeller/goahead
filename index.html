@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=8">
+  <link rel="stylesheet" href="styles.css?v=9">
 </head>
 <body>
   <div id="map" aria-label="Karte"></div>
@@ -28,8 +28,16 @@
 
   <div id="status" role="status" aria-live="polite" hidden></div>
 
+  <section id="info-panel" aria-label="Weg-Informationen" hidden>
+    <div class="info-head">
+      <span class="info-title">Wege an dieser Stelle</span>
+      <button id="info-close" type="button" aria-label="Schließen">&times;</button>
+    </div>
+    <div id="info-body"></div>
+  </section>
+
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="config.js?v=8"></script>
-  <script src="app.js?v=8"></script>
+  <script src="config.js?v=9"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>

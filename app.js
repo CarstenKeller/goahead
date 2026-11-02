@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "8";
+  var APP_VERSION = "9";
   var STORAGE_KEY = "goahead.view.v1";
 
   // ---------- kleine Helfer ----------
@@ -486,6 +486,23 @@
     document.body.appendChild(box);
   }
 
+  // fetch mit Zeitlimit (sonst hängt eine Abfrage bei schlechtem Netz beliebig lange)
+  function fetchWithTimeout(url, options, ms) {
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var opts = L.extend({}, options || {}, ctrl ? { signal: ctrl.signal } : {});
+    var timer = null;
+    return Promise.race([
+      fetch(url, opts),
+      new Promise(function (resolve, reject) {
+        timer = setTimeout(function () {
+          if (ctrl) ctrl.abort();
+          reject(new Error("keine Antwort nach " + Math.round(ms / 1000) + " s"));
+        }, ms);
+      })
+    ]).then(function (r) { clearTimeout(timer); return r; },
+            function (e) { clearTimeout(timer); throw e; });
+  }
+
   // ---------- Antippen: Informationen zu Wegen (WMS GetFeatureInfo) ----------
 
   var infoDefs = (cfg.overlays || []).filter(function (d) { return d.type === "wms" && d.featureInfo; });
@@ -584,7 +601,7 @@
     var entry = { url: url, status: "läuft" };
     log.push(entry);
     var t0 = Date.now();
-    return fetch(url, { mode: "cors" })
+    return fetchWithTimeout(url, { mode: "cors" }, 12000)
       .then(function (r) {
         entry.status = "HTTP " + r.status + " (" + (r.headers.get("content-type") || "?") + ")";
         if (!r.ok) throw new Error("HTTP " + r.status);
@@ -633,26 +650,42 @@
       "way(around:" + radius + "," + latlng.lat.toFixed(6) + "," + latlng.lng.toFixed(6) + ")->.w;" +
       'rel(bw.w)[type=route][route~"^(hiking|foot)$"];' +
       "out tags;";
-    var entry = { url: def.osmInfo + "  (Radius " + radius + " m)\n" + query, status: "läuft" };
-    log.push(entry);
-    var t0 = Date.now();
-    // POST als Formular: einfache Anfrage ohne CORS-Vorabprüfung
-    return fetch(def.osmInfo, {
-      method: "POST",
-      mode: "cors",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: "data=" + encodeURIComponent(query)
-    })
-      .then(function (r) {
-        entry.status = "HTTP " + r.status + " (" + (r.headers.get("content-type") || "?") + ")";
-        if (r.status === 429) throw new Error("Overpass-Server ausgelastet, bitte gleich noch einmal tippen");
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        return r.text();
-      })
-      .then(function (text) {
-        entry.ms = Date.now() - t0;
-        entry.bytes = text.length;
-        entry.snippet = text.slice(0, 1500);
+    var servers = [].concat(def.osmInfo);
+
+    function attempt(i) {
+      var entry = { url: servers[i] + "  (Radius " + radius + " m)\n" + query, status: "läuft" };
+      log.push(entry);
+      var t0 = Date.now();
+      // POST als Formular: einfache Anfrage ohne CORS-Vorabprüfung
+      return fetchWithTimeout(servers[i], {
+        method: "POST",
+        mode: "cors",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "data=" + encodeURIComponent(query)
+      }, 12000)
+        .then(function (r) {
+          entry.status = "HTTP " + r.status + " (" + (r.headers.get("content-type") || "?") + ")";
+          if (r.status === 429) throw new Error("Server ausgelastet (429)");
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.text();
+        })
+        .then(function (text) {
+          entry.ms = Date.now() - t0;
+          entry.bytes = text.length;
+          entry.snippet = text.slice(0, 1500);
+          return { text: text, entry: entry };
+        })
+        .catch(function (err) {
+          entry.error = err.message;
+          if (i + 1 < servers.length) return attempt(i + 1);
+          throw err;
+        });
+    }
+
+    return attempt(0)
+      .then(function (res) {
+        var text = res.text;
+        var entry = res.entry;
         var data = JSON.parse(text);
         var rels = (data.elements || []).filter(function (el) { return el.type === "relation"; });
         rels.sort(function (a, b) {
@@ -686,14 +719,15 @@
         });
       })
       .catch(function (err) {
-        entry.error = err.message;
+        var last = log[log.length - 1];
+        if (last && !last.error) last.error = err.message;
         throw err;
       });
   }
 
+  // Baut den Inhalt des Infofensters. Quellen ohne Treffer und ohne Fehler werden weggelassen.
   function renderFeatures(results) {
     var html = "";
-    var count = 0;
     function table(rows) {
       var t = "<table>";
       rows.forEach(function (kv) {
@@ -701,17 +735,13 @@
       });
       return t + "</table>";
     }
-    results.forEach(function (res) {
-      if (results.length > 1) {
-        html += '<div class="fi-source">' + escapeHtml(res.def.name) + "</div>";
-      }
+    var shown = results.filter(function (res) { return res.error || (res.features || []).length; });
+    shown.forEach(function (res) {
+      html += '<div class="fi-source">' + escapeHtml(res.def.name) + "</div>";
       if (res.error) {
         html += '<p class="fi-error">Abfrage fehlgeschlagen (' + escapeHtml(res.error) + ")</p>";
-      } else if (!(res.features || []).length && results.length > 1) {
-        html += "<p>Kein Weg gefunden.</p>";
       }
       (res.features || []).forEach(function (f) {
-        count++;
         html += '<div class="fi-feature"><div class="fi-type">' + escapeHtml(f.type) + "</div>";
         if (f.props.length) {
           html += table(f.props);
@@ -730,9 +760,6 @@
         html += '<p class="fi-raw"><a href="' + escapeHtml(res.htmlUrl) + '" target="_blank" rel="noopener">Original-Antwort des Servers öffnen</a></p>';
       }
     });
-    if (!count && html.indexOf("fi-error") < 0 && results.length === 1) {
-      html = "<p>Hier wurde kein Weg gefunden. Genauer auf die Linie tippen oder weiter hineinzoomen.</p>" + html;
-    }
     var details = "";
     results.forEach(function (res) {
       (res.log || []).forEach(function (e, i) {
@@ -750,21 +777,63 @@
     return '<div class="fi">' + html + "</div>";
   }
 
+  // ---------- Infofenster unten (volle Breite, unteres Drittel) ----------
+
+  var infoPanel = document.getElementById("info-panel");
+  var infoBody = document.getElementById("info-body");
+  var tapMarker = null;
+
+  function setTapMarker(latlng, searching) {
+    if (!tapMarker) {
+      tapMarker = L.marker(latlng, {
+        icon: L.divIcon({ className: "", html: '<div class="tap-dot"></div>', iconSize: [22, 22], iconAnchor: [11, 11] }),
+        interactive: false,
+        keyboard: false,
+        zIndexOffset: 900
+      });
+    }
+    tapMarker.setLatLng(latlng).addTo(map);
+    var el = tapMarker.getElement();
+    if (el) el.firstChild.classList.toggle("searching", !!searching);
+  }
+
+  function clearTapMarker() {
+    if (tapMarker) map.removeLayer(tapMarker);
+  }
+
+  function openInfoPanel(html) {
+    infoBody.innerHTML = html;
+    infoBody.scrollTop = 0;
+    infoPanel.hidden = false;
+    document.body.classList.add("info-open");
+  }
+
+  function closeInfoPanel() {
+    infoPanel.hidden = true;
+    document.body.classList.remove("info-open");
+    clearTapMarker();
+  }
+
+  document.getElementById("info-close").addEventListener("click", function () {
+    infoRequest++;               // laufende Abfrage verwerfen
+    closeInfoPanel();
+  });
+  // Gesten im Infofenster nicht an die Karte weitergeben
+  L.DomEvent.disableClickPropagation(infoPanel);
+  L.DomEvent.disableScrollPropagation(infoPanel);
+
   var infoRequest = 0;
 
   function queryFeatureInfo(latlng) {
     var active = infoDefs.filter(function (d) { return d.layers && map.hasLayer(layerById[d.id]); })
       .concat((cfg.overlays || []).filter(function (d) { return d.osmInfo && map.hasLayer(layerById[d.id]); }));
     if (!active.length) {
-      showStatus("Zum Abfragen von Wegen eine Wanderwege-Ebene einschalten.", 4000);
+      closeInfoPanel();
       return;
     }
 
     var requestId = ++infoRequest;
-    var popup = L.popup({ maxWidth: 320, minWidth: 220, maxHeight: 340, autoPanPadding: [20, 70], className: "fi-popup" })
-      .setLatLng(latlng)
-      .setContent('<div class="fi"><p>Frage Wegedaten ab …</p></div>')
-      .openOn(map);
+    setTapMarker(latlng, true);
 
     Promise.all(active.map(function (def) {
       var log = [];
@@ -786,8 +855,15 @@
           return { def: def, error: err.message, htmlUrl: htmlUrl, log: log };
         });
     })).then(function (results) {
-      if (requestId !== infoRequest || !map.hasLayer(popup)) return;
-      popup.setContent(renderFeatures(results));
+      if (requestId !== infoRequest) return;      // inzwischen neu getippt
+      var found = results.some(function (r) { return r.error || (r.features || []).length; });
+      if (!found) {
+        // Nichts gefunden: still bleiben, ein offenes Infofenster schließen
+        closeInfoPanel();
+        return;
+      }
+      setTapMarker(latlng, false);
+      openInfoPanel(renderFeatures(results));
     });
   }
 

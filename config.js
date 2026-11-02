@@ -98,7 +98,11 @@ window.GOAHEAD_CONFIG = {
         '(<a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noopener">CC BY-SA</a>)',
       visible: false,
       // Antippen fragt Wanderrouten aus OpenStreetMap über die Overpass-API ab
-      osmInfo: "https://overpass-api.de/api/interpreter"
+      // (Server werden der Reihe nach probiert, falls einer nicht antwortet)
+      osmInfo: [
+        "https://overpass-api.de/api/interpreter",
+        "https://overpass.private.coffee/api/interpreter"
+      ]
     }
   ],
 

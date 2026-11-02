@@ -26,6 +26,10 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   Angezeigt werden Name, Kürzel, Wegzeichen (`osmc:symbol`), Betreuer, Netz (international bis lokal) sowie
   alle übrigen OSM-Angaben und ein Link zur Relation. Sind beide Wege-Ebenen an, zeigt das Infofenster
   beide Quellen getrennt.
+- **Infofenster:** Es erscheint nur, wenn an der Tippstelle Wege gefunden wurden. Während der Suche pulsiert ein
+  oranger Kreis an der Tippstelle. Das Fenster sitzt fest im unteren Drittel über die volle Breite und ist scrollbar.
+  Tippen ins Leere schließt es. Jede Abfrage hat ein Zeitlimit von 12 s. Bei OSM wird bei Problemen ein
+  zweiter Overpass-Server versucht.
 - **Größe der Wegemarkierungen** (Knopf unter der Kartenwahl): Regler von 100 bis 300 %, wird gespeichert.
   - TFIS (WMS): stufenlos. Für dieselbe Fläche wird ein kleineres Bild angefordert und vergrößert angezeigt.
     Dadurch wird es etwas unschärfer. Möglicherweise blendet der Server dann Inhalte aus, die er nur bei
