@@ -2,7 +2,7 @@
  * Kartenkacheln werden bewusst (noch) NICHT gecacht – das ist ein eigener Schritt
  * (Offline-Karten), der Speicherplatz und Nutzungsbedingungen berücksichtigen muss.
  */
-var CACHE = "goahead-shell-v3";
+var CACHE = "goahead-shell-v4";
 var SHELL = [
   "./",
   "index.html",
@@ -37,7 +37,8 @@ self.addEventListener("fetch", function (event) {
   if (event.request.method !== "GET" || url.origin !== self.location.origin) return;
   // Netz zuerst (damit Updates sofort ankommen), Cache als Rückfall offline
   event.respondWith(
-    fetch(event.request).then(function (resp) {
+    // "no-cache": beim Server nachfragen, ob es eine neue Version gibt (statt HTTP-Cache)
+    fetch(event.request, { cache: "no-cache" }).then(function (resp) {
       var copy = resp.clone();
       caches.open(CACHE).then(function (c) { c.put(event.request, copy); });
       return resp;
