@@ -197,6 +197,8 @@
     parsed.lines.forEach(function (l) { l.forEach(function (p) { pts.push([p[0], p[1]]); }); });
     parsed.waypoints.forEach(function (w) { pts.push([w.lat, w.lon]); });
     if (!pts.length) return;
+    // Folgemodus beenden, sonst zieht das nächste GPS-Signal die Karte zur Position zurück
+    if (G.stopFollowing) G.stopFollowing();
     // unten Platz lassen, falls das Infofenster offen ist
     map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [30, 30], paddingBottomRight: [30, 60], maxZoom: 17 });
   }
@@ -246,6 +248,7 @@
       if (imported.length) {
         records = records.concat(imported);
         imported.forEach(function (rec, i) { showTrack(rec, i === imported.length - 1); });
+        if (G.closeMenu) G.closeMenu();
         requestPersistentStorage();
       }
       renderList();
@@ -337,6 +340,7 @@
       }
       showTrack(rec, true);
       panelEl.hidden = true;
+      if (G.closeMenu) G.closeMenu();
     } else if (act === "download" && e.type === "click") {
       var blob = new Blob([rec.gpx], { type: "application/gpx+xml" });
       var a = document.createElement("a");
@@ -409,7 +413,11 @@
       return box;
     }
   });
-  new TracksControl().addTo(map);
+  if (G.addToToolbar) {
+    G.addToToolbar(new TracksControl(), function () { if (panelEl) panelEl.hidden = true; });
+  } else {
+    new TracksControl().addTo(map);
+  }
 
   // ---------- Beim Start gespeicherte Tracks laden ----------
 

@@ -6,9 +6,15 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
 ## Stand (Schritt 1)
 
 - Beim Start wird die GPS-Position gesucht und die Karte auf sie zentriert (Zoomstufe 16).
-- Gesten: mit einem Finger verschieben, mit zwei Fingern zoomen, doppelt tippen zum Vergrößern. Zusätzlich gibt es +/−-Knöpfe.
-- Positions-Knopf (unten rechts): Die Karte folgt der Position (Knopf blau). Wer die Karte von Hand verschiebt, beendet das Folgen. Ein Tipp auf den Knopf zentriert wieder.
-- Kartenwahl (oben rechts): Topografische Karte NRW (DTK), Luftbild NRW (DOP) oder OpenStreetMap.
+- Gesten: mit einem Finger verschieben, mit zwei Fingern zoomen, doppelt tippen zum Vergrößern. Die +/−-Knöpfe
+  lassen sich in den Einstellungen einblenden (Standard: aus).
+- **Menü** (☰ oben rechts): Eine Leiste mit den Funktionsknöpfen fährt von rechts ein: Kartenwahl,
+  Größe der Wegemarkierungen, GPX-Tracks, Einstellungen. Ein Tipp auf die Karte schließt das Menü.
+- **Einstellungen:** Zoom-Knöpfe ein/aus (wird gespeichert), App-Version, Link zur Diagnose.
+- Positions-Knopf (unten rechts): Die Karte folgt der Position (Knopf blau). Im Folgemodus wird um die eigene
+  Position gezoomt. Verschieben der Karte oder Zoomen auf einen GPX-Track beendet das Folgen, ein Tipp auf den
+  Knopf zentriert wieder.
+- Kartenwahl (im Menü): Topografische Karte NRW (DTK), Luftbild NRW (DOP) oder OpenStreetMap.
 - Die zuletzt gewählte Karte und der Ausschnitt werden auf dem Gerät gespeichert.
 - Maßstabsleiste unten links.
 - **Wanderwege ein-/ausblenden** (Kartenwahl oben rechts, Abschnitt mit Häkchen):
@@ -49,7 +55,10 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     das Antippen von Wanderwegen weiter funktioniert.
   - Die Daten liegen nur auf diesem Gerät und in diesem Browser. Bei Speichermangel kann der Browser sie
     löschen. Die App bittet deshalb um dauerhaften Speicher (`navigator.storage.persist`).
-- **Wegzeichen bei TFIS:** Enthält ein Feld der TFIS-Antwort eine Bild-Adresse, wird sie als Wegzeichen angezeigt.
+- **TFIS-Infos:** Der Wegname ist die Überschrift, die Felder haben deutsche Bezeichnungen (Kategorie, Verein,
+  Verlauf, Länge, Streckenvariante, Signaturnummer, Schlüssel).
+  Wegzeichen: Versuch über `GetLegendGraphic` mit `RULE=<signaturnummer>`. **Ungeprüft**, ob der Dienst das
+  unterstützt; schlägt es fehl, erscheint kein Bild. Ein Link „Legende des Dienstes“ zeigt die Gesamtlegende.
 - Die App lässt sich zum Startbildschirm hinzufügen. Die App-Hülle funktioniert dann auch offline, die Kartenkacheln **noch nicht**.
 
 ## Kartendienste und Lizenz

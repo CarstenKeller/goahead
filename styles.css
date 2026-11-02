@@ -436,3 +436,97 @@ html, body {
   font-size: 12px;
   color: #666666;
 }
+
+/* Hamburger-Menü und einfahrende Leiste mit Funktionsknöpfen */
+.menu-btn {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  right: calc(12px + env(safe-area-inset-right));
+  z-index: 1200;
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #333333;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.menu-btn[aria-expanded="true"] {
+  background: #2e6b30;
+  color: #ffffff;
+}
+.toolbar {
+  position: absolute;
+  top: calc(76px + env(safe-area-inset-top));
+  right: calc(12px + env(safe-area-inset-right));
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  max-height: calc(100% - 100px - env(safe-area-inset-top));
+  transform: translateX(calc(100% + 30px));
+  transition: transform 0.25s ease, visibility 0.25s;
+  visibility: hidden;
+}
+.toolbar.open {
+  transform: translateX(0);
+  visibility: visible;
+}
+.toolbar > .leaflet-control {
+  margin: 0;
+  float: none;
+  clear: none;
+}
+.toolbar .settings-control {
+  order: 99;        /* Einstellungen immer zuletzt */
+}
+.toolbar.leaflet-touch .leaflet-control-layers-toggle {
+  width: 48px;
+  height: 48px;
+}
+.toolbar .leaflet-control-layers-expanded {
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+}
+
+/* Einstellungen */
+.settings-control {
+  background: #ffffff;
+}
+.leaflet-touch .settings-control a.settings-toggle {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.settings-panel {
+  width: min(280px, calc(100vw - 90px));
+  padding: 10px 12px;
+  font-size: 15px;
+}
+.settings-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+.settings-row input {
+  width: 22px;
+  height: 22px;
+}
+.settings-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #666666;
+}

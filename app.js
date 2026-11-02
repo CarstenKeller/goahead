@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "12";
+  var APP_VERSION = "13";
   var STORAGE_KEY = "goahead.view.v1";
 
   // ---------- kleine Helfer ----------
@@ -51,7 +51,7 @@
   var map = L.map("map", {
     center: start ? start.center : [cfg.initialView.lat, cfg.initialView.lng],
     zoom: start ? start.zoom : cfg.initialView.zoom,
-    zoomControl: true,
+    zoomControl: false,          // per Einstellung ein-/ausblendbar (Standard: aus)
     // Gesten: Ziehen, Pinch-Zoom, Doppeltipp – in Leaflet standardmäßig aktiv,
     // hier zur Klarheit explizit gesetzt.
     dragging: true,
@@ -181,7 +181,40 @@
     if (on) activeOverlays[def.id] = true;
   });
 
-  L.control.layers(baseEntries, overlayEntries, { position: "topright", collapsed: true }).addTo(map);
+  // ---------- Hamburger-Menü: Leiste mit Funktionsknöpfen, fährt von rechts ein ----------
+
+  var menuBtn = document.getElementById("menu-btn");
+  var toolbar = document.getElementById("toolbar");
+  var menuClosers = [];   // Funktionen, die beim Schließen offene Panels zuklappen
+
+  function menuIsOpen() { return toolbar.classList.contains("open"); }
+  function openMenu() {
+    toolbar.classList.add("open");
+    toolbar.setAttribute("aria-hidden", "false");
+    menuBtn.setAttribute("aria-expanded", "true");
+  }
+  function closeMenu() {
+    toolbar.classList.remove("open");
+    toolbar.setAttribute("aria-hidden", "true");
+    menuBtn.setAttribute("aria-expanded", "false");
+    menuClosers.forEach(function (fn) { fn(); });
+  }
+  menuBtn.addEventListener("click", function () {
+    if (menuIsOpen()) closeMenu(); else openMenu();
+  });
+  L.DomEvent.disableClickPropagation(toolbar);
+  L.DomEvent.disableScrollPropagation(toolbar);
+
+  // Steuerelement zur Karte hinzufügen und in die Menüleiste verschieben
+  function addToToolbar(control, onClose) {
+    control.addTo(map);
+    toolbar.appendChild(control.getContainer());
+    if (onClose) menuClosers.push(onClose);
+    return control;
+  }
+
+  var layersControl = L.control.layers(baseEntries, overlayEntries, { collapsed: true });
+  addToToolbar(layersControl, function () { layersControl.collapse(); });
 
   // ---------- Größe der Wegemarkierungen ----------
 
@@ -258,7 +291,63 @@
       return box;
     }
   });
-  new SizeControl().addTo(map);
+  var sizeControl = addToToolbar(new SizeControl(), function () {
+    var pnl = sizeControl.getContainer().querySelector(".size-panel");
+    if (pnl) pnl.hidden = true;
+  });
+
+  // ---------- Einstellungen ----------
+
+  var SETTINGS_KEY = "goahead.settings.v1";
+  var settings = { zoomButtons: false };
+  try {
+    var storedSettings = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) || "{}");
+    if (typeof storedSettings.zoomButtons === "boolean") settings.zoomButtons = storedSettings.zoomButtons;
+  } catch (e) { /* Standardwerte */ }
+
+  function saveSettings() {
+    try { window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* egal */ }
+  }
+
+  var zoomControl = L.control.zoom({ position: "topleft", zoomInTitle: "Vergrößern", zoomOutTitle: "Verkleinern" });
+  function applyZoomButtons() {
+    if (settings.zoomButtons) zoomControl.addTo(map); else zoomControl.remove();
+  }
+  applyZoomButtons();
+
+  var SettingsControl = L.Control.extend({
+    onAdd: function () {
+      var box = L.DomUtil.create("div", "leaflet-bar settings-control");
+      var btn = L.DomUtil.create("a", "settings-toggle", box);
+      btn.href = "#";
+      btn.setAttribute("role", "button");
+      btn.title = "Einstellungen";
+      btn.setAttribute("aria-label", "Einstellungen");
+      btn.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">' +
+        '<path fill="#444" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>';
+      var panel = L.DomUtil.create("div", "settings-panel", box);
+      panel.hidden = true;
+      panel.innerHTML = '<div class="settings-title">Einstellungen</div>' +
+        '<label class="settings-row"><input type="checkbox" data-setting="zoomButtons"> Zoom-Knöpfe (+/−) anzeigen</label>' +
+        '<p class="settings-note">App-Version ' + APP_VERSION + ' · <a href="?diagnose">Diagnose</a></p>';
+      var cb = panel.querySelector('[data-setting="zoomButtons"]');
+      cb.checked = settings.zoomButtons;
+      cb.addEventListener("change", function () {
+        settings.zoomButtons = cb.checked;
+        saveSettings();
+        applyZoomButtons();
+      });
+      L.DomEvent.on(btn, "click", function (e) {
+        L.DomEvent.preventDefault(e);
+        panel.hidden = !panel.hidden;
+      });
+      this._panel = panel;
+      return box;
+    }
+  });
+  var settingsControl = addToToolbar(new SettingsControl(), function () {
+    if (settingsControl._panel) settingsControl._panel.hidden = true;
+  });
   applySymbolScale(symbolScale);
 
   map.on("baselayerchange", function (e) {
@@ -601,6 +690,59 @@
     });
   }
 
+  // ---------- TFIS: Felder verständlich darstellen ----------
+
+  var TFIS_LABELS = {
+    schluessel: "Schlüssel",
+    verein: "Verein",
+    wegverlauf: "Verlauf",
+    kategorie: "Kategorie",
+    streckenvariante: "Streckenvariante",
+    offizielleLaenge: "Länge",
+    signaturnummer: "Signaturnummer"
+  };
+  var TFIS_ORDER = ["kategorie", "verein", "wegverlauf", "offizielleLaenge", "streckenvariante", "signaturnummer", "schluessel"];
+
+  function prettyLabel(key) {
+    if (TFIS_LABELS[key]) return TFIS_LABELS[key];
+    var t = key.replace(/([a-zäöü])([A-ZÄÖÜ])/g, "$1 $2").replace(/_/g, " ");
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
+  // Versuch: Wegzeichen über GetLegendGraphic mit der Signaturnummer als Regel.
+  // UNGEPRÜFT – ob der Dienst das unterstützt, ist nicht bekannt; schlägt das Laden
+  // fehl, wird das Bild einfach weggelassen.
+  function tfisLegendUrl(def, rule) {
+    var params = {
+      SERVICE: "WMS", VERSION: "1.3.0", REQUEST: "GetLegendGraphic",
+      LAYER: def.layers, FORMAT: "image/png", SLD_VERSION: "1.1.0"
+    };
+    if (rule) params.RULE = rule;
+    return def.url + L.Util.getParamString(params, def.url, true);
+  }
+
+  function prettifyTfisFeature(def, f) {
+    var byKey = {};
+    f.props.forEach(function (kv) { byKey[kv[0]] = kv[1]; });
+    var props = [];
+    TFIS_ORDER.forEach(function (k) { if (byKey[k] != null) props.push([k, byKey[k]]); });
+    f.props.forEach(function (kv) {
+      if (kv[0] !== "name" && TFIS_ORDER.indexOf(kv[0]) < 0) props.push(kv);
+    });
+    var out = props.map(function (kv) {
+      var v = kv[1];
+      if (kv[0] === "offizielleLaenge" && /^\d+([.,]\d+)?$/.test(v)) v = String(v).replace(".", ",") + " km";
+      return [prettyLabel(kv[0]), v];
+    });
+    var symbol = f.symbol;
+    if (!symbol && byKey.signaturnummer) symbol = tfisLegendUrl(def, byKey.signaturnummer);
+    return {
+      type: byKey.name || f.type,
+      props: out,
+      symbol: symbol
+    };
+  }
+
   // log: Liste, in die Anfrage und Antwort für die technischen Details geschrieben werden
   function fetchFeatures(def, latlng, windowPx, imgPx, log) {
     var url = featureInfoUrl(def, latlng, windowPx, imgPx, "text/xml;subtype=gml/3.2.1");
@@ -854,7 +996,8 @@
         html += "</div>";
       });
       if (res.htmlUrl) {
-        html += '<p class="fi-raw"><a href="' + escapeHtml(res.htmlUrl) + '" target="_blank" rel="noopener">Original-Antwort des Servers öffnen</a></p>';
+        html += '<p class="fi-raw"><a href="' + escapeHtml(res.htmlUrl) + '" target="_blank" rel="noopener">Original-Antwort des Servers öffnen</a>' +
+          (res.legendUrl ? ' · <a href="' + escapeHtml(res.legendUrl) + '" target="_blank" rel="noopener">Legende des Dienstes</a>' : "") + "</p>";
       }
     });
     var details = "";
@@ -1001,7 +1144,13 @@
           return features.length ? features : fetchFeatures(def, latlng, 101, 101, log);
         })
         .then(function (features) {
-          return { def: def, features: features, htmlUrl: htmlUrl, log: log };
+          return {
+            def: def,
+            features: features.map(function (f) { return prettifyTfisFeature(def, f); }),
+            htmlUrl: htmlUrl,
+            legendUrl: tfisLegendUrl(def),
+            log: log
+          };
         })
         .catch(function (err) {
           return { def: def, error: err.message, htmlUrl: htmlUrl, log: log };
@@ -1023,6 +1172,10 @@
   var clickTimer = null;
   map.on("click", function (e) {
     clearTimeout(clickTimer);
+    if (menuIsOpen()) {        // erster Tipp schließt nur das Menü
+      closeMenu();
+      return;
+    }
     clickTimer = setTimeout(function () { queryFeatureInfo(e.latlng); }, 300);
   });
   map.on("dblclick zoomstart", function () { clearTimeout(clickTimer); });
@@ -1048,13 +1201,26 @@
   var following = false;
   var hadFix = false;
 
+  var userMoved = false;   // hat die Karte vor dem ersten GPS-Fix selbst bewegt/gezoomt
+
   function setFollowing(on) {
     following = on;
     locateBtn.classList.toggle("following", on);
+    // Im Folgemodus um die Bildmitte (= eigene Position) zoomen, sonst um Finger/Mausposition.
+    // So springt die Karte nach dem Zoomen nicht zur Position zurück.
+    var mode = on ? "center" : true;
+    map.options.touchZoom = mode;
+    map.options.doubleClickZoom = mode;
+    map.options.scrollWheelZoom = mode;
+  }
+
+  function stopFollowing() {
+    userMoved = true;
+    setFollowing(false);
   }
 
   // Wer die Karte selbst verschiebt, will nicht zurückgezogen werden
-  map.on("dragstart", function () { setFollowing(false); });
+  map.on("dragstart", stopFollowing);
 
   function onPosition(pos) {
     var latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
@@ -1085,8 +1251,11 @@
     if (!hadFix) {
       hadFix = true;
       hideStatus();
-      setFollowing(true);
-      map.setView(latlng, Math.max(map.getZoom(), cfg.locateZoom), { animate: false });
+      // Hat man die Karte schon selbst bewegt (z. B. auf einen Track gezoomt), nicht wegspringen
+      if (!userMoved) {
+        setFollowing(true);
+        map.setView(latlng, Math.max(map.getZoom(), cfg.locateZoom), { animate: false });
+      }
     } else if (following) {
       map.panTo(latlng, { animate: true });
     }
@@ -1157,7 +1326,10 @@
   window.GOAHEAD = {
     map: map,
     showStatus: showStatus,
-    escapeHtml: escapeHtml
+    escapeHtml: escapeHtml,
+    stopFollowing: stopFollowing,
+    addToToolbar: addToToolbar,
+    closeMenu: closeMenu
   };
 
   // ---------- Service Worker (App-Hülle offline verfügbar) ----------
