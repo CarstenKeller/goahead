@@ -68,10 +68,61 @@
 
   // ---------- Hintergrundkarten und Overlays ----------
 
+  // WMS, dessen Inhalt (Linien, Symbole, Schrift) vergrößert dargestellt werden kann:
+  // Für dieselbe Fläche wird ein kleineres Bild angefordert und gestreckt angezeigt.
+  var ScalableWMS = L.TileLayer.WMS.extend({
+    _symbolScale: 1,
+    onAdd: function (map) {
+      L.TileLayer.WMS.prototype.onAdd.call(this, map);
+      this._applyScale();
+    },
+    _applyScale: function () {
+      if (!this._map) return;
+      var size = this.getTileSize().x;
+      var px = Math.max(64, Math.round(size / this._symbolScale));
+      this.wmsParams.width = px;
+      this.wmsParams.height = px;
+    },
+    setSymbolScale: function (f) {
+      if (f === this._symbolScale) return;
+      this._symbolScale = f;
+      if (this._map) {
+        this._applyScale();
+        this.redraw();
+      }
+    }
+  });
+
+  // Kachel-Layer (XYZ): Vergrößern nur in Zweierpotenzen möglich – Kacheln der
+  // nächstgröberen Zoomstufe werden doppelt so groß angezeigt.
+  function xyzScaleStep(f) {
+    if (f < 1.4) return 1;
+    if (f < 2.8) return 2;
+    return 4;
+  }
+
+  function setXyzSymbolScale(layer, f) {
+    var step = xyzScaleStep(f);
+    if (layer._symbolStep === step) return;
+    var def = layer._goaheadDef;
+    var offset = -Math.round(Math.log(step) / Math.LN2);
+    layer._symbolStep = step;
+    layer.options.tileSize = 256 * step;
+    layer.options.zoomOffset = offset;
+    layer.options.maxNativeZoom = (def.maxNativeZoom || def.maxZoom) - offset;
+    if (layer._map) {
+      var m = layer._map;
+      layer._rescaling = true;
+      m.removeLayer(layer);
+      layer.addTo(m);
+      layer._rescaling = false;
+    }
+  }
+
   function makeLayer(def, isOverlay) {
     var layer;
     if (def.type === "wms") {
-      layer = L.tileLayer.wms(def.url, {
+      layer = new ScalableWMS(def.url, {
         layers: def.layers || "",
         format: def.format,
         transparent: !!def.transparent,
@@ -131,11 +182,90 @@
 
   L.control.layers(baseEntries, overlayEntries, { position: "topright", collapsed: true }).addTo(map);
 
+  // ---------- Größe der Wegemarkierungen ----------
+
+  var SCALE_KEY = "goahead.symbolScale.v1";
+  var symbolScale = 1;
+  try {
+    var storedScale = parseFloat(window.localStorage.getItem(SCALE_KEY));
+    if (storedScale >= 1 && storedScale <= 3) symbolScale = storedScale;
+  } catch (e) { /* ohne Speicher */ }
+
+  function applySymbolScale(f) {
+    symbolScale = f;
+    (cfg.overlays || []).forEach(function (def) {
+      var layer = layerById[def.id];
+      if (def.type === "wms") layer.setSymbolScale(f);
+      else setXyzSymbolScale(layer, f);
+    });
+  }
+
+  var SizeControl = L.Control.extend({
+    options: { position: "topright" },
+    onAdd: function () {
+      var box = L.DomUtil.create("div", "leaflet-bar size-control");
+      var btn = L.DomUtil.create("a", "size-toggle", box);
+      btn.href = "#";
+      btn.setAttribute("role", "button");
+      btn.title = "Größe der Wegemarkierungen";
+      btn.setAttribute("aria-label", "Größe der Wegemarkierungen");
+      btn.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">' +
+        '<rect x="3" y="7" width="18" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>' +
+        '<path d="M7 12h10" stroke="#c0282d" stroke-width="3" stroke-linecap="round"/></svg>';
+
+      var panel = L.DomUtil.create("div", "size-panel", box);
+      panel.hidden = true;
+      var label = L.DomUtil.create("label", "", panel);
+      label.textContent = "Wegemarkierungen";
+      var row = L.DomUtil.create("div", "size-row", panel);
+      var input = L.DomUtil.create("input", "", row);
+      input.type = "range";
+      input.min = "1";
+      input.max = "3";
+      input.step = "0.25";
+      input.value = String(symbolScale);
+      input.setAttribute("aria-label", "Größe der Wegemarkierungen");
+      var out = L.DomUtil.create("output", "", row);
+      var note = L.DomUtil.create("div", "size-note", panel);
+
+      function render() {
+        var f = parseFloat(input.value);
+        out.textContent = Math.round(f * 100) + " %";
+        note.textContent = "OSM-Ebene: " + (xyzScaleStep(f) * 100) + " % (nur 100/200/400 % möglich)";
+      }
+      render();
+
+      var timer = null;
+      input.addEventListener("input", function () {
+        render();
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+          var f = parseFloat(input.value);
+          applySymbolScale(f);
+          try { window.localStorage.setItem(SCALE_KEY, String(f)); } catch (e) { /* egal */ }
+        }, 250);
+      });
+
+      L.DomEvent.on(btn, "click", function (e) {
+        L.DomEvent.preventDefault(e);
+        panel.hidden = !panel.hidden;
+      });
+      L.DomEvent.disableClickPropagation(box);
+      L.DomEvent.disableScrollPropagation(box);
+      // Panel schließen, wenn auf die Karte getippt wird
+      map.on("click", function () { panel.hidden = true; });
+      return box;
+    }
+  });
+  new SizeControl().addTo(map);
+  applySymbolScale(symbolScale);
+
   map.on("baselayerchange", function (e) {
     activeId = e.layer._goaheadDef.id;
     saveView();
   });
   map.on("overlayadd", function (e) {
+    if (e.layer._rescaling) return;
     var def = e.layer._goaheadDef;
     activeOverlays[def.id] = true;
     if (def.type === "wms" && !def.layers) {
@@ -145,6 +275,7 @@
     saveView();
   });
   map.on("overlayremove", function (e) {
+    if (e.layer._rescaling) return;
     delete activeOverlays[e.layer._goaheadDef.id];
     saveView();
   });

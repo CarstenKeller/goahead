@@ -17,6 +17,11 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     Wandervereine über den Landeswanderverband NRW zu, mindestens jährlich.
   - *Wanderwege OSM (Waymarked Trails)*: Daten aus OpenStreetMap, nicht amtlich. Zum Vergleich.
   - Der Ein/Aus-Zustand wird gespeichert.
+- **Größe der Wegemarkierungen** (Knopf unter der Kartenwahl): Regler von 100 bis 300 %, wird gespeichert.
+  - TFIS (WMS): stufenlos. Für dieselbe Fläche wird ein kleineres Bild angefordert und vergrößert angezeigt.
+    Dadurch wird es etwas unschärfer. Möglicherweise blendet der Server dann Inhalte aus, die er nur bei
+    feineren Maßstäben zeigt.
+  - OSM (Waymarked Trails): nur 100/200/400 %. Es werden Kacheln einer gröberen Zoomstufe vergrößert angezeigt.
 - Die App lässt sich zum Startbildschirm hinzufügen. Die App-Hülle funktioniert dann auch offline, die Kartenkacheln **noch nicht**.
 
 ## Kartendienste und Lizenz
