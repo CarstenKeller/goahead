@@ -21,6 +21,11 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   Sachdaten, die der TFIS-Dienst für die Stelle liefert (WMS GetFeatureInfo, GML 3.2.1). Zuerst wird mit
   großzügiger Fangtoleranz abgefragt, bei leerem Ergebnis noch einmal genau. Über „Original-Antwort des
   Servers öffnen“ lässt sich die unverarbeitete Antwort ansehen.
+- **OSM-Wege antippen** (bei eingeschalteter Ebene „Wanderwege OSM“): Die App fragt die Overpass-API
+  (`overpass-api.de`) nach Wanderrouten ab, die über Wege im Umkreis von etwa 24 Bildschirmpixeln laufen.
+  Angezeigt werden Name, Kürzel, Wegzeichen (`osmc:symbol`), Betreuer, Netz (international bis lokal) sowie
+  alle übrigen OSM-Angaben und ein Link zur Relation. Sind beide Wege-Ebenen an, zeigt das Infofenster
+  beide Quellen getrennt.
 - **Größe der Wegemarkierungen** (Knopf unter der Kartenwahl): Regler von 100 bis 300 %, wird gespeichert.
   - TFIS (WMS): stufenlos. Für dieselbe Fläche wird ein kleineres Bild angefordert und vergrößert angezeigt.
     Dadurch wird es etwas unschärfer. Möglicherweise blendet der Server dann Inhalte aus, die er nur bei

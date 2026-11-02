@@ -217,3 +217,14 @@ html, body {
   user-select: text;
   -webkit-user-select: text;
 }
+.fi-source {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #2e6b30;
+  margin: 6px 0 4px;
+}
+.fi-extra {
+  margin-top: 4px;
+  font-size: 12px;
+}

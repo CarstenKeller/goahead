@@ -96,7 +96,9 @@ window.GOAHEAD_CONFIG = {
       attribution:
         'Wanderwege: <a href="https://hiking.waymarkedtrails.org" target="_blank" rel="noopener">Waymarked Trails</a> ' +
         '(<a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noopener">CC BY-SA</a>)',
-      visible: false
+      visible: false,
+      // Antippen fragt Wanderrouten aus OpenStreetMap über die Overpass-API ab
+      osmInfo: "https://overpass-api.de/api/interpreter"
     }
   ],
 

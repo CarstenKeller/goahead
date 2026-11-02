@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "7";
+  var APP_VERSION = "8";
   var STORAGE_KEY = "goahead.view.v1";
 
   // ---------- kleine Helfer ----------
@@ -604,24 +604,125 @@
       });
   }
 
+  // ---------- OSM-Wanderrouten über die Overpass-API ----------
+
+  var OSM_NETWORK = { iwn: "international", nwn: "national", rwn: "regional", lwn: "lokal" };
+  var OSM_NETWORK_RANK = { iwn: 0, nwn: 1, rwn: 2, lwn: 3 };
+  // Reihenfolge und deutsche Bezeichnungen der wichtigsten OSM-Tags
+  var OSM_FIELDS = [
+    ["ref", "Kürzel"],
+    ["osmc:symbol", "Wegzeichen (osmc:symbol)"],
+    ["symbol", "Wegzeichen (Beschreibung)"],
+    ["operator", "Betreuer"],
+    ["network", "Netz"],
+    ["from", "von"],
+    ["to", "nach"],
+    ["distance", "Länge"],
+    ["description", "Beschreibung"],
+    ["website", "Webseite"],
+    ["note", "Notiz"]
+  ];
+
+  function fetchOsmRoutes(def, latlng, log) {
+    // Suchradius: etwa 24 Bildschirmpixel, mindestens 8 m, höchstens 250 m
+    var zoom = map.getZoom();
+    var p = map.project(latlng, zoom);
+    var meters = map.distance(latlng, map.unproject(p.add([24, 0]), zoom));
+    var radius = Math.round(Math.min(250, Math.max(8, meters)));
+    var query = "[out:json][timeout:20];" +
+      "way(around:" + radius + "," + latlng.lat.toFixed(6) + "," + latlng.lng.toFixed(6) + ")->.w;" +
+      'rel(bw.w)[type=route][route~"^(hiking|foot)$"];' +
+      "out tags;";
+    var entry = { url: def.osmInfo + "  (Radius " + radius + " m)\n" + query, status: "läuft" };
+    log.push(entry);
+    var t0 = Date.now();
+    // POST als Formular: einfache Anfrage ohne CORS-Vorabprüfung
+    return fetch(def.osmInfo, {
+      method: "POST",
+      mode: "cors",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "data=" + encodeURIComponent(query)
+    })
+      .then(function (r) {
+        entry.status = "HTTP " + r.status + " (" + (r.headers.get("content-type") || "?") + ")";
+        if (r.status === 429) throw new Error("Overpass-Server ausgelastet, bitte gleich noch einmal tippen");
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.text();
+      })
+      .then(function (text) {
+        entry.ms = Date.now() - t0;
+        entry.bytes = text.length;
+        entry.snippet = text.slice(0, 1500);
+        var data = JSON.parse(text);
+        var rels = (data.elements || []).filter(function (el) { return el.type === "relation"; });
+        rels.sort(function (a, b) {
+          var ra = OSM_NETWORK_RANK[a.tags.network]; var rb = OSM_NETWORK_RANK[b.tags.network];
+          ra = ra == null ? 9 : ra; rb = rb == null ? 9 : rb;
+          if (ra !== rb) return ra - rb;
+          return String(a.tags.ref || a.tags.name || "").localeCompare(String(b.tags.ref || b.tags.name || ""), "de");
+        });
+        entry.features = rels.length;
+        return rels.map(function (rel) {
+          var t = rel.tags || {};
+          var props = [];
+          OSM_FIELDS.forEach(function (f) {
+            var v = t[f[0]];
+            if (!v) return;
+            if (f[0] === "network" && OSM_NETWORK[v]) v = OSM_NETWORK[v] + " (" + v + ")";
+            if (f[0] === "distance" && /^[\d.,]+$/.test(v)) v = v + " km";
+            props.push([f[1], v]);
+          });
+          var shown = {};
+          OSM_FIELDS.forEach(function (f) { shown[f[0]] = true; });
+          shown.name = shown.type = shown.route = true;
+          var extra = Object.keys(t).filter(function (k) { return !shown[k]; }).sort()
+            .map(function (k) { return [k, t[k]]; });
+          return {
+            type: t.name || t.ref || ("Route " + rel.id),
+            props: props,
+            extra: extra,
+            link: { href: "https://www.openstreetmap.org/relation/" + rel.id, text: "In OpenStreetMap ansehen" }
+          };
+        });
+      })
+      .catch(function (err) {
+        entry.error = err.message;
+        throw err;
+      });
+  }
+
   function renderFeatures(results) {
     var html = "";
     var count = 0;
+    function table(rows) {
+      var t = "<table>";
+      rows.forEach(function (kv) {
+        t += "<tr><th>" + escapeHtml(kv[0]) + "</th><td>" + escapeHtml(kv[1]) + "</td></tr>";
+      });
+      return t + "</table>";
+    }
     results.forEach(function (res) {
+      if (results.length > 1) {
+        html += '<div class="fi-source">' + escapeHtml(res.def.name) + "</div>";
+      }
       if (res.error) {
-        html += '<p class="fi-error">' + escapeHtml(res.def.name) + ": Abfrage fehlgeschlagen (" + escapeHtml(res.error) + ")</p>";
+        html += '<p class="fi-error">Abfrage fehlgeschlagen (' + escapeHtml(res.error) + ")</p>";
+      } else if (!(res.features || []).length && results.length > 1) {
+        html += "<p>Kein Weg gefunden.</p>";
       }
       (res.features || []).forEach(function (f) {
         count++;
         html += '<div class="fi-feature"><div class="fi-type">' + escapeHtml(f.type) + "</div>";
         if (f.props.length) {
-          html += "<table>";
-          f.props.forEach(function (kv) {
-            html += "<tr><th>" + escapeHtml(kv[0]) + "</th><td>" + escapeHtml(kv[1]) + "</td></tr>";
-          });
-          html += "</table>";
-        } else {
+          html += table(f.props);
+        } else if (!f.extra || !f.extra.length) {
           html += "<p>(keine Sachdaten)</p>";
+        }
+        if (f.extra && f.extra.length) {
+          html += '<details class="fi-extra"><summary>Alle Angaben</summary>' + table(f.extra) + "</details>";
+        }
+        if (f.link) {
+          html += '<p class="fi-raw"><a href="' + escapeHtml(f.link.href) + '" target="_blank" rel="noopener">' + escapeHtml(f.link.text) + "</a></p>";
         }
         html += "</div>";
       });
@@ -629,13 +730,13 @@
         html += '<p class="fi-raw"><a href="' + escapeHtml(res.htmlUrl) + '" target="_blank" rel="noopener">Original-Antwort des Servers öffnen</a></p>';
       }
     });
-    if (!count && html.indexOf("fi-error") < 0) {
+    if (!count && html.indexOf("fi-error") < 0 && results.length === 1) {
       html = "<p>Hier wurde kein Weg gefunden. Genauer auf die Linie tippen oder weiter hineinzoomen.</p>" + html;
     }
     var details = "";
     results.forEach(function (res) {
       (res.log || []).forEach(function (e, i) {
-        details += "Anfrage " + (i + 1) + ": " + e.status +
+        details += res.def.name + " – Anfrage " + (i + 1) + ": " + e.status +
           (e.ms != null ? ", " + e.ms + " ms, " + e.bytes + " Zeichen" : "") +
           (e.features != null ? ", " + e.features + " Objekte erkannt" : "") +
           (e.error ? ", Fehler: " + e.error : "") + "\n" + e.url + "\n" +
@@ -652,9 +753,10 @@
   var infoRequest = 0;
 
   function queryFeatureInfo(latlng) {
-    var active = infoDefs.filter(function (d) { return d.layers && map.hasLayer(layerById[d.id]); });
+    var active = infoDefs.filter(function (d) { return d.layers && map.hasLayer(layerById[d.id]); })
+      .concat((cfg.overlays || []).filter(function (d) { return d.osmInfo && map.hasLayer(layerById[d.id]); }));
     if (!active.length) {
-      showStatus("Zum Abfragen von Wegen die Ebene „" + (infoDefs[0] ? infoDefs[0].name : "Wanderwege") + "“ einschalten.", 4000);
+      showStatus("Zum Abfragen von Wegen eine Wanderwege-Ebene einschalten.", 4000);
       return;
     }
 
@@ -666,6 +768,11 @@
 
     Promise.all(active.map(function (def) {
       var log = [];
+      if (def.osmInfo) {
+        return fetchOsmRoutes(def, latlng, log)
+          .then(function (features) { return { def: def, features: features, log: log }; })
+          .catch(function (err) { return { def: def, error: err.message, log: log }; });
+      }
       var htmlUrl = featureInfoUrl(def, latlng, 48, 13, "text/html");
       // erst mit großzügiger Fangtoleranz, bei leerem Ergebnis noch einmal genau
       return fetchFeatures(def, latlng, 48, 13, log)
