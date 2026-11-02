@@ -1,0 +1,103 @@
+:root {
+  --accent: #2e6b30;
+  --accent-active: #1f5fbf;
+  --btn-bg: #ffffff;
+  --btn-fg: #333333;
+  --status-bg: rgba(0, 0, 0, 0.75);
+  --status-fg: #ffffff;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #e8e8e8;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Verhindert Browser-Zoom/Scroll, damit die Gesten bei der Karte ankommen */
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+}
+
+/* Größere Bedienelemente für die Benutzung mit Handschuhen / im Gelände */
+.leaflet-touch .leaflet-bar a {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+  font-size: 24px;
+}
+.leaflet-touch .leaflet-control-layers-toggle {
+  width: 48px;
+  height: 48px;
+}
+.leaflet-control-layers-expanded {
+  font-size: 16px;
+  padding: 8px 12px;
+}
+.leaflet-control-layers label {
+  padding: 6px 0;
+}
+
+.leaflet-top.leaflet-left,
+.leaflet-top.leaflet-right {
+  margin-top: env(safe-area-inset-top);
+}
+
+.map-btn {
+  position: absolute;
+  right: calc(12px + env(safe-area-inset-right));
+  bottom: calc(40px + env(safe-area-inset-bottom));
+  z-index: 1000;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.map-btn.following {
+  color: var(--accent-active);
+}
+.map-btn.waiting svg {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% { opacity: 0.3; }
+}
+
+#status {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(12px + env(safe-area-inset-top));
+  z-index: 1000;
+  max-width: calc(100% - 140px);
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--status-bg);
+  color: var(--status-fg);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* Positionsmarker: blauer Punkt mit weißem Rand */
+.pos-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-active);
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+  box-sizing: border-box;
+}
