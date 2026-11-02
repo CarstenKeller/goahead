@@ -1,0 +1,41 @@
+name: TFIS-Paket untersuchen
+
+# Einmaliger Prüf-Workflow: lädt das offizielle TFIS-Paket von OpenGeodata.NRW
+# und listet den Inhalt, um herauszufinden, wie die Wegzeichen (Signaturen) enthalten sind.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/tfis-inspect.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verzeichnis auf OpenGeodata.NRW
+        run: curl -sSL https://www.opengeodata.nrw.de/produkte/geobasis/tfis_nrw/ | sed -e 's/<[^>]*>/ /g' | tr -s ' \n' | head -c 4000
+      - name: Paket laden und auflisten
+        run: |
+          set -e
+          curl -sSL -o tfis.zip https://www.opengeodata.nrw.de/produkte/geobasis/tfis_nrw/tfis_EPSG25832_GeoPackage.zip
+          ls -la tfis.zip
+          unzip -l tfis.zip | head -100
+          echo "--- Anzahl SVG:"; unzip -l tfis.zip | grep -ci '\.svg' || true
+          echo "--- SVG-Beispiele:"; unzip -l tfis.zip | grep -i '\.svg' | head -20 || true
+      - name: GeoPackage-Tabellen
+        run: |
+          set -e
+          mkdir x && cd x && unzip -q ../tfis.zip
+          GPKG=$(find . -name '*.gpkg' | head -1); echo "GPKG: $GPKG"
+          if [ -n "$GPKG" ]; then
+            sqlite3 "$GPKG" "select table_name, data_type from gpkg_contents;" || true
+            sqlite3 "$GPKG" "select name from sqlite_master where type='table';" || true
+            for t in $(sqlite3 "$GPKG" "select name from sqlite_master where type='table' and (name like '%sign%' or name like '%symb%' or name like '%wander%');"); do
+              echo "=== $t"; sqlite3 -header "$GPKG" "pragma table_info($t);" | head -40
+              sqlite3 -header "$GPKG" "select * from $t limit 2;" | cut -c1-600
+            done
+          fi
+          find . -type f | sed 's|^\./||' | awk -F/ '{print $1"/"$2}' | sort | uniq -c | head -50
