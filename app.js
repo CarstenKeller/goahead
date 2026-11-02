@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "9";
+  var APP_VERSION = "10";
   var STORAGE_KEY = "goahead.view.v1";
 
   // ---------- kleine Helfer ----------
@@ -495,8 +495,9 @@
       fetch(url, opts),
       new Promise(function (resolve, reject) {
         timer = setTimeout(function () {
-          if (ctrl) ctrl.abort();
+          // erst eigene Meldung, dann abbrechen (sonst gewinnt die AbortError-Meldung)
           reject(new Error("keine Antwort nach " + Math.round(ms / 1000) + " s"));
+          if (ctrl) ctrl.abort();
         }, ms);
       })
     ]).then(function (r) { clearTimeout(timer); return r; },
@@ -640,6 +641,90 @@
     ["note", "Notiz"]
   ];
 
+  // ---------- OSM-Wanderrouten über die API von Waymarked Trails ----------
+  // Endpunkte laut Quelltext von github.com/waymarkedtrails/waymarkedtrails-api:
+  //   /list/by_area?bbox=minx,miny,maxx,maxy (EPSG:3857), /details/relation/{id},
+  //   /symbols/id/{symbol_id}.svg
+
+  function wmtGroupLabel(g) {
+    var v = String(g || "").toLowerCase();
+    if (/^int|iwn/.test(v)) return "international";
+    if (/^nat|nwn/.test(v)) return "national";
+    if (/^reg|rwn/.test(v)) return "regional";
+    if (/^loc|lwn/.test(v)) return "lokal";
+    return g || "";
+  }
+
+  function fetchJson(url, log, ms) {
+    var entry = { url: url, status: "läuft" };
+    log.push(entry);
+    var t0 = Date.now();
+    return fetchWithTimeout(url, { mode: "cors" }, ms)
+      .then(function (r) {
+        entry.status = "HTTP " + r.status + " (" + (r.headers.get("content-type") || "?") + ")";
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.text();
+      })
+      .then(function (text) {
+        entry.ms = Date.now() - t0;
+        entry.bytes = text.length;
+        entry.snippet = text.slice(0, 800);
+        return JSON.parse(text);
+      })
+      .catch(function (err) {
+        entry.ms = Date.now() - t0;
+        entry.error = err.message;
+        throw err;
+      });
+  }
+
+  function fetchWmtRoutes(def, latlng, log) {
+    var zoom = map.getZoom();
+    var p = map.project(latlng, zoom);
+    var a = L.CRS.EPSG3857.project(map.unproject(p.add([-24, 24]), zoom));
+    var b = L.CRS.EPSG3857.project(map.unproject(p.add([24, -24]), zoom));
+    var bbox = [a.x, a.y, b.x, b.y].map(function (v) { return v.toFixed(1); }).join(",");
+    var base = def.wmtApi;
+
+    return fetchJson(base + "/list/by_area?bbox=" + bbox + "&limit=20", log, 10000)
+      .then(function (data) {
+        var routes = data.results || [];
+        log[log.length - 1].features = routes.length;
+        // Details (Betreuer, Länge, alle OSM-Angaben) je Route; Fehler dort sind nicht schlimm
+        return Promise.all(routes.slice(0, 12).map(function (rt) {
+          return fetchJson(base + "/details/relation/" + rt.id, log, 10000)
+            .catch(function () { return null; })
+            .then(function (det) { return { rt: rt, det: det }; });
+        }));
+      })
+      .then(function (items) {
+        return items.map(function (it) {
+          var rt = it.rt;
+          var det = it.det || {};
+          var props = [];
+          if (rt.ref) props.push(["Kürzel", rt.ref]);
+          if (rt.symbol_description) props.push(["Wegzeichen", rt.symbol_description]);
+          if (det.operator) props.push(["Betreuer", det.operator]);
+          if (rt.group) props.push(["Netz", wmtGroupLabel(rt.group)]);
+          if (det.official_length) props.push(["Länge", (det.official_length / 1000).toFixed(1).replace(".", ",") + " km"]);
+          if (rt.itinerary && rt.itinerary.length) props.push(["Verlauf", [].concat(rt.itinerary).join(" – ")]);
+          if (det.description) props.push(["Beschreibung", det.description]);
+          if (det.note) props.push(["Notiz", det.note]);
+          if (det.url) props.push(["Webseite", det.url]);
+          var extra = [];
+          var tags = det.tags || {};
+          Object.keys(tags).sort().forEach(function (k) { extra.push([k, tags[k]]); });
+          return {
+            type: rt.name || rt.ref || ("Route " + rt.id),
+            symbol: rt.symbol_id ? base + "/symbols/id/" + encodeURIComponent(rt.symbol_id) + ".svg" : null,
+            props: props,
+            extra: extra,
+            link: { href: "https://www.openstreetmap.org/relation/" + rt.id, text: "In OpenStreetMap ansehen" }
+          };
+        });
+      });
+  }
+
   function fetchOsmRoutes(def, latlng, log) {
     // Suchradius: etwa 24 Bildschirmpixel, mindestens 8 m, höchstens 250 m
     var zoom = map.getZoom();
@@ -676,6 +761,7 @@
           return { text: text, entry: entry };
         })
         .catch(function (err) {
+          entry.ms = Date.now() - t0;
           entry.error = err.message;
           if (i + 1 < servers.length) return attempt(i + 1);
           throw err;
@@ -742,7 +828,9 @@
         html += '<p class="fi-error">Abfrage fehlgeschlagen (' + escapeHtml(res.error) + ")</p>";
       }
       (res.features || []).forEach(function (f) {
-        html += '<div class="fi-feature"><div class="fi-type">' + escapeHtml(f.type) + "</div>";
+        html += '<div class="fi-feature"><div class="fi-type">' +
+          (f.symbol ? '<img class="fi-symbol" alt="" src="' + escapeHtml(f.symbol) + '" onerror="this.remove()">' : "") +
+          "<span>" + escapeHtml(f.type) + "</span></div>";
         if (f.props.length) {
           html += table(f.props);
         } else if (!f.extra || !f.extra.length) {
@@ -764,7 +852,7 @@
     results.forEach(function (res) {
       (res.log || []).forEach(function (e, i) {
         details += res.def.name + " – Anfrage " + (i + 1) + ": " + e.status +
-          (e.ms != null ? ", " + e.ms + " ms, " + e.bytes + " Zeichen" : "") +
+          (e.ms != null ? ", " + e.ms + " ms" : "") + (e.bytes != null ? ", " + e.bytes + " Zeichen" : "") +
           (e.features != null ? ", " + e.features + " Objekte erkannt" : "") +
           (e.error ? ", Fehler: " + e.error : "") + "\n" + e.url + "\n" +
           (e.snippet ? "Antwort (Anfang):\n" + e.snippet + "\n" : "") + "\n";
@@ -818,6 +906,55 @@
     infoRequest++;               // laufende Abfrage verwerfen
     closeInfoPanel();
   });
+  // Höhe des Infofensters durch Ziehen am Kopf ändern; ganz nach unten gezogen schließt es
+  var INFO_H_KEY = "goahead.infoHeight.v1";
+  function setInfoHeight(px) {
+    document.documentElement.style.setProperty("--info-height", Math.round(px) + "px");
+  }
+  try {
+    var storedH = parseFloat(window.localStorage.getItem(INFO_H_KEY));
+    if (storedH > 0.1 && storedH < 0.95) setInfoHeight(storedH * window.innerHeight);
+  } catch (e) { /* egal */ }
+
+  (function () {
+    var head = infoPanel.querySelector(".info-head");
+    var dragging = false;
+    var startY = 0;
+    var startH = 0;
+    var curH = 0;
+    head.addEventListener("pointerdown", function (e) {
+      if (e.target.closest("#info-close")) return;
+      dragging = true;
+      startY = e.clientY;
+      startH = curH = infoPanel.getBoundingClientRect().height;
+      head.setPointerCapture(e.pointerId);
+      infoPanel.classList.add("dragging");
+      e.preventDefault();
+    });
+    head.addEventListener("pointermove", function (e) {
+      if (!dragging) return;
+      var maxH = window.innerHeight * 0.9;
+      curH = Math.max(60, Math.min(maxH, startH + (startY - e.clientY)));
+      setInfoHeight(curH);
+    });
+    function end() {
+      if (!dragging) return;
+      dragging = false;
+      infoPanel.classList.remove("dragging");
+      var minH = window.innerHeight * 0.15;
+      if (curH < minH) {
+        // nach unten weggezogen: schließen, letzte sinnvolle Höhe behalten
+        setInfoHeight(Math.max(startH, minH));
+        infoRequest++;
+        closeInfoPanel();
+        return;
+      }
+      try { window.localStorage.setItem(INFO_H_KEY, String(curH / window.innerHeight)); } catch (err) { /* egal */ }
+    }
+    head.addEventListener("pointerup", end);
+    head.addEventListener("pointercancel", end);
+  })();
+
   // Gesten im Infofenster nicht an die Karte weitergeben
   L.DomEvent.disableClickPropagation(infoPanel);
   L.DomEvent.disableScrollPropagation(infoPanel);
@@ -826,7 +963,7 @@
 
   function queryFeatureInfo(latlng) {
     var active = infoDefs.filter(function (d) { return d.layers && map.hasLayer(layerById[d.id]); })
-      .concat((cfg.overlays || []).filter(function (d) { return d.osmInfo && map.hasLayer(layerById[d.id]); }));
+      .concat((cfg.overlays || []).filter(function (d) { return (d.wmtApi || d.osmInfo) && map.hasLayer(layerById[d.id]); }));
     if (!active.length) {
       closeInfoPanel();
       return;
@@ -837,8 +974,14 @@
 
     Promise.all(active.map(function (def) {
       var log = [];
-      if (def.osmInfo) {
-        return fetchOsmRoutes(def, latlng, log)
+      if (def.wmtApi || def.osmInfo) {
+        var first = def.wmtApi
+          ? fetchWmtRoutes(def, latlng, log).catch(function (err) {
+              if (!def.osmInfo) throw err;
+              return fetchOsmRoutes(def, latlng, log);     // Rückfall: Overpass
+            })
+          : fetchOsmRoutes(def, latlng, log);
+        return first
           .then(function (features) { return { def: def, features: features, log: log }; })
           .catch(function (err) { return { def: def, error: err.message, log: log }; });
       }

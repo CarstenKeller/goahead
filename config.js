@@ -97,7 +97,10 @@ window.GOAHEAD_CONFIG = {
         'Wanderwege: <a href="https://hiking.waymarkedtrails.org" target="_blank" rel="noopener">Waymarked Trails</a> ' +
         '(<a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noopener">CC BY-SA</a>)',
       visible: false,
-      // Antippen fragt Wanderrouten aus OpenStreetMap über die Overpass-API ab
+      // Antippen fragt Wanderrouten über die API von Waymarked Trails ab;
+      // Basis-URL nach Fremdprojekt und Quelltext, nicht aus offizieller Doku.
+      wmtApi: "https://hiking.waymarkedtrails.org/api/v1",
+      // Rückfall: Overpass-API
       // (Server werden der Reihe nach probiert, falls einer nicht antwortet)
       osmInfo: [
         "https://overpass-api.de/api/interpreter",

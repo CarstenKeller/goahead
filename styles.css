@@ -313,3 +313,36 @@ body.info-open .leaflet-bottom {
   width: 38%;
   white-space: normal;
 }
+
+/* Ziehgriff am Infofenster */
+.info-head {
+  position: relative;
+  touch-action: none;
+  cursor: ns-resize;
+  padding-top: 14px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.info-grip {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 44px;
+  height: 5px;
+  margin-left: -22px;
+  border-radius: 3px;
+  background: #c4c4c4;
+}
+#info-panel.dragging {
+  transition: none;
+}
+.fi-type {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fi-symbol {
+  width: 28px;
+  height: 28px;
+  flex: none;
+}

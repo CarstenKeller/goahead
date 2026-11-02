@@ -21,14 +21,19 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   Sachdaten, die der TFIS-Dienst für die Stelle liefert (WMS GetFeatureInfo, GML 3.2.1). Zuerst wird mit
   großzügiger Fangtoleranz abgefragt, bei leerem Ergebnis noch einmal genau. Über „Original-Antwort des
   Servers öffnen“ lässt sich die unverarbeitete Antwort ansehen.
-- **OSM-Wege antippen** (bei eingeschalteter Ebene „Wanderwege OSM“): Die App fragt die Overpass-API
-  (`overpass-api.de`) nach Wanderrouten ab, die über Wege im Umkreis von etwa 24 Bildschirmpixeln laufen.
-  Angezeigt werden Name, Kürzel, Wegzeichen (`osmc:symbol`), Betreuer, Netz (international bis lokal) sowie
-  alle übrigen OSM-Angaben und ein Link zur Relation. Sind beide Wege-Ebenen an, zeigt das Infofenster
-  beide Quellen getrennt.
+- **OSM-Wege antippen** (bei eingeschalteter Ebene „Wanderwege OSM“): Die App fragt die API von
+  Waymarked Trails ab (`https://hiking.waymarkedtrails.org/api/v1`, Endpunkte laut Quelltext von
+  github.com/waymarkedtrails/waymarkedtrails-api):
+  - `list/by_area` liefert die Routen im Umkreis von etwa 24 Bildschirmpixeln (bbox in EPSG:3857).
+  - `details/relation/{id}` liefert je Route Betreuer, Länge und alle OSM-Angaben.
+  - `symbols/id/{id}.svg` liefert das Wegzeichen als Bild.
+
+  Schlägt die Abfrage fehl, fragt die App die Overpass-API (zwei Server). Sind beide Wege-Ebenen an,
+  zeigt das Infofenster beide Quellen getrennt.
 - **Infofenster:** Es erscheint nur, wenn an der Tippstelle Wege gefunden wurden. Während der Suche pulsiert ein
   oranger Kreis an der Tippstelle. Das Fenster sitzt fest im unteren Drittel über die volle Breite und ist scrollbar.
-  Tippen ins Leere schließt es. Jede Abfrage hat ein Zeitlimit von 12 s. Bei OSM wird bei Problemen ein
+  Tippen ins Leere schließt es. Durch Ziehen am Kopf wird es größer oder kleiner; ganz nach unten gezogen
+  schließt es. Die Höhe wird gespeichert. Jede Abfrage hat ein Zeitlimit von 12 s. Bei OSM wird bei Problemen ein
   zweiter Overpass-Server versucht.
 - **Größe der Wegemarkierungen** (Knopf unter der Kartenwahl): Regler von 100 bis 300 %, wird gespeichert.
   - TFIS (WMS): stufenlos. Für dieselbe Fläche wird ein kleineres Bild angefordert und vergrößert angezeigt.
