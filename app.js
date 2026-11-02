@@ -66,46 +66,86 @@
 
   L.control.scale({ metric: true, imperial: false, position: "bottomleft" }).addTo(map);
 
-  // ---------- Hintergrundkarten ----------
+  // ---------- Hintergrundkarten und Overlays ----------
 
-  var layerById = {};
-  var layerControlEntries = {};
-  var defaultId = null;
-
-  cfg.baseLayers.forEach(function (def) {
+  function makeLayer(def, isOverlay) {
     var layer;
     if (def.type === "wms") {
       layer = L.tileLayer.wms(def.url, {
-        layers: def.layers,
+        layers: def.layers || "",
         format: def.format,
-        transparent: def.transparent,
+        transparent: !!def.transparent,
         version: "1.3.0",
         maxZoom: def.maxZoom,
         attribution: def.attribution,
         // 512er-Kacheln halbieren die Zahl der Anfragen an den WMS
         tileSize: 512,
-        detectRetina: false
+        detectRetina: false,
+        zIndex: isOverlay ? 10 : 1
       });
     } else {
       layer = L.tileLayer(def.url, {
         maxZoom: def.maxZoom,
-        attribution: def.attribution
+        maxNativeZoom: def.maxNativeZoom,
+        attribution: def.attribution,
+        zIndex: isOverlay ? 10 : 1
       });
     }
     layer._goaheadDef = def;
     watchTileErrors(layer, def);
+    return layer;
+  }
+
+  var layerById = {};
+  var baseEntries = {};
+  var overlayEntries = {};
+  var defaultId = null;
+
+  cfg.baseLayers.forEach(function (def) {
+    var layer = makeLayer(def, false);
     layerById[def.id] = layer;
-    layerControlEntries[def.name] = layer;
+    baseEntries[def.name] = layer;
     if (def.default && !defaultId) defaultId = def.id;
   });
 
-  var activeId = (saved && layerById[saved.layer]) ? saved.layer : (defaultId || cfg.baseLayers[0].id);
+  (cfg.overlays || []).forEach(function (def) {
+    var layer = makeLayer(def, true);
+    layerById[def.id] = layer;
+    overlayEntries[def.name] = layer;
+  });
+
+  var activeId = (saved && layerById[saved.layer] && baseEntries[layerById[saved.layer]._goaheadDef.name])
+    ? saved.layer : (defaultId || cfg.baseLayers[0].id);
   layerById[activeId].addTo(map);
 
-  L.control.layers(layerControlEntries, null, { position: "topright", collapsed: true }).addTo(map);
+  // Overlays: gespeicherter Zustand, sonst Voreinstellung aus config.js
+  var activeOverlays = {};
+  (cfg.overlays || []).forEach(function (def) {
+    var on = saved && saved.overlays ? saved.overlays.indexOf(def.id) >= 0 : !!def.visible;
+    // Ein WMS-Overlay ohne Layer-Namen wird erst nach der Capabilities-Abfrage eingeblendet
+    if (on && (def.type !== "wms" || def.layers)) {
+      layerById[def.id].addTo(map);
+    }
+    if (on) activeOverlays[def.id] = true;
+  });
+
+  L.control.layers(baseEntries, overlayEntries, { position: "topright", collapsed: true }).addTo(map);
 
   map.on("baselayerchange", function (e) {
     activeId = e.layer._goaheadDef.id;
+    saveView();
+  });
+  map.on("overlayadd", function (e) {
+    var def = e.layer._goaheadDef;
+    activeOverlays[def.id] = true;
+    if (def.type === "wms" && !def.layers) {
+      showStatus("„" + def.name + "“: Kartenebenen des Dienstes noch unbekannt. " +
+        "Details: Adresse mit ?diagnose öffnen.", 8000);
+    }
+    saveView();
+  });
+  map.on("overlayremove", function (e) {
+    delete activeOverlays[e.layer._goaheadDef.id];
     saveView();
   });
 
@@ -124,53 +164,143 @@
     });
   }
 
-  // WMS-Layer-Namen gegen die Capabilities prüfen (falls der Dienst CORS erlaubt)
-  cfg.baseLayers.forEach(function (def) {
-    if (def.type === "wms") checkWmsCapabilities(def, layerById[def.id]);
-  });
+  // ---------- WMS-Capabilities: Layer-Namen prüfen bzw. ermitteln ----------
+
+  var diagnostics = {};
+
+  function parseCapabilities(xmlText) {
+    var doc = new DOMParser().parseFromString(xmlText, "text/xml");
+    var result = [];
+    var crs = {};
+    var layers = doc.getElementsByTagName("Layer");
+    for (var i = 0; i < layers.length; i++) {
+      var entry = { name: null, title: null, leaf: true };
+      var children = layers[i].children;
+      for (var j = 0; j < children.length; j++) {
+        var tag = children[j].localName;
+        var text = children[j].textContent.trim();
+        if (tag === "Name") entry.name = text;
+        else if (tag === "Title") entry.title = text;
+        else if (tag === "Layer") entry.leaf = false;
+        else if (tag === "CRS" || tag === "SRS") crs[text] = true;
+      }
+      result.push(entry);
+    }
+    return { layers: result, crs: Object.keys(crs) };
+  }
+
+  function chooseLayers(def, caps) {
+    var named = caps.layers.filter(function (l) { return l.name; });
+    if (!named.length) return null;
+
+    // Basiskarte: eingetragener Name vorhanden -> behalten
+    if (def.layers) {
+      var wanted = def.layers.split(",");
+      var allThere = wanted.every(function (n) {
+        return named.some(function (l) { return l.name === n; });
+      });
+      if (allThere) return def.layers;
+    }
+
+    // Overlay: alle Blatt-Layer, deren Name oder Titel passt (z. B. /wander/i)
+    if (def.layerMatch) {
+      var hits = named.filter(function (l) {
+        return l.leaf && (def.layerMatch.test(l.name) || def.layerMatch.test(l.title || ""));
+      });
+      if (hits.length) return hits.map(function (l) { return l.name; }).join(",");
+    }
+
+    if (def.preferLayerMatch) {
+      for (var k = 0; k < named.length; k++) {
+        if (def.preferLayerMatch.test(named[k].name)) return named[k].name;
+      }
+    }
+    // Rückfall: oberster benannter Layer (zeigt i. d. R. alle Unterebenen)
+    return named[0].name;
+  }
 
   function checkWmsCapabilities(def, layer) {
-    if (!window.fetch || !window.DOMParser) return;
+    var diag = diagnostics[def.id] = { name: def.name, url: def.url, configured: def.layers || "(keiner)", state: "läuft" };
+    if (!window.fetch || !window.DOMParser) {
+      diag.state = "Browser ohne fetch/DOMParser";
+      return Promise.resolve();
+    }
     var url = def.url + (def.url.indexOf("?") >= 0 ? "&" : "?") + "SERVICE=WMS&REQUEST=GetCapabilities";
-    fetch(url, { mode: "cors" })
+    return fetch(url, { mode: "cors" })
       .then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.text();
       })
       .then(function (xmlText) {
-        var doc = new DOMParser().parseFromString(xmlText, "text/xml");
-        var names = [];
-        var crs = {};
-        var layers = doc.getElementsByTagName("Layer");
-        for (var i = 0; i < layers.length; i++) {
-          var children = layers[i].children;
-          for (var j = 0; j < children.length; j++) {
-            var tag = children[j].localName;
-            if (tag === "Name") names.push(children[j].textContent.trim());
-            if (tag === "CRS" || tag === "SRS") crs[children[j].textContent.trim()] = true;
-          }
-        }
-        console.info("[GoAhead] WMS " + def.url + " – Layer:", names, "CRS:", Object.keys(crs));
+        var caps = parseCapabilities(xmlText);
+        diag.state = "ok";
+        diag.layers = caps.layers;
+        diag.has3857 = caps.crs.indexOf("EPSG:3857") >= 0;
 
-        if (!crs["EPSG:3857"]) {
-          console.warn("[GoAhead] " + def.url + " meldet kein EPSG:3857.");
-        }
-        if (names.length && names.indexOf(def.layers) === -1) {
-          var pick = null;
-          for (var k = 0; k < names.length && !pick; k++) {
-            if (def.preferLayerMatch && def.preferLayerMatch.test(names[k])) pick = names[k];
-          }
-          pick = pick || names[0];
-          console.warn("[GoAhead] Layer „" + def.layers + "“ nicht gefunden, verwende „" + pick + "“.");
+        var pick = chooseLayers(def, caps);
+        diag.used = pick || "(keiner gefunden)";
+        if (pick && pick !== def.layers) {
+          console.warn("[GoAhead] " + def.name + ": verwende Layer „" + pick + "“ statt „" + (def.layers || "") + "“.");
           def.layers = pick;
           layer.setParams({ layers: pick });
+          if (activeOverlays[def.id] && !map.hasLayer(layer)) layer.addTo(map);
         }
       })
       .catch(function (err) {
         // Häufigster Grund: Dienst sendet keine CORS-Header. Die Kacheln
         // selbst funktionieren trotzdem (Bilder brauchen kein CORS).
-        console.info("[GoAhead] Capabilities von " + def.url + " nicht lesbar:", err.message);
+        diag.state = "nicht lesbar: " + err.message;
+        diag.used = def.layers || "(keiner)";
       });
+  }
+
+  var capsChecks = cfg.baseLayers.concat(cfg.overlays || [])
+    .filter(function (def) { return def.type === "wms"; })
+    .map(function (def) { return checkWmsCapabilities(def, layerById[def.id]); });
+
+  // Diagnose-Anzeige: Seite mit ?diagnose aufrufen
+  if (/[?&]diagnose\b/.test(window.location.search)) {
+    Promise.all(capsChecks).then(showDiagnostics);
+  }
+
+  function showDiagnostics() {
+    var lines = [];
+    Object.keys(diagnostics).forEach(function (id) {
+      var d = diagnostics[id];
+      lines.push("■ " + d.name);
+      lines.push("  Dienst: " + d.url);
+      lines.push("  Capabilities: " + d.state);
+      lines.push("  eingetragen: " + d.configured + "  →  verwendet: " + d.used);
+      if (d.layers) {
+        lines.push("  EPSG:3857: " + (d.has3857 ? "ja" : "NEIN"));
+        lines.push("  Layer (Name – Titel):");
+        d.layers.forEach(function (l) {
+          lines.push("    " + (l.name || "–") + " – " + (l.title || ""));
+        });
+      }
+      lines.push("");
+    });
+
+    var box = document.createElement("div");
+    box.id = "diagnose";
+    var pre = document.createElement("pre");
+    pre.textContent = lines.join("\n");
+    var close = document.createElement("button");
+    close.type = "button";
+    close.textContent = "Schließen";
+    close.addEventListener("click", function () { box.remove(); });
+    var copy = document.createElement("button");
+    copy.type = "button";
+    copy.textContent = "Kopieren";
+    copy.addEventListener("click", function () {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(pre.textContent).then(function () { copy.textContent = "Kopiert"; });
+      }
+    });
+    box.appendChild(copy);
+    box.appendChild(close);
+    box.appendChild(pre);
+    document.body.appendChild(box);
   }
 
   // ---------- Ansicht merken ----------
@@ -180,7 +310,7 @@
     clearTimeout(saveTimer);
     saveTimer = setTimeout(function () {
       var c = map.getCenter();
-      storageSet({ center: [c.lat, c.lng], zoom: map.getZoom(), layer: activeId });
+      storageSet({ center: [c.lat, c.lng], zoom: map.getZoom(), layer: activeId, overlays: Object.keys(activeOverlays) });
     }, 300);
   }
   map.on("moveend", saveView);

@@ -11,6 +11,12 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
 - Kartenwahl (oben rechts): Topografische Karte NRW (DTK), Luftbild NRW (DOP) oder OpenStreetMap.
 - Die zuletzt gewählte Karte und der Ausschnitt werden auf dem Gerät gespeichert.
 - Maßstabsleiste unten links.
+- **Wanderwege ein-/ausblenden** (Kartenwahl oben rechts, Abschnitt mit Häkchen):
+  - *Wanderwege NRW (amtlich, TFIS)*: Touristik- und Freizeitinformationssystem von Geobasis NRW
+    (`https://www.wms.nrw.de/geobasis/wms_nw_tfis`). Die Wegedaten liefern laut Geobasis NRW die
+    Wandervereine über den Landeswanderverband NRW zu, mindestens jährlich.
+  - *Wanderwege OSM (Waymarked Trails)*: Daten aus OpenStreetMap, nicht amtlich. Zum Vergleich.
+  - Der Ein/Aus-Zustand wird gespeichert.
 - Die App lässt sich zum Startbildschirm hinzufügen. Die App-Hülle funktioniert dann auch offline, die Kartenkacheln **noch nicht**.
 
 ## Kartendienste und Lizenz
@@ -30,6 +36,12 @@ Die Entwicklungsumgebung hatte keinen Netzzugang zu `*.nrw.de`. Deshalb fragt di
 Start die Capabilities ab. Fehlt der eingetragene Layer, weicht sie auf einen passenden Layer aus.
 Das klappt aber nur, wenn der Dienst CORS erlaubt. Die Ergebnisse stehen in der Browser-Konsole.
 Bleibt die DTK grau, die Layer-Namen in `config.js` prüfen.
+
+Beim TFIS-Dienst ist kein Layer-Name eingetragen. Die App nimmt alle Ebenen, deren Name oder Titel
+„wander“ enthält. Gibt der Dienst seine Capabilities nicht frei (CORS), bleibt die Ebene leer.
+
+**Diagnose:** Die App mit `?diagnose` aufrufen (https://carstenkeller.github.io/goahead/?diagnose).
+Sie zeigt dann je Dienst, ob die Capabilities lesbar waren, welche Layer es gibt und welche verwendet werden.
 
 ## Starten / Hosten
 

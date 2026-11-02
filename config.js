@@ -57,5 +57,48 @@ window.GOAHEAD_CONFIG = {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende'
     }
+  ],
+
+  /*
+   * Ein-/ausblendbare Ebenen über der Hintergrundkarte.
+   *
+   * "Wanderwege NRW (amtlich)": Touristik- und Freizeitinformationssystem (TFIS NRW)
+   * von Geobasis NRW. Laut Geobasis NRW liefern die Wandervereine (Kooperation mit dem
+   * Landeswanderverband NRW) ihre markierten Wege mindestens jährlich zu.
+   * Die Layer-Namen des Dienstes sind nicht hinterlegt: Die App ermittelt beim Start
+   * alle Ebenen, deren Name oder Titel "wander" enthält (layerMatch). Ergebnis
+   * prüfen: App mit ?diagnose aufrufen.
+   *
+   * "Wanderwege OSM": Waymarked Trails, Daten aus OpenStreetMap (von Freiwilligen
+   * erfasst, nicht amtlich) – nützlich zum Vergleich.
+   */
+  overlays: [
+    {
+      id: "nrw-tfis-wander",
+      name: "Wanderwege NRW (amtlich, TFIS)",
+      type: "wms",
+      url: "https://www.wms.nrw.de/geobasis/wms_nw_tfis",
+      layers: null,                        // wird zur Laufzeit ermittelt
+      layerMatch: /wander/i,
+      format: "image/png",
+      transparent: true,
+      maxZoom: 20,
+      attribution:
+        '&copy; Geobasis NRW / Wandervereine, ' +
+        '<a href="https://www.govdata.de/dl-de/zero-2-0" target="_blank" rel="noopener">dl-de/zero-2-0</a>',
+      visible: true
+    },
+    {
+      id: "osm-hiking",
+      name: "Wanderwege OSM (Waymarked Trails)",
+      type: "xyz",
+      url: "https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png",
+      maxZoom: 20,
+      maxNativeZoom: 18,
+      attribution:
+        'Wanderwege: <a href="https://hiking.waymarkedtrails.org" target="_blank" rel="noopener">Waymarked Trails</a> ' +
+        '(<a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noopener">CC BY-SA</a>)',
+      visible: false
+    }
   ]
 };
