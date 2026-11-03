@@ -13,8 +13,8 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
 - **Route planen** (Knopf mit Routen-Symbol im Menü), Modul `planner.js`:
   - Im Planungsmodus bleibt im Menü nur die Kartenwahl. Unten erscheint ein kompaktes Feld: Kopfzeile mit Name,
     Kennzahlen (Punkte, Länge, Anstieg; Vorschlag in Orange), *Speichern* und *Beenden*; darunter Symbolknöpfe
-    *Rückgängig*, *Wiederholen*, *S* (zum Startpunkt), *Rundtour*, *Routing-Profil* (Wandern/BRouter ↔ Fußweg/OSRM)
-    und *Suche*. Langer Druck auf einen Knopf zeigt seine Beschreibung.
+    *Rückgängig*, *Wiederholen*, *S* (zum Startpunkt), *Rundtour* und *Suche*. Das Routing wird in den
+    Einstellungen gewählt; bei BRouter erscheint das Höhenprofil automatisch. Langer Druck auf einen Knopf zeigt seine Beschreibung.
   - **Auf der Karte:**
     - Tipp auf die Karte: Vorschlagspunkt mit vorgeschlagener Strecke (orange, gestrichelt).
       Nochmal auf den Vorschlagspunkt tippen: einrasten.
@@ -28,8 +28,8 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
       in der Gesamtstrecke). Gilt auch für den Rückweg einer Rundtour.
   - *Rückgängig/Wiederholen*: bis zu 20 Schritte (während der Sitzung).
   - Für alle vorläufigen (orangen) Punkte gilt: antippen = übernehmen, ziehen = verschieben, Tipp woanders = wegnehmen.
-  - **Höhen und Dauer:** Kopfzeile zeigt Punkte, Länge, ↑/↓ Höhenmeter und ≈ Gehzeit. Symbolknopf *Höhenprofil* blendet
-    ein Säulendiagramm ein (Farbe: Steigung/Ebene/Gefälle); Antippen/Ziehen darin zeigt Entfernung und Höhe und
+  - **Höhen und Dauer:** Kopfzeile zeigt Punkte, Länge, ↑/↓ Höhenmeter und ≈ Gehzeit. Bei BRouter-Routing erscheint
+    automatisch ein Säulendiagramm (Farbe: Steigung/Ebene/Gefälle); Antippen/Ziehen darin zeigt Entfernung und Höhe und
     markiert die Stelle auf der Karte.
     - Höhen stammen aus BRouter (dritter Koordinatenwert, geprüft im Quelltext `FormatJson`). Abschnitte ohne Höhen
       (OSRM, direkte Linien) werden zwischen bekannten Höhen linear aufgefüllt. Höhenmeter zählen ab 3 m Änderung.
@@ -56,7 +56,23 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     Chromium-Quelltext `chrome/browser/webshare/share_service_impl.cc`). Dann bietet die App an, die Datei als
     `Name.gpx.txt` zu teilen (Empfänger entfernt „.txt“; GoAhead liest sie auch so) oder die GPX herunterzuladen
     und nur den Text zu teilen.
-- **Unterwegs** (*Los geht's*), Modul `nav.js`:
+- **Unterwegs** (*Los geht's*), Module `nav.js` und `offline.js`:
+  - Kopfzeile: Name mit Offline-Symbol, eine Zustandszeile (Abbiegung, neben der Route, GPS ungenau,
+    Bildschirm anlassen, Aufnahme/Pause) und die Knöpfe *Pause/Weiter*, *S* (zum Startpunkt),
+    *Position und Start zeigen*, *Position*, *Beenden*.
+  - Kennzahlen: km gewandert, km verbleibend (entlang der Route), Ø km/h, Zeit unterwegs, Restzeit und Ankunft
+    (nach den Gehgeschwindigkeiten aus den Einstellungen), aktuelle Geschwindigkeit, Höhe, geplante Länge/Gehzeit.
+    Darunter das Höhenprofil mit der eigenen Position (bei Routen mit Höhen).
+  - Position auf der Route: Projektion auf das 25-m-Raster, zuerst in der Nähe der letzten Stelle gesucht
+    (Schleifen/Kreuzungen springen nicht). Mehr als 50 m daneben: Hinweis, keine Abbiegungs-Vibration.
+  - **Vibration vor Abbiegungen** (Abstand in den Einstellungen, Standard 20 m): Abbiegungen werden beim Start aus
+    der Routenform berechnet (Richtungswechsel > 35° über ±15 m). Links: zwei kurze, rechts: ein langer Impuls.
+    Safari auf dem iPhone unterstützt keine Vibration (`navigator.vibrate`) – dort bleibt es still.
+  - **Offline-Karten:** Beim Start werden die Kacheln aller sichtbaren Kartenebenen in den Zoomstufen 12–17 in
+    einem Korridor um die Route gespeichert (Abstand in den Einstellungen, Standard 1 km). Ohne Empfang wird alle
+    30 s und beim Wiederkehren des Netzes erneut versucht. Fertig: grünes Wolken-Symbol neben dem Namen
+    (Tooltip: Anzahl Kacheln). Ebenen ohne CORS-Freigabe werden übersprungen und im Tooltip genannt. Der
+    Service Worker liefert gespeicherte Kacheln auch ohne Netz. Nach dem Ende der Tour wird der Speicher freigegeben.
   - Zeigt die geplante Route, die eigene Position (Folgemodus) und die gewanderte Strecke (blau). Im Menü bleibt nur
     die Kartenwahl. Das Feld unten zeigt gewanderte Strecke, Zeit in Bewegung und Länge der Planung.
   - *⏸ Pause* / *▶ Weiter*: Während der Pause wird nichts aufgezeichnet; danach beginnt ein neues Teilstück.
@@ -71,7 +87,8 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
 - **Oberfläche:** leicht transparente „Glas“-Flächen mit Unschärfe, einheitlich über Design-Variablen in `styles.css`.
   Browser ohne Unschärfe-Unterstützung bekommen automatisch weniger durchsichtige Flächen.
 - **Einstellungen** (Zahnrad im Menü): ziehbare untere Leiste mit scrollbarem Inhalt – Zoom-Knöpfe ein/aus,
-  Gehgeschwindigkeit (Ebene, Steigung, Gefälle in km/h, Schwelle in %), App-Version, Link zur Diagnose.
+  Routing beim Planen (BRouter, Standard, mit Höhen / OSRM), Gehgeschwindigkeit (Ebene, Steigung, Gefälle in km/h,
+  Schwelle in %), Unterwegs: Offline-Abstand (km) und Vibrationsabstand (m), App-Version, Link zur Diagnose.
   Alles wird gespeichert.
 - **Untere Leisten** lassen sich bis auf ihre Kopfzeile zusammenschieben; der Positions-Knopf sitzt immer darüber.
 - Positions-Knopf (unten rechts): Die Karte folgt der Position (Knopf blau). Im Folgemodus wird um die eigene
@@ -183,7 +200,8 @@ Einmalig nötig: unter *Settings → Pages → Build and deployment → Source* 
 - `index.html`, `styles.css`, `app.js`: die App
 - `tracks.js`: Seite *Tracks*, GPX-Import, lokale Speicherung, Track-Liste
 - `planner.js`: Route planen (Routing, Suche, Planungsfeld), Liste *Geplant*, GPX-Export
-- `nav.js`: Unterwegs-Modus, Aufzeichnung, Liste *Erwandert*
+- `offline.js`: Offline-Karten entlang der Route
+- `nav.js`: Unterwegs-Modus, Aufzeichnung, Abbiegungen, Liste *Erwandert*
 - `config.js`: Kartendienste, Startansicht, Zoomstufe
 - `sw.js`, `manifest.webmanifest`, `icons/`: PWA (installierbar, App-Hülle offline)
 - `vendor/leaflet/`: Leaflet 1.9.4 (BSD-2-Clause), lokal eingebunden

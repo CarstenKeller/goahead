@@ -115,10 +115,133 @@
     });
   }
 
+  // ---------- Routenbezug: Kennzahlen, Position auf der Route, Abbiegungen ----------
+
+  var stats = null;        // G.planner.routeStats der geplanten Route (Raster, Höhen, Länge)
+  var turns = [];          // [{d, dir: "links"|"rechts", angle}]
+  var progress = null;     // {idx, d (m entlang), off (m neben der Route)}
+  var recent = [];         // letzte Positionen für die aktuelle Geschwindigkeit
+  var speedNow = null;     // m/s
+  var turnFlash = null;    // {text, until}
+  var OFF_ROUTE_M = 50;    // weiter weg: keine Abbiegungs-Hinweise
+
+  function routeOf(w) {
+    // ältere Touren ohne gespeicherte Route: Linie als ein Abschnitt
+    return w.route || { segments: [{ latlngs: w.planLine || [] }], closing: null, roundtrip: false, points: [] };
+  }
+
+  function computeRouteData() {
+    stats = G.planner && walk ? G.planner.routeStats(routeOf(walk)) : null;
+    turns = stats ? findTurns(stats.profile.pts) : [];
+  }
+
+  // Abbiegungen: Richtungsänderung > 35° über ±15 m, auf 5-m-Raster der Routenlinie
+  function findTurns(pts) {
+    if (!pts || pts.length < 3) return [];
+    var grid = [];
+    var j = 0;
+    var total = pts[pts.length - 1].d;
+    for (var d = 0; d <= total; d += 5) {
+      while (j < pts.length - 2 && pts[j + 1].d < d) j++;
+      var a = pts[j];
+      var b = pts[j + 1];
+      var t = b.d > a.d ? Math.min(1, Math.max(0, (d - a.d) / (b.d - a.d))) : 0;
+      grid.push({ d: d, lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t });
+    }
+    function bearing(p, q) {
+      var y = Math.sin((q.lng - p.lng) * Math.PI / 180) * Math.cos(q.lat * Math.PI / 180);
+      var x = Math.cos(p.lat * Math.PI / 180) * Math.sin(q.lat * Math.PI / 180) -
+        Math.sin(p.lat * Math.PI / 180) * Math.cos(q.lat * Math.PI / 180) * Math.cos((q.lng - p.lng) * Math.PI / 180);
+      return Math.atan2(y, x) * 180 / Math.PI;
+    }
+    var K = 3;   // 3 × 5 m = 15 m
+    var cand = [];
+    for (var i = K; i < grid.length - K; i++) {
+      var delta = bearing(grid[i], grid[i + K]) - bearing(grid[i - K], grid[i]);
+      while (delta > 180) delta -= 360;
+      while (delta < -180) delta += 360;
+      if (Math.abs(delta) > 35) cand.push({ d: grid[i].d, angle: delta });
+    }
+    // benachbarte Kandidaten (innerhalb 25 m) zu einer Abbiegung zusammenfassen
+    var out = [];
+    cand.forEach(function (c) {
+      var last = out[out.length - 1];
+      if (last && c.d - last.d <= 25) {
+        if (Math.abs(c.angle) > Math.abs(last.angle)) { last.d = c.d; last.angle = c.angle; }
+      } else {
+        out.push({ d: c.d, angle: c.angle });
+      }
+    });
+    return out.map(function (t) { return { d: t.d, angle: Math.round(t.angle), dir: t.angle > 0 ? "rechts" : "links" }; });
+  }
+
+  // eigene Position auf die Route projizieren (Rasterpunkte; erst in der Nähe der letzten Stelle suchen)
+  function locateOnRoute(lat, lng) {
+    if (!stats || !stats.grid.length) return null;
+    var g = stats.grid;
+    var here = L.latLng(lat, lng);
+    function search(from, to) {
+      var best = { idx: -1, dist: Infinity };
+      for (var i = Math.max(0, from); i <= Math.min(g.length - 1, to); i++) {
+        var dd = here.distanceTo(L.latLng(g[i].lat, g[i].lng));
+        if (dd < best.dist) best = { idx: i, dist: dd };
+      }
+      return best;
+    }
+    var best = null;
+    if (progress) best = search(progress.idx - 8, progress.idx + 80);   // 200 m zurück, 2 km voraus
+    if (!best || best.dist > OFF_ROUTE_M) {
+      var all = search(0, g.length - 1);
+      if (!best || all.dist < best.dist) best = all;
+    }
+    var scale = g[g.length - 1].d ? stats.dist / g[g.length - 1].d : 1;
+    return { idx: best.idx, d: g[best.idx].d, dRoute: g[best.idx].d * scale, off: best.dist, e: g[best.idx].e };
+  }
+
+  function vibrateFor(dir) {
+    // links: zwei kurze, rechts: ein langer Impuls (Android; iOS/Safari unterstützt keine Vibration)
+    if (navigator.vibrate) navigator.vibrate(dir === "links" ? [150, 120, 150] : [450]);
+  }
+
+  function checkTurns() {
+    if (!progress || progress.off > OFF_ROUTE_M || !turns.length || walk.paused) return;
+    var warn = (G.getSettings().turnWarnM || 20);
+    walk.turnsDone = walk.turnsDone || {};
+    for (var i = 0; i < turns.length; i++) {
+      var t = turns[i];
+      var ahead = t.d - progress.d;
+      if (ahead < 0) continue;
+      if (ahead <= warn && !walk.turnsDone[i]) {
+        walk.turnsDone[i] = true;
+        vibrateFor(t.dir);
+        turnFlash = { text: (t.dir === "links" ? "↰ links" : "↱ rechts") + " in " + Math.round(ahead) + " m", until: Date.now() + 6000 };
+      }
+      break;   // nur die nächste Abbiegung
+    }
+  }
+
   // ---------- Aufzeichnung ----------
 
   G.onPosition(function (pos) {
-    if (!active || !walk || walk.paused) return;
+    if (!active || !walk) return;
+    var c0 = pos.coords;
+    // Position auf der Route und Geschwindigkeit (auch in der Pause, für die Anzeige)
+    if (c0.accuracy <= MAX_ACCURACY) {
+      progress = locateOnRoute(c0.latitude, c0.longitude) || progress;
+      var now = pos.timestamp || Date.now();
+      recent.push({ t: now, ll: L.latLng(c0.latitude, c0.longitude) });
+      while (recent.length > 2 && now - recent[0].t > 30000) recent.shift();
+      if (c0.speed != null && !isNaN(c0.speed)) {
+        speedNow = c0.speed;
+      } else if (recent.length > 1) {
+        var dt = (now - recent[0].t) / 1000;
+        var dist = 0;
+        for (var r = 1; r < recent.length; r++) dist += recent[r - 1].ll.distanceTo(recent[r].ll);
+        speedNow = dt > 3 ? dist / dt : speedNow;
+      }
+      checkTurns();
+    }
+    if (walk.paused) { renderPanel(); return; }
     var c = pos.coords;
     walk.lastFix = Date.now();
     if (c.accuracy > MAX_ACCURACY) { walk.weak = true; renderPanel(); return; }
@@ -154,19 +277,28 @@
   panel.innerHTML =
     '<div class="nav-head sheet-handle">' +
       '<span class="sheet-grip" aria-hidden="true"></span>' +
-      '<span class="sheet-titles"><span class="nav-title"></span><span class="nav-state"></span></span>' +
+      '<span class="sheet-titles"><span class="nav-title-row"><span class="nav-offline" hidden></span><span class="nav-title"></span></span><span class="nav-state"></span></span>' +
       '<span class="sheet-head-btns">' +
         '<button type="button" class="icon-btn nav-pause"></button>' +
+        '<button type="button" class="icon-btn nav-start" title="Zum Startpunkt" aria-label="Zum Startpunkt"><span class="icon-letter">S</span></button>' +
+        '<button type="button" class="icon-btn nav-fit" title="Position und Start zeigen" aria-label="Position und Start zeigen">' + G.icon("fit") + "</button>" +
         '<button type="button" class="icon-btn nav-center" title="Auf meine Position" aria-label="Auf meine Position">' + G.icon("locate") + "</button>" +
         '<button type="button" class="icon-btn nav-end" title="Tour beenden" aria-label="Tour beenden">' + G.icon("stop") + "</button>" +
       "</span>" +
     "</div>" +
     '<div class="sheet-body">' +
     '<div class="nav-stats">' +
-      '<div><span class="nav-val nav-dist">0,00 km</span><span class="nav-lbl">gewandert</span></div>' +
+      '<div><span class="nav-val nav-dist">0,00</span><span class="nav-lbl">km gewandert</span></div>' +
+      '<div><span class="nav-val nav-rest">–</span><span class="nav-lbl">km verbleibend</span></div>' +
+      '<div><span class="nav-val nav-avg">–</span><span class="nav-lbl">Ø km/h</span></div>' +
       '<div><span class="nav-val nav-time">0:00:00</span><span class="nav-lbl">unterwegs</span></div>' +
-      '<div><span class="nav-val nav-plan">–</span><span class="nav-lbl nav-plan-lbl">geplant</span></div>' +
+      '<div><span class="nav-val nav-left">–</span><span class="nav-lbl">Restzeit</span></div>' +
+      '<div><span class="nav-val nav-eta">–</span><span class="nav-lbl">Ankunft</span></div>' +
+      '<div><span class="nav-val nav-speed">–</span><span class="nav-lbl">km/h aktuell</span></div>' +
+      '<div><span class="nav-val nav-ele">–</span><span class="nav-lbl">Höhe m</span></div>' +
+      '<div><span class="nav-val nav-plan">–</span><span class="nav-lbl nav-plan-lbl">km geplant</span></div>' +
     "</div>" +
+    '<div class="nav-profile-box" hidden><svg class="pf-svg nav-pf" aria-label="Höhenprofil mit Position"></svg></div>' +
     "</div>";
   document.body.appendChild(panel);
   L.DomEvent.disableClickPropagation(panel);
@@ -176,10 +308,19 @@
 
   var el = {
     title: panel.querySelector(".nav-title"),
+    offline: panel.querySelector(".nav-offline"),
     dist: panel.querySelector(".nav-dist"),
+    rest: panel.querySelector(".nav-rest"),
+    avg: panel.querySelector(".nav-avg"),
     time: panel.querySelector(".nav-time"),
+    left: panel.querySelector(".nav-left"),
+    eta: panel.querySelector(".nav-eta"),
+    speed: panel.querySelector(".nav-speed"),
+    ele: panel.querySelector(".nav-ele"),
     plan: panel.querySelector(".nav-plan"),
     planLbl: panel.querySelector(".nav-plan-lbl"),
+    profBox: panel.querySelector(".nav-profile-box"),
+    profSvg: panel.querySelector(".nav-pf"),
     state: panel.querySelector(".nav-state"),
     pause: panel.querySelector(".nav-pause")
   };
@@ -189,30 +330,119 @@
     if (walk.paused) resume(); else pause();
   });
   panel.querySelector(".nav-center").addEventListener("click", function () { G.follow(); });
+  function startPoint() {
+    var line = walk && walk.planLine;
+    return line && line.length ? L.latLng(line[0][0], line[0][1]) : null;
+  }
+  panel.querySelector(".nav-start").addEventListener("click", function () {
+    var s0 = startPoint();
+    if (!s0) return;
+    if (G.stopFollowing) G.stopFollowing();
+    map.setView(s0, Math.max(map.getZoom(), 16));
+  });
+  panel.querySelector(".nav-fit").addEventListener("click", function () {
+    var s0 = startPoint();
+    var me = G.getPosition && G.getPosition();
+    if (!s0 && !me) return;
+    if (G.stopFollowing) G.stopFollowing();
+    if (s0 && me) {
+      // unten Platz für die Leiste lassen
+      map.fitBounds(L.latLngBounds([s0, me]), { paddingTopLeft: [40, 80], paddingBottomRight: [40, panel.offsetHeight + 40], maxZoom: 17 });
+    } else {
+      map.setView(s0 || me, Math.max(map.getZoom(), 16));
+    }
+  });
   panel.querySelector(".nav-end").addEventListener("click", askEnd);
 
   function renderPanel() {
     if (!walk) return;
     el.title.textContent = walk.routeName;
-    el.dist.textContent = km(walk.distance);
-    el.time.textContent = duration(movingTime(walk));
-    el.plan.textContent = walk.planLength ? km(walk.planLength) : "–";
-    el.planLbl.textContent = walk.planHours && G.planner ? "geplant · ≈" + G.planner.hm(walk.planHours) + " h" : "geplant";
+    var moving = movingTime(walk);
+    el.dist.textContent = num(walk.distance / 1000, 2);
+    el.time.textContent = duration(moving);
+    el.plan.textContent = walk.planLength ? num(walk.planLength / 1000, 1) : "–";
+    el.planLbl.textContent = walk.planHours && G.planner ? "geplant ≈" + G.planner.hm(walk.planHours) + " h" : "km geplant";
+    el.avg.textContent = moving > 60000 && walk.distance > 0 ? num(walk.distance / 1000 / (moving / 3600000), 1) : "–";
+    el.speed.textContent = speedNow != null ? num(speedNow * 3.6, 1) : "–";
+    if (stats && progress) {
+      var restM = Math.max(0, stats.dist - progress.dRoute);
+      el.rest.textContent = num(restM / 1000, 2);
+      var leftH = G.planner.remainingHours(stats, progress.idx);
+      el.left.textContent = G.planner.hm(leftH);
+      var eta = new Date(Date.now() + leftH * 3600000);
+      el.eta.textContent = eta.getHours() + ":" + (eta.getMinutes() < 10 ? "0" : "") + eta.getMinutes();
+      el.ele.textContent = stats.hasEle && progress.e != null ? String(Math.round(progress.e)) : "–";
+    } else {
+      el.rest.textContent = stats ? num(stats.dist / 1000, 2) : "–";
+      el.left.textContent = walk.planHours && G.planner ? G.planner.hm(walk.planHours) : "–";
+      el.eta.textContent = "–";
+      el.ele.textContent = "–";
+    }
+    renderNavProfile();
+    renderOffline();
     var pt = walk.paused ? "Weiter aufzeichnen" : "Pause";
     el.pause.innerHTML = G.icon(walk.paused ? "play" : "pause");
     el.pause.title = pt;
     el.pause.setAttribute("aria-label", pt);
     el.pause.classList.toggle("on", walk.paused);
-    // knapper Zustand statt Erklärtext; Warnungen nur, wo Daten verloren gehen könnten
+    // knapper Zustand, EINE Zeile (Kopfhöhe = --sheet-min): nur das Wichtigste, in dieser Rangfolge
     var st;
-    var cls = "";
+    var cls = "is-rec";
     if (walk.paused) { st = walk.interrupted ? "Pause (neu geladen)" : "Pause"; cls = "is-pause"; }
-    else if (!walk.lastFix) { st = "● Aufnahme · warte auf GPS"; cls = "is-rec"; }
-    else if (walk.weak) { st = "● Aufnahme · ⚠ GPS ungenau"; cls = "is-warn"; }
-    else { st = "● Aufnahme"; cls = "is-rec"; }
-    if (!walk.paused && wakeLockOk === false) { st += " · ⚠ Bildschirm anlassen"; cls = "is-warn"; }
+    else if (turnFlash && Date.now() < turnFlash.until) { st = turnFlash.text; cls = "is-warn"; }
+    else if (progress && progress.off > OFF_ROUTE_M) { st = "⚠ " + Math.round(progress.off) + " m neben der Route"; cls = "is-warn"; }
+    else if (!walk.lastFix) { st = "● Aufnahme · warte auf GPS"; }
+    else if (walk.weak) { st = "⚠ GPS ungenau"; cls = "is-warn"; }
+    else if (wakeLockOk === false) { st = "⚠ Bildschirm anlassen"; cls = "is-warn"; }
+    else { st = "● Aufnahme"; }
     el.state.textContent = st;
     el.state.className = "nav-state " + cls;
+  }
+
+  function num(v, digits) { return v.toFixed(digits).replace(".", ","); }
+
+  // Höhenprofil mit eigener Position (nur wenn die Route Höhen hat)
+  var lastProfileKey = "";
+  function renderNavProfile() {
+    var has = !!(stats && stats.hasEle && stats.grid.length > 1 && G.planner && G.planner.drawProfile);
+    el.profBox.hidden = !has;
+    if (!has) return;
+    var key = (progress ? progress.idx : -1) + "|" + el.profBox.clientWidth;
+    if (key === lastProfileKey) return;   // nur neu zeichnen, wenn sich etwas ändert
+    lastProfileKey = key;
+    G.planner.drawProfile(el.profSvg, stats, { width: el.profBox.clientWidth, markerD: progress ? progress.d : null });
+  }
+
+  // ---------- Offline-Karten entlang der Route ----------
+
+  var offlineJob = null;
+  function startOffline() {
+    if (!G.offline || !walk || !walk.planLine || walk.planLine.length < 2) return;
+    if (offlineJob) offlineJob.stop();
+    var km0 = G.getSettings().offlineKm || 1;
+    offlineJob = G.offline.saveCorridor(walk.planLine, km0, function (st) {
+      if (!walk) return;
+      walk.offline = { state: st.state, done: st.done, total: st.total, skipped: st.skipped };
+      saveWalk();
+      renderOffline();
+    });
+  }
+  function stopOffline(clearCache) {
+    if (offlineJob) { offlineJob.stop(); offlineJob = null; }
+    if (clearCache && G.offline) G.offline.clear();
+  }
+  function renderOffline() {
+    var o = walk && walk.offline;
+    el.offline.hidden = !o || o.state === "unsupported";
+    if (el.offline.hidden) return;
+    el.offline.innerHTML = G.icon("offline");
+    el.offline.className = "nav-offline is-" + o.state;
+    var t = o.state === "done" ? "Karten entlang der Route offline gespeichert (" + o.total + " Kacheln)"
+      : o.state === "retry" ? "Offline-Speichern: kein Empfang, wird wiederholt (" + o.done + "/" + o.total + ")"
+      : "Karten werden offline gespeichert (" + o.done + "/" + o.total + ")";
+    if (o.skipped && o.skipped.length) t += " – nicht offline: " + o.skipped.join(", ");
+    el.offline.title = t;
+    el.offline.setAttribute("aria-label", t);
   }
 
   var ticker = null;
@@ -230,9 +460,14 @@
     layer.addTo(map);
     drawPlan();
     drawWalk();
+    computeRouteData();
+    progress = null;
+    lastProfileKey = "";
     clearInterval(ticker);
-    ticker = setInterval(function () { if (walk && !walk.paused) el.time.textContent = duration(movingTime(walk)); }, 1000);
+    ticker = setInterval(function () { if (walk && !walk.paused) renderPanel(); }, 1000);
     renderPanel();
+    // Offline-Karten (auch nach Neuladen: bereits gespeicherte Kacheln werden übersprungen)
+    setTimeout(startOffline, 1500);
   }
 
   function start(rec) {
@@ -247,6 +482,7 @@
       routeId: rec.id,
       routeName: rec.name,
       planLine: line,
+      route: { segments: rec.segments || [], closing: rec.closing || null, roundtrip: !!rec.roundtrip, points: rec.points || [] },
       planLength: (rec.stats && rec.stats.length) || lineLength(line),
       planHours: G.planner && G.planner.routeStats ? G.planner.routeStats(rec).hours : null,
       startedAt: Date.now(),
@@ -346,6 +582,10 @@
   function leave() {
     active = false;
     walk = null;
+    stats = null;
+    progress = null;
+    turns = [];
+    stopOffline(true);
     saveWalk();
     clearInterval(ticker);
     releaseWakeLock();
@@ -495,6 +735,8 @@
   G.nav = {
     start: start,
     isActive: function () { return active; },
-    getWalk: function () { return walk; }
+    getWalk: function () { return walk; },
+    getTurns: function () { return turns; },
+    getProgress: function () { return progress; }
   };
 })();

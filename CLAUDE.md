@@ -43,7 +43,8 @@ Platz wie möglich:
    nie niedriger: `--sheet-min` (72 px) = Höhe der Kopfzeile (`.sheet-handle` ist genau so hoch).
    Der Positions-Knopf sitzt fest *oberhalb* dieser Mindesthöhe (`bottom: --sheet-min + 12 px`) und ist
    bei zusammengeschobener Leiste immer ganz sichtbar. Kopfzeilen-Inhalte dürfen nicht höher als
-   `--sheet-min` werden.
+   `--sheet-min` werden: Titel und **eine** Zustandszeile (einzeilig, Wichtigstes zuerst), höchstens
+   5 Symbolknöpfe.
 2. **Leisten-Aufbau:** `<section class="sheet">` → Kopf `.sheet-handle` mit `.sheet-grip`,
    `.sheet-titles` (Titel + Kennzahlen) und `.sheet-head-btns` → Inhalt `.sheet-body` (scrollt).
    Ziehbar machen mit `GOAHEAD.makeResizable(panel, kopf, speicherSchlüssel)`.
@@ -68,8 +69,12 @@ Platz wie möglich:
 - `app.js`: Karte, Ebenen, Position, Menü, Infofenster, Dialoge; Schnittstelle `window.GOAHEAD` (G).
 - `tracks.js`: Seite *Tracks* (Reiter GPX/Geplant/Erwandert), GPX-Import, **IndexedDB** (`G.db`).
 - `planner.js`: Route planen, Liste *Geplant*, GPX-Export.
-- `nav.js`: Unterwegs-Modus, Aufzeichnung, Liste *Erwandert*.
-- `config.js`: Kartendienste. Reihenfolge der Skripte in `index.html` beachten (app → tracks → planner → nav).
+- `offline.js`: Kartenkacheln entlang einer Route offline speichern (Cache `goahead-tiles-v1`).
+- `nav.js`: Unterwegs-Modus, Aufzeichnung, Abbiegungen/Vibration, Liste *Erwandert*.
+- `sw.js`: App-Hülle (Netz zuerst) und Kacheln aus dem Offline-Speicher. Der Kachel-Cache darf beim
+  Aktualisieren des Service Workers **nicht** gelöscht werden (sonst gehen Offline-Karten mitten in einer Tour verloren).
+- `config.js`: Kartendienste. Reihenfolge der Skripte in `index.html` beachten
+  (app → tracks → planner → offline → nav).
 
 ## Bei jeder Veröffentlichung
 
@@ -94,6 +99,8 @@ Platz wie möglich:
   OSRM, Nominatim, Waymarked Trails). Getestet wird mit Playwright/Chromium (headless, Gerät „Pixel 7“)
   und **nachgebildeten Antworten** (`context.route`). Das in der Rückmeldung an den Nutzer offen sagen.
 - Prüfen: keine JavaScript-Fehler (`pageerror`), Abläufe Schritt für Schritt, Screenshots ansehen.
+- Grenzen der Testumgebung kennen: Playwright beantwortet nachgebildete Anfragen auch „offline“ und ergänzt
+  CORS-Freigaben selbst. Fehlendes Netz bzw. CORS-Ablehnung daher mit `route.abort()` nachstellen.
 - Lokaler Server: `python3 -m http.server 8765` im Repo-Verzeichnis.
 - Externe Daten, die nur außerhalb erreichbar sind, notfalls über einen GitHub-Actions-Lauf holen
   (wie die TFIS-Wegzeichen im Deploy-Workflow).

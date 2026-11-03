@@ -508,9 +508,7 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sheet-titles > .nav-state {
-  white-space: normal;    /* Warnungen nicht abschneiden */
-}
+/* Zustandszeile unterwegs: einzeilig (Kopfhöhe ist fest), Wichtigstes steht vorn */
 .sheet-head-btns {
   display: flex;
   gap: 6px;
@@ -676,22 +674,21 @@ button {
 
 /* Unterwegs */
 .nav-stats {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
   text-align: center;
 }
 .nav-stats > div {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 8px 4px;
+  padding: 6px 4px;
   border-radius: var(--r-md);
   background: rgba(255, 255, 255, 0.5);
   border: 1px solid var(--c-line);
 }
 .nav-val {
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -1099,4 +1096,54 @@ button {
 }
 #settings-panel .sheet-body {
   padding-bottom: 20px;
+}
+.settings-num select {
+  max-width: 55%;
+  padding: 6px 8px;
+  font-size: 14px;
+  border: 1px solid var(--c-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--c-text);
+}
+
+/* Unterwegs: Titelzeile mit Offline-Symbol, Höhenprofil mit Position */
+.nav-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.nav-title-row .nav-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav-offline {
+  flex: none;
+  display: inline-flex;
+  color: var(--c-muted);
+}
+.nav-offline svg {
+  width: 18px;
+  height: 18px;
+}
+.nav-offline.is-done { color: var(--c-accent); }
+.nav-offline.is-retry { color: var(--c-candidate); }
+.nav-offline.is-loading svg { animation: pulse 1.2s ease-in-out infinite; }
+.nav-profile-box {
+  margin-top: 8px;
+  padding: 4px 2px 0;
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.45);
+  touch-action: none;
+}
+.pf-me {
+  stroke: var(--c-blue);
+  stroke-width: 2;
+}
+.pf-me-dot {
+  fill: var(--c-blue);
+  stroke: #ffffff;
+  stroke-width: 2;
 }

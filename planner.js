@@ -243,7 +243,7 @@
   // Berechnet den Weg von a nach b; nie fehlschlagend (Rückfall gerade Linie, markiert als „kein Weg“)
   function route(a, b, mode) {
     if (mode === "line") return Promise.resolve(lineSeg(a, b));
-    var list = PROFILES[plan.profile].engines;
+    var list = PROFILES[currentProfile()].engines;
     var errors = [];
     function attempt(i) {
       if (i >= list.length) {
@@ -697,13 +697,10 @@
     render();
   }
 
-  function cycleProfile() {
-    var keys = Object.keys(PROFILES);
-    plan.profile = keys[(keys.indexOf(plan.profile) + 1) % keys.length];
-    savePlan();
-    renderPanel();
-    G.showStatus("Routing: " + PROFILES[plan.profile].label, 2000);
-    if (candidate) setCandidate(candidate.latlng);   // Vorschlag neu berechnen
+  // Routing-Dienst kommt aus den Einstellungen (Standard: BRouter)
+  function currentProfile() {
+    var st = G.getSettings ? G.getSettings() : null;
+    return st && st.routing === "osrm" ? "foot" : "hiking";
   }
 
   // ---------- Höhenprofil, Höhenmeter, Dauer ----------
@@ -994,8 +991,7 @@
         iconBtn("plan-redo", "redo", "Wiederholen") +
         '<button type="button" class="icon-btn plan-start" title="Zum Startpunkt" aria-label="Zum Startpunkt"><span class="icon-letter">S</span></button>' +
         iconBtn("plan-round", "roundtrip", "Rundtour") +
-        iconBtn("plan-profile", null, "Routing") +
-        iconBtn("plan-chart", "chart", "Höhenprofil ein/aus") +
+
         iconBtn("plan-find", "search", "Adresse oder Koordinaten suchen") +
       "</div>" +
       '<div class="plan-profile-box" hidden><svg class="pf-svg" aria-label="Höhenprofil"></svg></div>' +
@@ -1020,9 +1016,9 @@
     redo: panel.querySelector(".plan-redo"),
     start: panel.querySelector(".plan-start"),
     round: panel.querySelector(".plan-round"),
-    profile: panel.querySelector(".plan-profile"),
+
     find: panel.querySelector(".plan-find"),
-    chart: panel.querySelector(".plan-chart"),
+
     profBox: panel.querySelector(".plan-profile-box"),
     profSvg: panel.querySelector(".pf-svg"),
     form: panel.querySelector(".plan-search"),
@@ -1051,18 +1047,11 @@
     }
   });
   el.save.addEventListener("click", saveRoute);
-  var PROFILE_KEY = "goahead.planProfile.v1";
-  var showProfile = true;
-  try { showProfile = window.localStorage.getItem(PROFILE_KEY) !== "0"; } catch (e) { /* Standard: an */ }
-  el.chart.addEventListener("click", function () {
-    showProfile = !showProfile;
-    try { window.localStorage.setItem(PROFILE_KEY, showProfile ? "1" : "0"); } catch (e) { /* egal */ }
-    renderPanel();
-  });
+
   el.undo.addEventListener("click", undo);
   el.redo.addEventListener("click", redo);
   el.round.addEventListener("click", toggleRoundtrip);
-  el.profile.addEventListener("click", cycleProfile);
+
   el.start.addEventListener("click", function () {
     if (plan.points.length) goTo(plan.points[0]);
   });
@@ -1104,10 +1093,6 @@
     el.start.disabled = !n;
     el.round.classList.toggle("on", plan.roundtrip);
     el.round.setAttribute("aria-pressed", plan.roundtrip ? "true" : "false");
-    var prof = PROFILES[plan.profile];
-    el.profile.innerHTML = G.icon(prof.icon);
-    el.profile.title = "Routing: " + prof.label + " (antippen zum Wechseln)";
-    el.profile.setAttribute("aria-label", el.profile.title);
     renderProfile(n ? lastStats : null);
   }
 
@@ -1124,18 +1109,29 @@
     return e;
   }
 
+  // Bei BRouter-Routing (mit Höhen) wird das Profil automatisch gezeigt
   function renderProfile(t) {
-    var has = !!(t && t.hasEle && t.grid.length > 1);
-    el.chart.disabled = !has;
-    el.chart.classList.toggle("on", has && showProfile);
-    el.chart.title = has ? "Höhenprofil ein/aus" : "Höhenprofil (Höhendaten nur mit BRouter-Routing)";
-    el.chart.setAttribute("aria-label", el.chart.title);
-    el.profBox.hidden = !(has && showProfile);
-    if (el.profBox.hidden) { hideProfileMarker(); return; }
+    var has = !!(t && t.hasEle && t.grid.length > 1) && currentProfile() === "hiking";
+    el.profBox.hidden = !has;
+    if (!has) { hideProfileMarker(); return; }
+    drawProfile(el.profSvg, t, {
+      width: el.profBox.clientWidth,
+      onPick: function (p) {
+        if (!profMarker) {
+          profMarker = L.circleMarker([p.lat, p.lng], { radius: 7, color: "#ffffff", weight: 3, fillColor: COLOR_CANDIDATE, fillOpacity: 1, interactive: false });
+        }
+        profMarker.setLatLng([p.lat, p.lng]).addTo(layer);
+      },
+      onRelease: function () { setTimeout(hideProfileMarker, 2500); }
+    });
+  }
 
-    var svg = el.profSvg;
+  // Säulen-Höhenprofil in ein <svg> zeichnen (auch für „Unterwegs“).
+  // opts: width, markerD (Position in m, z. B. eigener Standort), onPick(punkt), onRelease()
+  function drawProfile(svg, t, opts) {
+    opts = opts || {};
     while (svg.firstChild) svg.removeChild(svg.firstChild);
-    var W = Math.max(200, el.profBox.clientWidth || 320);
+    var W = Math.max(200, opts.width || 320);
     var H = 76;
     var padL = 34;
     var padB = 14;
@@ -1168,10 +1164,17 @@
     svgEl("text", { x: padL - 4, y: 4 + plotH, "text-anchor": "end", "class": "pf-label" }, svg).textContent = Math.round(minE) + " m";
     svgEl("text", { x: W - 2, y: H - 2, "text-anchor": "end", "class": "pf-label" }, svg).textContent = km(t.dist);
     svgEl("text", { x: padL, y: H - 2, "class": "pf-label" }, svg).textContent = "0";
+    // feste Marke (z. B. eigene Position unterwegs)
+    if (opts.markerD != null) {
+      var mx = x(Math.max(0, Math.min(total, opts.markerD)));
+      svgEl("line", { x1: mx, x2: mx, y1: 2, y2: 4 + plotH, "class": "pf-me" }, svg);
+      var k0 = Math.min(grid.length - 1, Math.max(0, Math.round(opts.markerD / PROFILE_STEP)));
+      svgEl("circle", { cx: mx, cy: y(grid[k0].e), r: 4.5, "class": "pf-me-dot" }, svg);
+    }
     var cursor = svgEl("line", { x1: 0, x2: 0, y1: 2, y2: 4 + plotH, "class": "pf-cursor", visibility: "hidden" }, svg);
     var readout = svgEl("text", { x: padL + 4, y: 12, "class": "pf-readout", visibility: "hidden" }, svg);
 
-    // Tippen/Ziehen im Profil: Stelle anzeigen und auf der Karte markieren
+    // Tippen/Ziehen im Profil: Stelle anzeigen (und z. B. auf der Karte markieren)
     function show(ev) {
       var r = svg.getBoundingClientRect();
       var px = (ev.clientX - r.left) / r.width * W;
@@ -1185,14 +1188,27 @@
       readout.setAttribute("x", x(p.d) > W / 2 ? x(p.d) - 4 : x(p.d) + 4);
       readout.setAttribute("text-anchor", x(p.d) > W / 2 ? "end" : "start");
       readout.setAttribute("visibility", "visible");
-      if (!profMarker) {
-        profMarker = L.circleMarker([p.lat, p.lng], { radius: 7, color: "#ffffff", weight: 3, fillColor: COLOR_CANDIDATE, fillOpacity: 1, interactive: false });
-      }
-      profMarker.setLatLng([p.lat, p.lng]).addTo(layer);
+      if (opts.onPick) opts.onPick(p);
     }
     svg.onpointerdown = function (ev) { svg.setPointerCapture(ev.pointerId); show(ev); };
     svg.onpointermove = function (ev) { if (ev.buttons || ev.pointerType === "mouse") show(ev); };
-    svg.onpointerup = function () { setTimeout(hideProfileMarker, 2500); };
+    svg.onpointerup = function () { if (opts.onRelease) opts.onRelease(); };
+  }
+
+  // Gehzeit ab einer Stelle des Rasters bis zum Ziel (für „Unterwegs“)
+  function remainingHours(t, fromIdx) {
+    var st = G.getSettings();
+    var thr = st.slopePercent / 100;
+    var g = t.grid;
+    var h = 0;
+    for (var i = Math.max(1, fromIdx + 1); i < g.length; i++) {
+      var dd = g[i].d - g[i - 1].d;
+      var cls = t.hasEle ? slopeClass(g[i].e - g[i - 1].e, dd, thr) : "flat";
+      var v = cls === "up" ? st.speedUp : (cls === "down" ? st.speedDown : st.speedFlat);
+      h += dd / 1000 / v;
+    }
+    var total = g.length ? g[g.length - 1].d : 0;
+    return total > 0 && t.dist > 0 ? h * t.dist / total : h;
   }
 
   function hideProfileMarker() {
@@ -1234,7 +1250,7 @@
       segments: clone(plan.segments),
       roundtrip: plan.roundtrip,
       closing: plan.closing ? clone(plan.closing) : null,
-      profile: plan.profile,
+      profile: currentProfile(),
       stats: { length: t.dist, ascent: t.asc, descent: t.desc, hours: t.hours, points: plan.points.length, lines: t.lines }
     };
     G.db.put("routes", rec).then(function () {
@@ -1533,6 +1549,8 @@
     getPlan: function () { return plan; },
     routeLine: routeLine,
     routeStats: routeStats,
+    drawProfile: drawProfile,
+    remainingHours: remainingHours,
     statsText: statsText,
     hm: hm,
     xmlEsc: xmlEsc,
