@@ -12,6 +12,11 @@ bildschirmfüllend zeigt und **auch bei ausgeschaltetem Bildschirm aufzeichnet**
   GPS alle 2 s, Punkte ungenauer als 50 m oder näher als 5 m am letzten werden verworfen (wie in `nav.js`).
   Vibriert vor Abbiegungen (Luftlinie zur Abbiegung ≤ eingestellter Abstand – eine Näherung;
   die Web-App rechnet entlang der Route).
+- Fotos (`takePhoto`, ab App-Version mit `hasCamera`): legt einen Eintrag in der Galerie an
+  (MediaStore, `Pictures/GoAhead` → Album „GoAhead“) und öffnet die Kamera-App (`ACTION_IMAGE_CAPTURE` mit
+  `EXTRA_OUTPUT`). Danach geht eine verkleinerte, nach EXIF gedrehte Kopie (max. 1600 px) an die Web-App
+  (`window.GOAHEAD_PHOTO_RESULT`). Abbruch löscht den leeren Galerie-Eintrag. Ohne Kamera-Berechtigung
+  (die App fordert keine an – `ACTION_IMAGE_CAPTURE` braucht sie nicht, solange sie im Manifest fehlt).
 - `TrackStore.kt`: hängt jeden Punkt sofort an `track.jsonl` im App-Speicher an. Die Web-App holt die
   Punkte beim Einschalten des Bildschirms und alle 3 s (solange sichtbar) ab. Beim Beenden der Tour wird die Datei geleert.
 

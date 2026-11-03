@@ -58,6 +58,13 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     Chromium-Quelltext `chrome/browser/webshare/share_service_impl.cc`). Dann bietet die App an, die Datei als
     `Name.gpx.txt` zu teilen (Empfänger entfernt „.txt“; GoAhead liest sie auch so) oder die GPX herunterzuladen
     und nur den Text zu teilen.
+- **Aufnahme ohne Route** (roter Aufnahme-Knopf im Menü): spontane Tour aufzeichnen wie unterwegs, nur ohne
+  Routenbezug (keine Restzeit/Abbiegungen). Beim Beenden fragt die App nach dem Namen.
+- **Fotos unterwegs** (Kamera-Knopf in der Kopfzeile von *Unterwegs*), Modul `photos.js`: Das Foto wird an der
+  aktuellen Position der Tour zugeordnet und als Kamera-Marker auf der Karte gezeigt; Antippen zeigt das Bild
+  (dort auch löschen). In der **Android-App** speichert die Kamera das Bild in voller Größe in der Galerie,
+  Album „GoAhead“ (Ordner Pictures/GoAhead); GoAhead behält eine verkleinerte Kopie (max. 1600 px). Im **Browser**
+  kann eine Web-App nicht in die Galerie speichern – dort liegt das Foto nur in GoAhead. Fotos sind Teil der Sicherung.
 - **Unterwegs** (*Los geht's*), Module `nav.js` und `offline.js`:
   - Kopfzeile: Name mit Offline-Symbol, eine Zustandszeile (Abbiegung, neben der Route, GPS ungenau,
     Bildschirm anlassen, Aufnahme/Pause) und die Knöpfe *Pause/Weiter*, *S* (zum Startpunkt),
@@ -89,6 +96,11 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     „⚠ Akku-Optimierung an“ und beim Start ein Dialog zu den Akku-Einstellungen (Samsung).
     In der App werden GPX-Dateien als echte `.gpx` geteilt und Exporte unter „Downloads“ gespeichert.
     Download der APK: https://carstenkeller.github.io/goahead/app/goahead.apk
+- **Erwandert → Ansehen:** Strecke auf der Karte und eine ziehbare Leiste mit Kennzahlen (km, Zeit in Bewegung,
+  Ø km/h, ↑/↓ m, Höhenbereich, Start/Ende, Datum), Höhenprofil und Fotos. *Geplant → Ansehen* ebenso mit
+  km, ↑/↓, Gehzeit und Profil. „⋯“ öffnet das Menü der Tour, „✕“ schließt und entfernt die Linie.
+- **Listen *Geplant* und *Erwandert*:** oben Anzahl und Gesamt-km der angezeigten Touren, Filter nach Jahr
+  und Namenssuche (Lupe).
 - **Untere Leisten ziehen:** Planungsfeld und Unterwegs-Feld lassen sich am Griff oben größer oder kleiner ziehen
   (Höhe wird gespeichert). Alle unteren Leisten legen sich über Positions-Knopf, Maßstab und Quellenangabe,
   ohne sie zu verschieben.
@@ -177,7 +189,7 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
 
 ## Hinweis zum lokalen Speicher
 
-Ändert sich die Datenbank-Version (zuletzt auf 3), müssen andere offene Tabs mit einer älteren App-Version
+Ändert sich die Datenbank-Version (zuletzt auf 4: Speicher „photos“), müssen andere offene Tabs mit einer älteren App-Version
 geschlossen werden – sonst blockiert der Browser die Umstellung. Die App meldet das jetzt, statt still zu hängen,
 und gibt die Datenbank ab dieser Version selbst frei, wenn eine neuere Version sie anfordert.
 
@@ -258,6 +270,8 @@ Einmalig nötig: unter *Settings → Pages → Build and deployment → Source* 
 - `mosaic.js`, `regions.js`: Kartenmosaik nach Gebiet und die Grenzen dazu
 - `offline.js`: Offline-Karten entlang der Route
 - `nav.js`: Unterwegs-Modus, Aufzeichnung, Abbiegungen, Liste *Erwandert*
+- `tourview.js`: Leiste mit Tour-Details, Listenkopf (Anzahl, km, Jahr, Suche)
+- `photos.js`: Fotos unterwegs (Kamera, Speicher, Marker, Anzeige)
 - `backup.js`: Sicherung/Wiederherstellen, Sammel-Import (GPX, ZIP) nach *Geplant*/*Erwandert*
 - `android/`: Android-App (WebView + Aufzeichnung im Hintergrund), Build im Pages-Workflow
 - `config.js`: Kartendienste, Startansicht, Zoomstufe

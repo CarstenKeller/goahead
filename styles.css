@@ -64,7 +64,7 @@
   --z-settings: 1600;           /* Einstellungen */
   --z-page: 2500;               /* Vollbildseiten */
   --z-dialog: 3000;
-  --z-photo: 3100;              /* Foto-Anzeige (über Dialogen) */
+  --z-photo: 2900;              /* Foto-Anzeige (über Seiten, unter Dialogen) */
   --c-photo: #7048e8;           /* Foto-Marker */
 
   --info-height: 34vh;          /* Standardhöhe Infofenster (per Ziehen änderbar) */
@@ -1185,14 +1185,8 @@ button {
   height: 257px !important;
 }
 
-/* Foto-Knopf unterwegs: links, auf gleicher Höhe wie der Positions-Knopf (über der Mindesthöhe) */
-.map-btn.photo-btn {
-  right: auto;
-  left: calc(12px + env(safe-area-inset-left));
-}
-.photo-btn svg {
-  width: 26px;
-  height: 26px;
+.nav-extra {
+  margin-bottom: 8px;
 }
 /* Foto-Marker auf der Karte */
 .photo-pin {

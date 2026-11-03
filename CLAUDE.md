@@ -24,6 +24,10 @@ Platz wie möglich:
   Beschriftung in `title` **und** `aria-label`. Langer Druck zeigt den Tooltip auf Touch-Geräten (global in app.js).
   Textknöpfe nur in Dialogen/Auswahlmenüs.
 - **Wichtigste Aktionen in die Kopfzeile** der Leiste (z. B. Speichern, Beenden), Titel und Kennzahlen links daneben.
+  Kopfknöpfe sind schlank und ohne Fläche (Titel braucht mindestens ein Drittel der Breite); die Leiste lässt
+  sich auch ziehen, wenn der Finger auf einem Kopfknopf beginnt.
+- Bedienelemente, die bei hochgezogener Leiste gebraucht werden (z. B. Kamera unterwegs), gehören in die
+  Kopfzeile – nicht als Kartenknopf, den die Leiste verdeckt.
 - **Bedienung direkt auf der Karte vor Knöpfen:** Antippen, erneut antippen, Doppeltipp, Ziehen
   (z. B. Vorschlagspunkt erneut antippen = übernehmen; Strecke antippen = Zwischenpunkt; Doppeltipp = Modus wechseln).
   Keinen Knopf für etwas, das auf der Karte direkt geht.
@@ -71,6 +75,8 @@ Platz wie möglich:
 - `planner.js`: Route planen, Liste *Geplant*, GPX-Export.
 - `offline.js`: Kartenkacheln entlang einer Route offline speichern (Cache `goahead-tiles-v1`).
 - `nav.js`: Unterwegs-Modus, Aufzeichnung, Abbiegungen/Vibration, Liste *Erwandert*.
+- `tourview.js`: `G.tourView.open({...})` (Tour-Details als Leiste), `G.listTools` (Listenkopf mit Anzahl, km,
+  Jahr, Suche). `photos.js`: `G.photos` (Speicher „photos“, Blob), Kamera über `takePhoto` der App, sonst `<input capture>`.
 - `backup.js`: Sicherung/Wiederherstellen (alle Speicher + `goahead.*` in localStorage), Sammel-Import GPX/ZIP.
   Nach Änderungen an gespeicherten Daten `goahead:data` auf `window` auslösen – die Listen laden dann neu.
 - `android/`: Android-App (Kotlin, WebView). Brücke `window.GoAheadNative`, in der Web-App nur über `G.native`
@@ -84,7 +90,7 @@ Platz wie möglich:
   (Quellen in `config.js`, unten = überall → oben = genaueste, `region` = Länderkürzel). Neue Kartendienste erst
   im Workflow „Kartendienste prüfen“ (`.github/scripts/probe_maps.py`) testen. Overlays mit Inhalt nur in einem Gebiet
   bekommen `region` (keine Anfragen außerhalb, auch nicht offline). Reihenfolge der Skripte in `index.html` beachten
-  (config → regions → mosaic → app → tracks → planner → offline → nav → backup).
+  (config → regions → mosaic → app → tracks → planner → tourview → offline → photos → nav → backup).
 
 ## Bei jeder Veröffentlichung
 

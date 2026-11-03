@@ -345,13 +345,16 @@
       '<span class="sheet-titles"><span class="nav-title-row"><span class="nav-offline" hidden></span><span class="nav-title"></span></span><span class="nav-state"></span></span>' +
       '<span class="sheet-head-btns">' +
         '<button type="button" class="icon-btn nav-pause"></button>' +
-        '<button type="button" class="icon-btn nav-start" title="Zum Startpunkt" aria-label="Zum Startpunkt"><span class="icon-letter">S</span></button>' +
+        '<button type="button" class="icon-btn nav-photo" title="Foto aufnehmen" aria-label="Foto aufnehmen">' + G.icon("camera") + "</button>" +
         '<button type="button" class="icon-btn nav-fit" title="Position und Start zeigen" aria-label="Position und Start zeigen">' + G.icon("fit") + "</button>" +
         '<button type="button" class="icon-btn nav-center" title="Auf meine Position" aria-label="Auf meine Position">' + G.icon("locate") + "</button>" +
         '<button type="button" class="icon-btn nav-end" title="Tour beenden" aria-label="Tour beenden">' + G.icon("stop") + "</button>" +
       "</span>" +
     "</div>" +
     '<div class="sheet-body">' +
+    '<div class="icon-row nav-extra">' +
+      '<button type="button" class="icon-btn nav-start" title="Zum Startpunkt" aria-label="Zum Startpunkt"><span class="icon-letter">S</span></button>' +
+    "</div>" +
     '<div class="nav-stats">' +
       '<div><span class="nav-val nav-dist">0,00</span><span class="nav-lbl">km gewandert</span></div>' +
       '<div><span class="nav-val nav-rest">–</span><span class="nav-lbl">km verbleibend</span></div>' +
@@ -424,6 +427,8 @@
 
   function renderPanel() {
     if (!walk) return;
+    // freie Aufnahme: Felder, die nur mit Route Sinn ergeben, ausblenden
+    [el.rest, el.left, el.eta, el.plan].forEach(function (v) { v.parentNode.hidden = !!walk.free; });
     el.title.textContent = walk.routeName;
     var moving = movingTime(walk);
     el.dist.textContent = num(walk.distance / 1000, 2);
@@ -518,15 +523,8 @@
 
   // ---------- Fotos unterwegs ----------
 
-  var photoBtn = document.createElement("button");
-  photoBtn.type = "button";
-  photoBtn.className = "map-btn photo-btn";
-  photoBtn.title = "Foto aufnehmen";
-  photoBtn.setAttribute("aria-label", "Foto aufnehmen");
-  photoBtn.innerHTML = G.icon("camera");
-  photoBtn.hidden = true;
-  document.body.appendChild(photoBtn);
-  L.DomEvent.disableClickPropagation(photoBtn);
+  // Kamera-Knopf in der Kopfzeile (immer erreichbar, auch bei hochgezogener Leiste)
+  var photoBtn = panel.querySelector(".nav-photo");
   photoBtn.addEventListener("click", function () { if (walk && G.photos) G.photos.take(walk.id); });
 
   var walkPhotos = null;   // Fotos der laufenden Tour auf der Karte
@@ -743,7 +741,6 @@
     releaseWakeLock();
     document.body.classList.remove("mode-nav");
     panel.hidden = true;
-    photoBtn.hidden = true;
     if (walkPhotos) { map.removeLayer(walkPhotos.layer); walkPhotos = null; }
     map.removeLayer(layer);
   }
@@ -797,7 +794,9 @@
     w.segments.forEach(function (s) { s.forEach(function (p) { pts.push(p); }); });
     var hasEle = pts.some(function (p) { return p[2] != null; });
     var prof = G.planner && G.planner.routeStats && hasEle
-      ? G.planner.routeStats({ segments: w.segments.map(function (s) { return { latlngs: s.map(function (p) { return [p[0], p[1], p[2]]; }), distance: 0 }; }) })
+      ? G.planner.routeStats({ segments: w.segments.map(function (s) {
+        return { latlngs: s.map(function (p) { return [p[0], p[1], p[2]]; }), distance: lineLength(s) };
+      }) })
       : null;
     var ele = pts.map(function (p) { return p[2]; }).filter(function (e) { return e != null; });
     var avg = w.movingMs > 60000 ? num(w.distance / 1000 / (w.movingMs / 3600000), 1) : "–";
