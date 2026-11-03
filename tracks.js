@@ -89,7 +89,11 @@
   G.db = {
     all: function (name) { return storeIn(name, "readonly", function (s) { return s.getAll(); }); },
     put: function (name, rec) { return storeIn(name, "readwrite", function (s) { return s.put(rec); }); },
-    del: function (name, id) { return storeIn(name, "readwrite", function (s) { return s["delete"](id); }); }
+    del: function (name, id) { return storeIn(name, "readwrite", function (s) { return s["delete"](id); }); },
+    // viele Datensätze in EINER Transaktion (Sammel-Import, Wiederherstellen)
+    putMany: function (name, recs) {
+      return storeIn(name, "readwrite", function (s) { recs.forEach(function (r) { s.put(r); }); return null; });
+    }
   };
 
   function dbAll() { return store("readonly", function (s) { return s.getAll(); }); }
@@ -271,7 +275,7 @@
             fileName: file.name,
             importedAt: new Date().toISOString(),
             color: COLORS[(records.length + imported.length) % COLORS.length],
-            visible: true,
+            visible: files.length <= 5,   // bei vielen Dateien nicht alle auf einmal auf die Karte
             stats: stats(parsed),
             gpx: text
           };
@@ -286,8 +290,9 @@
     return chain.then(function () {
       if (imported.length) {
         records = records.concat(imported);
-        imported.forEach(function (rec, i) { showTrack(rec, i === imported.length - 1); });
-        closePage();
+        var vis = imported.filter(function (r) { return r.visible; });
+        vis.forEach(function (rec, i) { showTrack(rec, i === vis.length - 1); });
+        if (vis.length) closePage();
         requestPersistentStorage();
       }
       renderList();
@@ -380,13 +385,7 @@
       closePage();
       if (G.closeMenu) G.closeMenu();
     } else if (act === "download" && e.type === "click") {
-      var blob = new Blob([rec.gpx], { type: "application/gpx+xml" });
-      var a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = rec.fileName || (rec.name + ".gpx");
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      G.downloadFile(rec.fileName || (rec.name + ".gpx"), rec.gpx, "application/gpx+xml");
     } else if (act === "delete" && e.type === "click") {
       if (!window.confirm("Track „" + rec.name + "“ vom Gerät löschen?")) return;
       dbDelete(rec.id).then(function () {
@@ -424,7 +423,7 @@
       "</nav>" +
       '<div class="page-body">' +
         '<div class="page-panel" data-panel="gpx" role="tabpanel">' +
-          '<button type="button" class="trk-import">GPX importieren …</button>' +
+          '<button type="button" class="trk-import">GPX/ZIP importieren …</button>' +
           '<input type="file" multiple hidden>' +
           '<div class="trk-list"></div>' +
           '<p class="trk-note">Tracks werden nur auf diesem Gerät gespeichert.</p>' +
@@ -440,10 +439,14 @@
 
     var input = pageEl.querySelector('input[type="file"]');
     // Viele Android-Dateiauswahlen kennen keinen GPX-Typ; daher großzügig
-    input.accept = ".gpx,application/gpx+xml,application/xml,text/xml,application/octet-stream";
+    input.accept = ".gpx,.zip,.txt,application/gpx+xml,application/xml,text/xml,application/zip,application/octet-stream";
     pageEl.querySelector(".trk-import").addEventListener("click", function () { input.click(); });
     input.addEventListener("change", function () {
-      importFiles(input.files).then(function () { input.value = ""; });
+      var files = Array.prototype.slice.call(input.files || []);
+      input.value = "";
+      // Sammel-Import (backup.js): fragt, wohin (GPX / Geplant / Erwandert), liest auch ZIP-Dateien
+      if (G.backup && G.backup.importFiles) G.backup.importFiles(files);
+      else importFiles(files);
     });
 
     listEl = pageEl.querySelector(".trk-list");
@@ -512,17 +515,26 @@
     new TracksControl().addTo(map);
   }
   G.openTracksPage = openPage;
+  G.importGpxTracks = importFiles;
   G.closeTracksPage = closePage;
   G.tracksPanel = function (tab) { return pageEl.querySelector('[data-panel="' + tab + '"]'); };
 
   // ---------- Beim Start gespeicherte Tracks laden ----------
 
-  dbAll().then(function (all) {
-    records = all || [];
-    records.forEach(function (rec) { if (rec.visible) showTrack(rec, false); });
-    renderList();
-  }).catch(function (err) {
-    console.warn("[GoAhead] Tracks konnten nicht geladen werden:", err);
-    if (listEl) listEl.innerHTML = '<p class="trk-empty">Lokaler Speicher nicht verfügbar: ' + esc(err.message || String(err)) + "</p>";
-  });
+  function loadAll() {
+    return dbAll().then(function (all) {
+      Object.keys(layers).forEach(function (id) { map.removeLayer(layers[id]); });
+      layers = {};
+      parsedCache = {};
+      records = all || [];
+      records.forEach(function (rec) { if (rec.visible) showTrack(rec, false); });
+      renderList();
+    }).catch(function (err) {
+      console.warn("[GoAhead] Tracks konnten nicht geladen werden:", err);
+      if (listEl) listEl.innerHTML = '<p class="trk-empty">Lokaler Speicher nicht verfügbar: ' + esc(err.message || String(err)) + "</p>";
+    });
+  }
+  loadAll();
+  // Nach Sammel-Import oder Wiederherstellen (backup.js) neu einlesen
+  window.addEventListener("goahead:data", loadAll);
 })();

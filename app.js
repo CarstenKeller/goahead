@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "24";
+  var APP_VERSION = "25";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {
@@ -25,12 +25,19 @@
     chart: '<path d="M3 20h18"/><path d="M4 16l5-6 4 3 7-8"/>',
     fit: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
     offline: '<path d="M7 18h10a4 4 0 0 0 .6-8A6 6 0 0 0 6.2 9.3 4.5 4.5 0 0 0 7 18z"/><path d="M9.5 13.5l2 2 3.5-3.5"/>',
-    share: '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/>'
+    share: '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/>',
+    download: '<path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/>',
+    upload: '<path d="M12 15V4"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/>',
+    battery: '<rect x="3" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/><path d="M7 10v4M10 10v4"/>'
   };
   function icon(name) {
     return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" ' +
       'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || "") + "</svg>";
   }
+
+  // Läuft GoAhead in der Android-App (android/), stellt diese window.GoAheadNative bereit:
+  // Aufzeichnung im Hintergrund, Dateien speichern/teilen, Akku-Einstellungen.
+  var NATIVE = window.GoAheadNative || null;
 
   var STORAGE_KEY = "goahead.view.v1";
 
@@ -389,7 +396,17 @@
         '<div class="settings-sub">Unterwegs</div>' +
         numRow("offlineKm", "Karten offline um die Route", "km", 0.2, 5, 0.1) +
         numRow("turnWarnM", "Vibration vor Abbiegung", "m", 5, 200, 5) +
-        '<p class="settings-note">App-Version ' + APP_VERSION + ' · <a href="?diagnose">Diagnose</a></p>' +
+        '<div class="settings-sub">Daten</div>' +
+        '<div class="settings-act"><span>Sicherung</span><span class="icon-row">' +
+          '<button type="button" class="icon-btn settings-backup" title="Sichern (alle Touren, Routen, Tracks, Einstellungen)" aria-label="Sichern">' + icon("download") + "</button>" +
+          '<button type="button" class="icon-btn settings-restore" title="Wiederherstellen" aria-label="Wiederherstellen">' + icon("upload") + "</button>" +
+        "</span></div>" +
+        (NATIVE ? '<div class="settings-sub">Android-App</div>' +
+          '<div class="settings-act"><span class="settings-battery"></span><span class="icon-row">' +
+            '<button type="button" class="icon-btn settings-battery-btn" title="Akku-Einstellungen" aria-label="Akku-Einstellungen">' + icon("battery") + "</button>" +
+          "</span></div>" : "") +
+        '<p class="settings-note">App-Version ' + APP_VERSION + (NATIVE ? " · Android-App " + escapeHtml(nativeCall("appVersion") || "?") : "") +
+          ' · <a href="?diagnose">Diagnose</a></p>' +
       "</div>";
     document.body.appendChild(settingsSheet);
     L.DomEvent.disableClickPropagation(settingsSheet);
@@ -426,13 +443,53 @@
       applyZoomButtons();
     });
     settingsSheet.querySelector(".settings-close").addEventListener("click", function () { settingsSheet.hidden = true; });
+    settingsSheet.querySelector(".settings-backup").addEventListener("click", function () {
+      if (window.GOAHEAD.backup) window.GOAHEAD.backup.save();
+    });
+    settingsSheet.querySelector(".settings-restore").addEventListener("click", function () {
+      if (window.GOAHEAD.backup) window.GOAHEAD.backup.restore();
+    });
+    var batBtn = settingsSheet.querySelector(".settings-battery-btn");
+    if (batBtn) batBtn.addEventListener("click", batteryDialog);
     makeResizable(settingsSheet, settingsSheet.querySelector(".settings-head"), "goahead.settingsHeight.v1");
   })();
 
   function openSettings() {
     closeMenu();
+    renderBattery();
     settingsSheet.hidden = false;
   }
+
+  // ---------- Android-App: Brücke ----------
+
+  // Aufruf einer Methode der App; Fehler (z. B. ältere App ohne diese Methode) ergeben null
+  function nativeCall(name) {
+    if (!NATIVE || typeof NATIVE[name] !== "function") return null;
+    try { return NATIVE[name].apply(NATIVE, Array.prototype.slice.call(arguments, 1)); }
+    catch (e) { console.warn("[GoAhead] App-Aufruf " + name + ":", e); return null; }
+  }
+
+  function batteryOptimized() { return nativeCall("batteryOptimized") === true; }
+
+  function renderBattery() {
+    var elB = settingsSheet.querySelector(".settings-battery");
+    if (!elB) return;
+    var opt = batteryOptimized();
+    elB.textContent = opt ? "⚠ Akku-Optimierung an" : "✓ Akku: nicht eingeschränkt";
+    elB.className = "settings-battery" + (opt ? " is-warn" : "");
+  }
+
+  // Samsung beendet „optimierte“ Apps im Hintergrund – dann bricht die Aufzeichnung ab.
+  // Menüpfade nach Samsung-/Fachseiten (One UI 6), auf dem Gerät nicht geprüft.
+  function batteryDialog() {
+    actionSheet("Akku-Einstellungen", "Damit die Aufzeichnung bei ausgeschaltetem Bildschirm weiterläuft: " +
+      "Akku-Optimierung ausschalten. Samsung zusätzlich: App-Info → Akku → „Nicht eingeschränkt“, " +
+      "und unter Akku → Grenzen der Hintergrundnutzung GoAhead nicht in „Schlafende Apps“.", [
+      { label: "Akku-Optimierung ausschalten", primary: true, onClick: function () { nativeCall("requestBatteryExemption"); } },
+      { label: "App-Info öffnen (Akku → Nicht eingeschränkt)", onClick: function () { nativeCall("openAppSettings"); } }
+    ]);
+  }
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) renderBattery(); });
 
   var SettingsControl = L.Control.extend({
     onAdd: function () {
@@ -1598,6 +1655,13 @@
   // (geprüft im Chromium-Quelltext chrome/browser/webshare/share_service_impl.cc: Endung UND
   // MIME-Typ müssen auf der Liste stehen; .txt/text/plain ja, .gpx nein). Dann Ausweichwege anbieten.
   function shareGpx(fileName, gpxText, title, detailText) {
+    // Android-App: echte .gpx-Datei über das Teilen-Menü von Android
+    if (NATIVE) {
+      if (!nativeCall("shareFile", fileName, "application/gpx+xml", gpxText, title || "", detailText || "")) {
+        showStatus("Teilen fehlgeschlagen.", 5000);
+      }
+      return;
+    }
     function tryShare(file) {
       var data = { title: title, text: detailText };
       if (file) data.files = [file];
@@ -1633,6 +1697,15 @@
   }
 
   function downloadFile(fileName, text, mime) {
+    if (NATIVE) {
+      // WebView kann keine Downloads über <a download> – die App legt die Datei in „Downloads“ ab
+      if (nativeCall("saveFile", fileName, mime || "application/octet-stream", text)) {
+        showStatus("Gespeichert unter „Downloads“: " + fileName, 5000);
+      } else {
+        showStatus("Speichern fehlgeschlagen: " + fileName, 6000);
+      }
+      return;
+    }
     var blob = new Blob([text], { type: mime || "application/octet-stream" });
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1647,6 +1720,7 @@
   window.GOAHEAD = {
     map: map,
     showStatus: showStatus,
+    hideStatus: hideStatus,
     escapeHtml: escapeHtml,
     stopFollowing: stopFollowing,
     addToToolbar: addToToolbar,
@@ -1669,7 +1743,10 @@
     getSettings: function () { return settings; },
     onSettingsChange: function (fn) { settingsListeners.push(fn); },
     shareGpx: shareGpx,
-    icon: icon
+    icon: icon,
+    version: APP_VERSION,
+    // Android-App (sonst null): native.call("methode", …), native.batteryOptimized(), native.batteryDialog()
+    native: NATIVE ? { call: nativeCall, batteryOptimized: batteryOptimized, batteryDialog: batteryDialog } : null
   };
 
   // ---------- Service Worker (App-Hülle offline verfügbar) ----------

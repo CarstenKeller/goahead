@@ -1,2 +1,7 @@
 # beim Veröffentlichen erzeugt (siehe .github/workflows/pages.yml)
 symbols/tfis/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.p12

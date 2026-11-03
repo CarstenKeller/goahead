@@ -81,6 +81,12 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   - Der Zwischenstand wird laufend lokal gesichert. Wird die Seite neu geladen, geht die Tour pausiert weiter.
   - **Grenze:** Eine Web-App zeichnet nur auf, solange sie sichtbar ist. Die App hält deshalb den Bildschirm an
     (Screen Wake Lock), sofern der Browser das kann; sonst erscheint ein Hinweis.
+  - **Android-App** (`android/`, siehe [android/README.md](android/README.md)): zeigt GoAhead bildschirmfüllend und
+    zeichnet über einen Vordergrunddienst **auch bei ausgeschaltetem Bildschirm** auf; vibriert dann auch vor
+    Abbiegungen. Beim Einschalten holt die Web-App die Punkte ab. Ist die Akku-Optimierung noch an, erscheint
+    „⚠ Akku-Optimierung an“ und beim Start ein Dialog zu den Akku-Einstellungen (Samsung).
+    In der App werden GPX-Dateien als echte `.gpx` geteilt und Exporte unter „Downloads“ gespeichert.
+    Download der APK: https://carstenkeller.github.io/goahead/app/goahead.apk
 - **Untere Leisten ziehen:** Planungsfeld und Unterwegs-Feld lassen sich am Griff oben größer oder kleiner ziehen
   (Höhe wird gespeichert). Alle unteren Leisten legen sich über Positions-Knopf, Maßstab und Quellenangabe,
   ohne sie zu verschieben.
@@ -90,6 +96,11 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   Routing beim Planen (BRouter, Standard, mit Höhen / OSRM), Gehgeschwindigkeit (Ebene, Steigung, Gefälle in km/h,
   Schwelle in %), Unterwegs: Offline-Abstand (km) und Vibrationsabstand (m), App-Version, Link zur Diagnose.
   Alles wird gespeichert.
+- **Sicherung** (Einstellungen → Daten): *Sichern* schreibt alle Tracks, geplanten Routen, erwanderten Touren und
+  Einstellungen in eine JSON-Datei (`goahead-sicherung-JJJJ-MM-TT.json`; speichern oder teilen, z. B. an Google Drive).
+  *Wiederherstellen* ergänzt: Einträge mit gleicher Kennung werden überschrieben, andere bleiben. Laufende Tour und
+  Planungsentwurf des Geräts werden nicht überschrieben. So zieht man auch von Chrome in die Android-App um.
+  In der Android-App zusätzlich: Akku-Zustand und Knopf zu den Akku-Einstellungen.
 - **Untere Leisten** lassen sich bis auf ihre Kopfzeile zusammenschieben; der Positions-Knopf sitzt immer darüber.
 - Positions-Knopf (unten rechts): Die Karte folgt der Position (Knopf blau). Im Folgemodus wird um die eigene
   Position gezoomt. Verschieben der Karte oder Zoomen auf einen GPX-Track beendet das Folgen, ein Tipp auf den
@@ -128,6 +139,16 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   - OSM (Waymarked Trails): nur 100/200/400 %. Es werden Kacheln einer gröberen Zoomstufe vergrößert angezeigt.
 - **GPX-Tracks** (Reiter *GPX* auf der Seite *Tracks*):
   - Eine oder mehrere GPX-Dateien importieren. Gelesen werden Tracks, Routen und Wegpunkte.
+  - **Sammel-Import** (z. B. aus komoot): viele GPX-Dateien oder ZIP-Archive (auch Ordner darin) auf einmal.
+    Danach wählen: *Automatisch* (Dateien mit Zeitstempeln an fast allen Punkten → *Erwandert*, sonst → *Geplant*),
+    alle nach *Geplant*, alle nach *Erwandert* oder alle nach *GPX*. Geplante werden zu Routen mit Wegpunkten etwa
+    alle 1 km; die Linie bleibt wie in der Datei und lässt sich wie eine eigene Planung verändern und abgehen.
+    Erwanderte behalten Zeitstempel; die Zeit in Bewegung ist geschätzt (Lücken über 2 min und Stillstand zählen nicht).
+    Schon importierte Dateien (gleicher Name, Länge, Start) werden übersprungen.
+    **komoot:** bietet offiziell nur den GPX-Download je Tour (App: ⋯ → „GPX-Datei herunterladen“, Web: „Export“;
+    die Region muss freigeschaltet sein). Ob komoot geplanten Touren Zeitstempel mitgibt, ist ungeprüft – im Zweifel
+    geplante und gemachte Touren getrennt importieren und das Ziel ausdrücklich wählen.
+    ZIP: Verfahren „stored“/„deflate“ (Entpacken über `DecompressionStream`, Chrome ab 80, Safari ab 16.4), kein ZIP64.
   - Gespeichert wird die Original-Datei lokal im Browser (IndexedDB), sie ist auch nach einem Neustart
     wieder da. Je Track: ein-/ausblenden (Zustand wird gespeichert), hinzoomen, GPX herunterladen, löschen.
   - Angezeigt werden Länge, Anstieg (aus den Höhenwerten der Datei, daher nur „ca.“) und die Zahl der Wegpunkte.
@@ -202,6 +223,8 @@ Einmalig nötig: unter *Settings → Pages → Build and deployment → Source* 
 - `planner.js`: Route planen (Routing, Suche, Planungsfeld), Liste *Geplant*, GPX-Export
 - `offline.js`: Offline-Karten entlang der Route
 - `nav.js`: Unterwegs-Modus, Aufzeichnung, Abbiegungen, Liste *Erwandert*
+- `backup.js`: Sicherung/Wiederherstellen, Sammel-Import (GPX, ZIP) nach *Geplant*/*Erwandert*
+- `android/`: Android-App (WebView + Aufzeichnung im Hintergrund), Build im Pages-Workflow
 - `config.js`: Kartendienste, Startansicht, Zoomstufe
 - `sw.js`, `manifest.webmanifest`, `icons/`: PWA (installierbar, App-Hülle offline)
 - `vendor/leaflet/`: Leaflet 1.9.4 (BSD-2-Clause), lokal eingebunden

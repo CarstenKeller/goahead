@@ -18,7 +18,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Android-App (WebView + Aufzeichnung im Hintergrund), siehe android/README.md.
+  # Signiert wird mit dem verschlüsselten Schlüssel android/goahead-keystore.p12.enc; das Passwort
+  # steht im Repository-Secret GOAHEAD_KEYSTORE_PASSWORD. Ohne Secret: nur Probe-Build, keine APK auf der Seite.
+  android:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+      - name: APK bauen
+        working-directory: android
+        env:
+          GOAHEAD_KEYSTORE_PASSWORD: ${{ secrets.GOAHEAD_KEYSTORE_PASSWORD }}
+          GOAHEAD_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          set -e
+          mkdir -p /tmp/apk
+          if [ -n "$GOAHEAD_KEYSTORE_PASSWORD" ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in goahead-keystore.p12.enc \
+              -out /tmp/goahead.p12 -pass env:GOAHEAD_KEYSTORE_PASSWORD
+            export GOAHEAD_KEYSTORE_FILE=/tmp/goahead.p12
+            gradle --no-daemon assembleRelease
+            cp app/build/outputs/apk/release/app-release.apk /tmp/apk/goahead.apk
+            rm -f /tmp/goahead.p12
+          else
+            echo "::warning::Secret GOAHEAD_KEYSTORE_PASSWORD fehlt – nur Probe-Build (Debug), keine APK auf der Seite."
+            unset GOAHEAD_KEYSTORE_PASSWORD
+            gradle --no-daemon assembleDebug
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: goahead-apk
+          path: /tmp/apk/
+          if-no-files-found: ignore
+
   deploy:
+    needs: android
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -39,6 +82,14 @@ jobs:
           find /tmp/tfis/svg_Dateien/Wanderwege -name '*.svg' -exec cp {} symbols/tfis/ \;
           python3 .github/scripts/fix_svg_viewbox.py symbols/tfis
           echo "Wegzeichen: $(ls symbols/tfis | wc -l), Größe: $(du -sh symbols/tfis | cut -f1)"
+      - name: Android-APK übernehmen (falls gebaut)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: goahead-apk
+          path: app/
+      - name: Quelltext der Android-App nicht veröffentlichen
+        run: rm -rf android
       # Statische Seite ohne Build: Repository-Inhalt wird direkt ausgeliefert
       # (.git und .github werden von upload-pages-artifact ausgelassen)
       - uses: actions/upload-pages-artifact@v3

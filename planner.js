@@ -1279,6 +1279,8 @@
     });
   }
 
+  window.addEventListener("goahead:data", function () { loadRoutes(); });
+
   function renderRoutesList() {
     var box = G.tracksPanel && G.tracksPanel("planned");
     if (!box) return;

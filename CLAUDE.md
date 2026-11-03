@@ -71,10 +71,17 @@ Platz wie möglich:
 - `planner.js`: Route planen, Liste *Geplant*, GPX-Export.
 - `offline.js`: Kartenkacheln entlang einer Route offline speichern (Cache `goahead-tiles-v1`).
 - `nav.js`: Unterwegs-Modus, Aufzeichnung, Abbiegungen/Vibration, Liste *Erwandert*.
+- `backup.js`: Sicherung/Wiederherstellen (alle Speicher + `goahead.*` in localStorage), Sammel-Import GPX/ZIP.
+  Nach Änderungen an gespeicherten Daten `goahead:data` auf `window` auslösen – die Listen laden dann neu.
+- `android/`: Android-App (Kotlin, WebView). Brücke `window.GoAheadNative`, in der Web-App nur über `G.native`
+  (`G.native.call(name, …)`, sonst `null`). Downloads/Teilen laufen dort über die App (`G.downloadFile`, `G.shareGpx`
+  benutzen, nie eigene `<a download>`). Aufzeichnung: Dienst sammelt, `nav.js` holt ab (`pullNative`); in der App
+  vibriert nur der Dienst. Die App-Methoden ändern sich selten – neue nur zusätzlich, alte nicht umbenennen
+  (installierte Apps werden nicht automatisch aktualisiert). Build nur in GitHub Actions; testen am Gerät des Nutzers.
 - `sw.js`: App-Hülle (Netz zuerst) und Kacheln aus dem Offline-Speicher. Der Kachel-Cache darf beim
   Aktualisieren des Service Workers **nicht** gelöscht werden (sonst gehen Offline-Karten mitten in einer Tour verloren).
 - `config.js`: Kartendienste. Reihenfolge der Skripte in `index.html` beachten
-  (app → tracks → planner → offline → nav).
+  (app → tracks → planner → offline → nav → backup).
 
 ## Bei jeder Veröffentlichung
 
@@ -98,6 +105,7 @@ Platz wie möglich:
 - Die Entwicklungsumgebung hat meist **keinen Zugriff** auf die externen Dienste (wms.nrw.de, BRouter,
   OSRM, Nominatim, Waymarked Trails). Getestet wird mit Playwright/Chromium (headless, Gerät „Pixel 7“)
   und **nachgebildeten Antworten** (`context.route`). Das in der Rückmeldung an den Nutzer offen sagen.
+- App-Modus testen: `window.GoAheadNative` per `addInitScript` nachbilden.
 - Prüfen: keine JavaScript-Fehler (`pageerror`), Abläufe Schritt für Schritt, Screenshots ansehen.
 - Grenzen der Testumgebung kennen: Playwright beantwortet nachgebildete Anfragen auch „offline“ und ergänzt
   CORS-Freigaben selbst. Fehlendes Netz bzw. CORS-Ablehnung daher mit `route.abort()` nachstellen.

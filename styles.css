@@ -1015,6 +1015,19 @@ button {
   font-weight: 600;
   color: var(--c-muted);
 }
+.settings-act {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+.settings-act > span:first-child {
+  flex: 1;
+}
+.settings-battery.is-warn {
+  color: var(--c-danger);
+  font-weight: 600;
+}
 .settings-num {
   display: flex;
   align-items: center;

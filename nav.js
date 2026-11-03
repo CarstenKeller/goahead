@@ -9,6 +9,10 @@
  *
  * Grenze von Web-Apps: Aufgezeichnet wird nur, solange die App sichtbar ist. Die App
  * hält deshalb den Bildschirm an (Screen Wake Lock), wo der Browser das unterstützt.
+ *
+ * In der Android-App (android/, window.GoAheadNative) zeichnet stattdessen ein Vordergrunddienst
+ * auf – auch bei ausgeschaltetem Bildschirm. Diese Seite holt die Punkte dort ab (pullNative),
+ * sobald sie sichtbar ist, und alle paar Sekunden, solange sie sichtbar bleibt.
  */
 (function () {
   "use strict";
@@ -26,6 +30,7 @@
 
   var walk = null;         // laufende Tour
   var active = false;
+  var NATIVE = G.native;   // Android-App oder null
 
   // ---------- Hilfen ----------
 
@@ -66,6 +71,7 @@
   var wakeLockOk = null;   // null = unbekannt, true/false nach dem ersten Versuch
 
   function requestWakeLock() {
+    if (NATIVE) return;   // App: Aufzeichnung läuft auch bei ausgeschaltetem Bildschirm
     if (!("wakeLock" in navigator)) { wakeLockOk = false; renderPanel(); return; }
     navigator.wakeLock.request("screen").then(function (lock) {
       wakeLock = lock;
@@ -160,19 +166,21 @@
       var delta = bearing(grid[i], grid[i + K]) - bearing(grid[i - K], grid[i]);
       while (delta > 180) delta -= 360;
       while (delta < -180) delta += 360;
-      if (Math.abs(delta) > 35) cand.push({ d: grid[i].d, angle: delta });
+      if (Math.abs(delta) > 35) cand.push({ d: grid[i].d, angle: delta, lat: grid[i].lat, lng: grid[i].lng });
     }
     // benachbarte Kandidaten (innerhalb 25 m) zu einer Abbiegung zusammenfassen
     var out = [];
     cand.forEach(function (c) {
       var last = out[out.length - 1];
       if (last && c.d - last.d <= 25) {
-        if (Math.abs(c.angle) > Math.abs(last.angle)) { last.d = c.d; last.angle = c.angle; }
+        if (Math.abs(c.angle) > Math.abs(last.angle)) { last.d = c.d; last.angle = c.angle; last.lat = c.lat; last.lng = c.lng; }
       } else {
-        out.push({ d: c.d, angle: c.angle });
+        out.push({ d: c.d, angle: c.angle, lat: c.lat, lng: c.lng });
       }
     });
-    return out.map(function (t) { return { d: t.d, angle: Math.round(t.angle), dir: t.angle > 0 ? "rechts" : "links" }; });
+    return out.map(function (t) {
+      return { d: t.d, angle: Math.round(t.angle), dir: t.angle > 0 ? "rechts" : "links", lat: t.lat, lng: t.lng };
+    });
   }
 
   // eigene Position auf die Route projizieren (Rasterpunkte; erst in der Nähe der letzten Stelle suchen)
@@ -213,11 +221,80 @@
       if (ahead < 0) continue;
       if (ahead <= warn && !walk.turnsDone[i]) {
         walk.turnsDone[i] = true;
-        vibrateFor(t.dir);
+        if (!NATIVE) vibrateFor(t.dir);   // App: vibriert der Aufzeichnungsdienst (auch bei Bildschirm aus)
         turnFlash = { text: (t.dir === "links" ? "↰ links" : "↱ rechts") + " in " + Math.round(ahead) + " m", until: Date.now() + 6000 };
       }
       break;   // nur die nächste Abbiegung
     }
+  }
+
+  // App: kommende Abbiegungen an den Aufzeichnungsdienst geben (vibriert bei Bildschirm aus).
+  // Nur noch nicht gemeldete (turnsDone) und noch nicht passierte – sonst vibrierte es doppelt.
+  var sentTurnsKey = null;
+  function sendTurns() {
+    if (!NATIVE || !walk) return;
+    var warn = (G.getSettings().turnWarnM || 20);
+    var from = progress && progress.off <= OFF_ROUTE_M ? progress.d : -Infinity;
+    var done = walk.turnsDone || {};
+    var list = turns.filter(function (t, i) { return t.d > from && !done[i]; });
+    var key = list.length + "|" + (list[0] ? list[0].d : "") + "|" + warn;
+    if (key === sentTurnsKey) return;
+    sentTurnsKey = key;
+    NATIVE.call("setTurns", JSON.stringify(list.map(function (t) {
+      return [Math.round(t.lat * 1e6) / 1e6, Math.round(t.lng * 1e6) / 1e6, t.dir === "links" ? "l" : "r"];
+    })), Math.round(warn));
+  }
+
+  // App: neue Punkte vom Aufzeichnungsdienst übernehmen
+  function pullNative() {
+    if (!NATIVE || !walk) return 0;
+    var raw = NATIVE.call("getPoints", walk.nativeIdx || 0);
+    var pts;
+    try { pts = JSON.parse(raw || "[]"); } catch (e) { return 0; }
+    if (!pts.length) return 0;
+    walk.nativeIdx = (walk.nativeIdx || 0) + pts.length;
+    pts.forEach(function (q) { addPoint([q[0], q[1], q[2], q[3]], false); });
+    walk.lastFix = Date.now();
+    var q = pts[pts.length - 1];
+    progress = locateOnRoute(q[0], q[1]) || progress;
+    checkTurns();   // markiert Abbiegungen, die der Dienst inzwischen gemeldet hat (vibriert hier nicht)
+    saveWalk();
+    drawWalk();
+    sendTurns();
+    renderPanel();
+    return pts.length;
+  }
+  function nativeRefresh() {
+    if (!active || !walk) return;
+    pullNative();
+    sendTurns();
+    nativeBattery = NATIVE.batteryOptimized();
+    renderPanel();
+  }
+  var nativeBattery = false;
+  if (NATIVE) {
+    window.GOAHEAD_NATIVE_RESUME = nativeRefresh;   // ruft die App beim Zurückkehren auf
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) nativeRefresh(); });
+  }
+
+  // Punkt an das laufende Teilstück hängen: p = [lat, lon, höhe|null, zeit ms]
+  function addPoint(p, draw) {
+    var seg = walk.segments[walk.segments.length - 1];
+    if (seg.length) {
+      var last = seg[seg.length - 1];
+      var d = L.latLng(last[0], last[1]).distanceTo(L.latLng(p[0], p[1]));
+      if (d < MIN_STEP) return false;
+      walk.distance += d;
+    }
+    seg.push(p);
+    if (draw && currentLine) {
+      currentLine.addLatLng([p[0], p[1]]);
+      // weiße Kontur mitführen
+      var layers = walkLayer.getLayers();
+      var casing = layers[layers.length - 2];
+      if (casing && casing.addLatLng) casing.addLatLng([p[0], p[1]]);
+    }
+    return true;
   }
 
   // ---------- Aufzeichnung ----------
@@ -244,25 +321,13 @@
     if (walk.paused) { renderPanel(); return; }
     var c = pos.coords;
     walk.lastFix = Date.now();
-    if (c.accuracy > MAX_ACCURACY) { walk.weak = true; renderPanel(); return; }
-    walk.weak = false;
-    var seg = walk.segments[walk.segments.length - 1];
+    walk.weak = c.accuracy > MAX_ACCURACY;
+    // App: aufgezeichnet wird im Dienst; hier nur abholen
+    if (NATIVE) { pullNative(); renderPanel(); return; }
+    if (walk.weak) { renderPanel(); return; }
     var p = [Math.round(c.latitude * 1e6) / 1e6, Math.round(c.longitude * 1e6) / 1e6,
       c.altitude != null ? Math.round(c.altitude * 10) / 10 : null, pos.timestamp || Date.now()];
-    if (seg.length) {
-      var last = seg[seg.length - 1];
-      var d = L.latLng(last[0], last[1]).distanceTo(L.latLng(p[0], p[1]));
-      if (d < MIN_STEP) return;
-      walk.distance += d;
-    }
-    seg.push(p);
-    if (currentLine) {
-      currentLine.addLatLng([p[0], p[1]]);
-      // weiße Kontur mitführen
-      var layers = walkLayer.getLayers();
-      var casing = layers[layers.length - 2];
-      if (casing && casing.addLatLng) casing.addLatLng([p[0], p[1]]);
-    }
+    if (!addPoint(p, true)) return;
     saveWalk();
     renderPanel();
   });
@@ -393,7 +458,8 @@
     else if (progress && progress.off > OFF_ROUTE_M) { st = "⚠ " + Math.round(progress.off) + " m neben der Route"; cls = "is-warn"; }
     else if (!walk.lastFix) { st = "● Aufnahme · warte auf GPS"; }
     else if (walk.weak) { st = "⚠ GPS ungenau"; cls = "is-warn"; }
-    else if (wakeLockOk === false) { st = "⚠ Bildschirm anlassen"; cls = "is-warn"; }
+    else if (NATIVE && nativeBattery) { st = "⚠ Akku-Optimierung an"; cls = "is-warn"; }
+    else if (!NATIVE && wakeLockOk === false) { st = "⚠ Bildschirm anlassen"; cls = "is-warn"; }
     else { st = "● Aufnahme"; }
     el.state.textContent = st;
     el.state.className = "nav-state " + cls;
@@ -464,7 +530,18 @@
     progress = null;
     lastProfileKey = "";
     clearInterval(ticker);
-    ticker = setInterval(function () { if (walk && !walk.paused) renderPanel(); }, 1000);
+    var tick = 0;
+    ticker = setInterval(function () {
+      if (!walk) return;
+      if (NATIVE && !document.hidden && ++tick % 3 === 0 && !walk.paused) pullNative();
+      if (!walk.paused) renderPanel();
+    }, 1000);
+    if (NATIVE) {
+      sentTurnsKey = null;
+      nativeBattery = NATIVE.batteryOptimized();
+      pullNative();
+      sendTurns();
+    }
     renderPanel();
     // Offline-Karten (auch nach Neuladen: bereits gespeicherte Kacheln werden übersprungen)
     setTimeout(startOffline, 1500);
@@ -491,10 +568,13 @@
       pausedTotal: 0,
       segments: [[]],
       distance: 0,
-      lastFix: null
+      lastFix: null,
+      nativeIdx: 0
     };
+    if (NATIVE) NATIVE.call("startRecording", true);
     saveWalk();
     enter();
+    if (NATIVE && nativeBattery) setTimeout(NATIVE.batteryDialog, 800);
     if (line.length > 1) map.fitBounds(L.latLngBounds(line), { padding: [30, 30], maxZoom: 16 });
     // dann auf die eigene Position und ihr folgen
     setTimeout(function () { G.follow(); }, 600);
@@ -502,6 +582,7 @@
   }
 
   function pause() {
+    if (NATIVE) { pullNative(); NATIVE.call("pauseRecording"); }
     walk.paused = true;
     walk.pausedAt = Date.now();
     saveWalk();
@@ -514,6 +595,7 @@
     walk.pausedAt = null;
     walk.interrupted = false;
     walk.lastFix = null;
+    if (NATIVE) { pullNative(); NATIVE.call("startRecording", false); }
     // neues Teilstück, damit die Pause nicht als gerade Linie überbrückt wird
     if (walk.segments[walk.segments.length - 1].length) walk.segments.push([]);
     saveWalk();
@@ -580,6 +662,7 @@
   }
 
   function leave() {
+    if (NATIVE) NATIVE.call("stopRecording");   // erst nach dem Speichern bzw. Verwerfen: löscht die Punkte im Dienst
     active = false;
     walk = null;
     stats = null;
@@ -718,7 +801,12 @@
     var saved = JSON.parse(window.localStorage.getItem(WALK_KEY) || "null");
     if (saved && Array.isArray(saved.segments)) {
       walk = saved;
-      if (!walk.paused) {
+      var nState = NATIVE ? NATIVE.call("recordingState") : null;
+      if (nState === "rec" && walk.paused) NATIVE.call("pauseRecording");   // Zustand der Seite gilt
+      if (!walk.paused && nState === "rec") {
+        // App: Der Dienst hat weiter aufgezeichnet – nichts verloren, einfach fortsetzen
+        walk.interrupted = false;
+      } else if (!walk.paused) {
         // Seite wurde während der Aufzeichnung neu geladen: pausiert fortsetzen
         // Pause ab der letzten Sicherung, damit die Zeit ohne Aufzeichnung nicht mitzählt
         walk.paused = true;
@@ -731,6 +819,7 @@
   } catch (e) { /* keine laufende Tour */ }
 
   loadWalks();
+  window.addEventListener("goahead:data", loadWalks);
 
   G.nav = {
     start: start,
