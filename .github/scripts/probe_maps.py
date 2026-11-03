@@ -192,6 +192,44 @@ def second():
     page("Sachsen Nutzungsbedingungen", "https://geoportal.sachsen.de/nutzungsbedingungen.html", r"lizenz|dl-de|cc by|namensnennung")
 
 
+DOPS = [
+    ("NW", "https://www.wms.nrw.de/geobasis/wms_nw_dop", "nw_dop_rgb", "1.3.0", (8.2, 51.2)),
+    ("BY", "https://geoservices.bayern.de/od/wms/dop/v1/dop20", "by_dop20c", "1.1.1", (11.5, 48.1)),
+    ("NI", "https://opendata.lgln.niedersachsen.de/doorman/noauth/dop_wms", "ni_dop20", "1.3.0", (9.7, 52.4)),
+    ("HE", "https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows", "he_dop_rgb", "1.3.0", (8.7, 50.1)),
+    ("BW", "https://owsproxy.lgl-bw.de/owsproxy/ows/WMS_LGL-BW_ATKIS_DOP_20_C", "IMAGES_DOP_20_RGB", "1.3.0", (9.2, 48.8)),
+    ("RP", "https://geo4.service24.rlp.de/wms/rp_dop20.fcgi", "rp_dop20", "1.3.0", (7.6, 50.0)),
+    ("SN", "https://geodienste.sachsen.de/wms_geosn_dop-rgb/guest", "sn_dop_020", "1.3.0", (13.7, 51.05)),
+    ("TH", "https://www.geoproxy.geoportal-th.de/geoproxy/services/DOP20", "th_dop", "1.3.0", (11.0, 50.98)),
+    ("BB", "https://isk.geobasis-bb.de/mapproxy/dop20c/service/wms", "bebb_dop20c", "1.3.0", (13.06, 52.4)),
+    ("SH", "https://dienste.gdi-sh.de/WMS_SH_DOP20col_OpenGBD", "sh_dop20_rgb", "1.3.0", (10.13, 54.32)),
+    ("ST", "https://www.geodatenportal.sachsen-anhalt.de/wss/service/ST_LVermGeo_DOP_WMS_OpenData/guest", "lsa_lvermgeo_dop20_2", "1.3.0", (11.97, 51.48)),
+    ("MV", "https://www.geodaten-mv.de/dienste/adv_dop", "mv_dop", "1.3.0", (11.41, 53.63)),
+    ("BE", "https://gdi.berlin.de/services/wms/truedop_2024", "truedop_2024", "1.3.0", (13.4, 52.52)),
+    ("SL", "https://geoportal.saarland.de/freewms/dop2023", "sl_dop20_rgb", "1.3.0", (7.0, 49.23)),
+]
+
+
+def third():
+    print("# Kartendienste – Prüfung 3")
+    z, x, y = xyz(13.0, 47.3)
+    for host in ("mapsneu.wien.gv.at", "maps.wien.gv.at", "maps1.wien.gv.at", "www.basemap.at"):
+        tile("basemap.at standard " + host, f"https://{host}/basemap/geolandbasemap/normal/google3857/{z}/{y}/{x}.png")
+    tile("basemap.at orthofoto mapsneu", f"https://mapsneu.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857/{z}/{y}/{x}.jpeg")
+    tile("TopPlusOpen z05", "https://sgx.geodatenzentrum.de/wmts_topplus_open/tile/1.0.0/web/default/WEBMERCATOR/05/10/16.png")
+    tile("TopPlusOpen z5", "https://sgx.geodatenzentrum.de/wmts_topplus_open/tile/1.0.0/web/default/WEBMERCATOR/5/10/16.png")
+    for code, base, layer, ver, (lon, lat) in DOPS:
+        crsp = "CRS" if ver == "1.3.0" else "SRS"
+        u = (base + f"?SERVICE=WMS&VERSION={ver}&REQUEST=GetMap&LAYERS={layer}&STYLES=&{crsp}=EPSG:3857"
+             f"&BBOX={bbox(lon, lat)}&WIDTH=256&HEIGHT=256&FORMAT=image/jpeg")
+        tile("DOP " + code + " jpeg", u)
+    page("Sachsen-Anhalt Open Data Lizenz", "https://www.lvermgeo.sachsen-anhalt.de/de/gdp-open-data.html", r"lizenz|dl-de|cc by|namensnennung")
+
+
+if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "3":
+    third()
+    sys.exit(0)
+
 if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "2":
     second()
     sys.exit(0)
