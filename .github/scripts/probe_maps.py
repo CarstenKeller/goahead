@@ -67,7 +67,7 @@ def wms(name, base, sample_bbox3857):
                 layers.append((nm, title))
     for el in root.iter():
         if local(el.tag) in ("AccessConstraints", "Fees"):
-            print(local(el.tag) + ":", (el.text or "").strip()[:300])
+            print(local(el.tag) + ":", (el.text or "").strip()[:900])
     print("Version:", ver, "| EPSG:3857:", "EPSG:3857" in crs, "| Ebenen:", "; ".join(f"{n} ({t})" for n, t in layers[:25]))
     if layers:
         ln = layers[0][0] if len(layers) == 1 else next((n for n, _ in layers if re.search(r"dop|rgb|ortho", n, re.I)), layers[-1][0])
@@ -151,6 +151,50 @@ def xyz(lon, lat, z=14):
     y = int((1 - math.log(math.tan(math.radians(lat)) + 1 / math.cos(math.radians(lat))) / math.pi) / 2 * n)
     return z, x, y
 
+
+def tilematrix_ids(url, setname):
+    st, h, b = get(url)
+    root = ET.fromstring(b)
+    for tms in root.iter():
+        if local(tms.tag) != "TileMatrixSet":
+            continue
+        kids = list(tms)
+        ident = next((c.text for c in kids if local(c.tag) == "Identifier"), None)
+        if ident != setname:
+            continue
+        ids = [next((m.text for m in tm if local(m.tag) == "Identifier"), None) for tm in kids if local(tm.tag) == "TileMatrix"]
+        print(f"TileMatrixSet {setname}: {len(ids)} Stufen, Kennungen {ids[:3]} … {ids[-2:]}")
+
+
+def second():
+    print("# Kartendienste – Prüfung 2")
+    z, x, y = xyz(9.2, 48.8)
+    tilematrix_ids("https://sgx.geodatenzentrum.de/wmts_topplus_open/1.0.0/WMTSCapabilities.xml", "WEBMERCATOR")
+    tile("TopPlusOpen web", f"https://sgx.geodatenzentrum.de/wmts_topplus_open/tile/1.0.0/web/default/WEBMERCATOR/{z}/{y}/{x}.png")
+    tilematrix_ids("https://sgx.geodatenzentrum.de/wmts_basemapde/1.0.0/WMTSCapabilities.xml", "GLOBAL_WEBMERCATOR")
+    tile("basemap.de farbe", f"https://sgx.geodatenzentrum.de/wmts_basemapde/tile/1.0.0/de_basemapde_web_raster_farbe/default/GLOBAL_WEBMERCATOR/{z}/{y}/{x}.png")
+    z, x, y = xyz(13.0, 47.3)
+    tile("basemap.at standard", f"https://maps1.wien.gv.at/basemap/geolandbasemap/normal/google3857/{z}/{y}/{x}.png")
+    tile("basemap.at orthofoto", f"https://maps2.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857/{z}/{y}/{x}.jpeg")
+    page("basemap.at Lizenz", "https://basemap.at/", r"lizenz|licen|cc.by|nutzung")
+    for name, base, (lon, lat) in [
+        ("HE (lika-services)", "https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows", (8.7, 50.1)),
+        ("HE (freeimages)", "https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-freeimages.ows", (8.7, 50.1)),
+        ("HE (Geoportal 54936)", "https://www.geoportal.hessen.de/mapbender/php/wms.php?inspire=1&layer_id=54936&withChilds=1", (8.7, 50.1)),
+        ("HH (Zeitreihe)", "https://geodienste.hamburg.de/wms_dop_zeitreihe_unbelaubt", (10.0, 53.55)),
+        ("HH (HH_WMS_DOP_hochaufloesend)", "https://geodienste.hamburg.de/HH_WMS_DOP_hochaufloesend", (10.0, 53.55)),
+        ("ST", "https://www.geodatenportal.sachsen-anhalt.de/wss/service/ST_LVermGeo_DOP_WMS_OpenData/guest", (11.97, 51.48)),
+        ("MV", "https://www.geodaten-mv.de/dienste/adv_dop", (11.41, 53.63)),
+        ("SN", "https://geodienste.sachsen.de/wms_geosn_dop-rgb/guest", (13.7, 51.05)),
+        ("SL", "https://geoportal.saarland.de/freewms/dop2023", (7.0, 49.23)),
+    ]:
+        wms("DOP " + name, base, bbox(lon, lat))
+    page("Sachsen Nutzungsbedingungen", "https://geoportal.sachsen.de/nutzungsbedingungen.html", r"lizenz|dl-de|cc by|namensnennung")
+
+
+if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "2":
+    second()
+    sys.exit(0)
 
 if __name__ == "__main__":
     print("# Kartendienste – Prüfung")
