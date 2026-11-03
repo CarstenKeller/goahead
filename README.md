@@ -27,6 +27,14 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
       Doppeltipp wechselt zwischen *Weg* (Routing) und *direkt* (gerade Linie, gestrichelt, mit ihrer Länge
       in der Gesamtstrecke). Gilt auch für den Rückweg einer Rundtour.
   - *Rückgängig/Wiederholen*: bis zu 20 Schritte (während der Sitzung).
+  - Für alle vorläufigen (orangen) Punkte gilt: antippen = übernehmen, ziehen = verschieben, Tipp woanders = wegnehmen.
+  - **Höhen und Dauer:** Kopfzeile zeigt Punkte, Länge, ↑/↓ Höhenmeter und ≈ Gehzeit. Symbolknopf *Höhenprofil* blendet
+    ein Säulendiagramm ein (Farbe: Steigung/Ebene/Gefälle); Antippen/Ziehen darin zeigt Entfernung und Höhe und
+    markiert die Stelle auf der Karte.
+    - Höhen stammen aus BRouter (dritter Koordinatenwert, geprüft im Quelltext `FormatJson`). Abschnitte ohne Höhen
+      (OSRM, direkte Linien) werden zwischen bekannten Höhen linear aufgefüllt. Höhenmeter zählen ab 3 m Änderung.
+    - Gehzeit: Route im 25-m-Raster; je Schritt Steigung (> Schwelle), Gefälle (< −Schwelle) oder Ebene mit der
+      jeweiligen Geschwindigkeit aus den **Einstellungen** (Startwerte als Annahme: 4,5 / 3,0 / 4,0 km/h, Schwelle 5 %).
   - Suche: Adresse (Nominatim/OpenStreetMap) oder Koordinaten: Dezimalgrad (`51.758, 9.030`, auch mit
     Dezimalkomma oder vertauscht) oder UTM Zone 32 wie in TIM-online (`32U 494000 5735000` oder `494000 5735000`).
     Koordinaten setzen direkt einen Vorschlagspunkt.
@@ -37,11 +45,17 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   - Neue Route: *Tracks → Geplant → ＋ Neue Route planen*.
 - **Tracks** (Knopf mit Linien-Symbol im Menü): eigene Seite mit den Reitern *GPX*, *Geplant*, *Erwandert*.
   - *Geplant*: gespeicherte Routen mit Länge, Anstieg, Punktzahl, Datum. Antippen öffnet ein Menü:
-    *▶ Los geht's* (Unterwegs-Modus), *✎ Verändern* (Planungsmodus), *⬇ GPX exportieren*, *🗑 Löschen*.
+    *▶ Los geht's* (Unterwegs-Modus), *✎ Verändern* (Planungsmodus), *↗ Teilen*, *⬇ GPX exportieren*, *🗑 Löschen*.
     GPX-Export: Track mit der berechneten Linie (inkl. Rundtour-Rückweg) und Wegpunkte für die geplanten Punkte.
   - *Erwandert*: beendete Aufzeichnungen mit Länge, Zeit in Bewegung, Anstieg (aus GPS-Höhen, daher „ca.“), Datum.
     Antippen: auf der Karte zeigen/entfernen, GPX exportieren (Track mit Höhe und Zeit), löschen.
   - Gespeichert wird lokal (IndexedDB `goahead`, Version 3, Speicher `tracks`, `routes`, `walks`).
+  - **Teilen** (geplante und erwanderte Touren, z. B. an WhatsApp über das Teilen-Menü des Systems): GPX-Datei mit
+    Beschreibung (Länge, Höhenmeter, Gehzeit, Punkte) und Höhen, dazu derselbe Text als Nachricht.
+    **Grenze:** Chrome erlaubt beim Teilen nur bestimmte Dateitypen, `.gpx` gehört nicht dazu (geprüft im
+    Chromium-Quelltext `chrome/browser/webshare/share_service_impl.cc`). Dann bietet die App an, die Datei als
+    `Name.gpx.txt` zu teilen (Empfänger entfernt „.txt“; GoAhead liest sie auch so) oder die GPX herunterzuladen
+    und nur den Text zu teilen.
 - **Unterwegs** (*Los geht's*), Modul `nav.js`:
   - Zeigt die geplante Route, die eigene Position (Folgemodus) und die gewanderte Strecke (blau). Im Menü bleibt nur
     die Kartenwahl. Das Feld unten zeigt gewanderte Strecke, Zeit in Bewegung und Länge der Planung.
@@ -56,7 +70,8 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   ohne sie zu verschieben.
 - **Oberfläche:** leicht transparente „Glas“-Flächen mit Unschärfe, einheitlich über Design-Variablen in `styles.css`.
   Browser ohne Unschärfe-Unterstützung bekommen automatisch weniger durchsichtige Flächen.
-- **Einstellungen:** Zoom-Knöpfe ein/aus (wird gespeichert), App-Version, Link zur Diagnose.
+- **Einstellungen:** Zoom-Knöpfe ein/aus, Gehgeschwindigkeit (Ebene, Steigung, Gefälle in km/h, Schwelle in %),
+  App-Version, Link zur Diagnose. Alles wird gespeichert.
 - Positions-Knopf (unten rechts): Die Karte folgt der Position (Knopf blau). Im Folgemodus wird um die eigene
   Position gezoomt. Verschieben der Karte oder Zoomen auf einen GPX-Track beendet das Folgen, ein Tipp auf den
   Knopf zentriert wieder.

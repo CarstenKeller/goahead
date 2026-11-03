@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "21";
+  var APP_VERSION = "22";
   var STORAGE_KEY = "goahead.view.v1";
 
   // ---------- kleine Helfer ----------
@@ -299,11 +299,22 @@
   // ---------- Einstellungen ----------
 
   var SETTINGS_KEY = "goahead.settings.v1";
-  var settings = { zoomButtons: false };
+  // Gehgeschwindigkeiten für die Dauer-Prognose: Startwerte sind Annahmen, in den Einstellungen anpassbar
+  var SETTING_DEFAULTS = {
+    zoomButtons: false,
+    speedFlat: 4.5,      // km/h in der Ebene
+    speedUp: 3.0,        // km/h bei Steigung
+    speedDown: 4.0,      // km/h bei Gefälle
+    slopePercent: 5      // ab dieser Neigung (%) gilt ein Abschnitt als Steigung bzw. Gefälle
+  };
+  var settings = JSON.parse(JSON.stringify(SETTING_DEFAULTS));
   try {
     var storedSettings = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) || "{}");
-    if (typeof storedSettings.zoomButtons === "boolean") settings.zoomButtons = storedSettings.zoomButtons;
+    Object.keys(SETTING_DEFAULTS).forEach(function (k) {
+      if (typeof storedSettings[k] === typeof SETTING_DEFAULTS[k]) settings[k] = storedSettings[k];
+    });
   } catch (e) { /* Standardwerte */ }
+  var settingsListeners = [];
 
   function saveSettings() {
     try { window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* egal */ }
@@ -327,9 +338,33 @@
         '<path fill="#444" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>';
       var panel = L.DomUtil.create("div", "settings-panel", box);
       panel.hidden = true;
+      function numRow(key, label, unit, min, max, step) {
+        return '<label class="settings-num"><span>' + label + '</span><input type="number" inputmode="decimal" data-num="' + key +
+          '" min="' + min + '" max="' + max + '" step="' + step + '"><span class="settings-unit">' + unit + "</span></label>";
+      }
       panel.innerHTML = '<div class="settings-title">Einstellungen</div>' +
         '<label class="settings-row"><input type="checkbox" data-setting="zoomButtons"> Zoom-Knöpfe (+/−) anzeigen</label>' +
+        '<div class="settings-sub">Gehgeschwindigkeit (für die Dauer)</div>' +
+        numRow("speedFlat", "Ebene", "km/h", 0.5, 10, 0.1) +
+        numRow("speedUp", "Steigung", "km/h", 0.5, 10, 0.1) +
+        numRow("speedDown", "Gefälle", "km/h", 0.5, 10, 0.1) +
+        numRow("slopePercent", "Steigung/Gefälle ab", "%", 1, 30, 1) +
         '<p class="settings-note">App-Version ' + APP_VERSION + ' · <a href="?diagnose">Diagnose</a></p>';
+      panel.querySelectorAll("[data-num]").forEach(function (inp) {
+        var key = inp.getAttribute("data-num");
+        inp.value = String(settings[key]);
+        inp.addEventListener("change", function () {
+          var v = parseFloat(String(inp.value).replace(",", "."));
+          var min = parseFloat(inp.min);
+          var max = parseFloat(inp.max);
+          if (isNaN(v)) v = SETTING_DEFAULTS[key];
+          v = Math.min(max, Math.max(min, v));
+          inp.value = String(v);
+          settings[key] = v;
+          saveSettings();
+          settingsListeners.forEach(function (fn) { try { fn(settings); } catch (e) { console.warn(e); } });
+        });
+      });
       var cb = panel.querySelector('[data-setting="zoomButtons"]');
       cb.checked = settings.zoomButtons;
       cb.addEventListener("change", function () {
@@ -1441,7 +1476,9 @@
     play: '<path d="M7 4l13 8-13 8z" fill="currentColor"/>',
     stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>',
     locate: '<circle cx="12" cy="12" r="3.5" fill="currentColor"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/>',
-    plus: '<path d="M12 5v14M5 12h14"/>'
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    chart: '<path d="M3 20h18"/><path d="M4 16l5-6 4 3 7-8"/>',
+    share: '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/>'
   };
   function icon(name) {
     return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" ' +
@@ -1502,6 +1539,45 @@
     });
   })();
 
+  // GPX mit Begleittext teilen (z. B. an WhatsApp über das Teilen-Menü des Systems).
+  // Chrome lässt beim Teilen nur bestimmte Dateitypen zu – .gpx gehört nicht dazu
+  // (geprüft im Chromium-Quelltext chrome/browser/webshare/share_service_impl.cc: Endung UND
+  // MIME-Typ müssen auf der Liste stehen; .txt/text/plain ja, .gpx nein). Dann Ausweichwege anbieten.
+  function shareGpx(fileName, gpxText, title, detailText) {
+    function tryShare(file) {
+      var data = { title: title, text: detailText };
+      if (file) data.files = [file];
+      return navigator.share(data).catch(function (err) {
+        if (err && err.name === "AbortError") return;   // vom Nutzer abgebrochen
+        showStatus("Teilen fehlgeschlagen: " + (err && err.message || err), 6000);
+      });
+    }
+    if (!navigator.share) {
+      downloadFile(fileName, gpxText, "application/gpx+xml");
+      showStatus("Teilen wird von diesem Browser nicht unterstützt – GPX wurde heruntergeladen.", 6000);
+      return;
+    }
+    var gpxFile = null;
+    try { gpxFile = new File([gpxText], fileName, { type: "application/gpx+xml" }); } catch (e) { /* alte Browser */ }
+    if (gpxFile && navigator.canShare && navigator.canShare({ files: [gpxFile] })) {
+      tryShare(gpxFile);
+      return;
+    }
+    var txtFile = null;
+    try { txtFile = new File([gpxText], fileName + ".txt", { type: "text/plain" }); } catch (e) { /* alte Browser */ }
+    var canTxt = txtFile && navigator.canShare && navigator.canShare({ files: [txtFile] });
+    var actions = [];
+    if (canTxt) {
+      actions.push({ label: "Als „" + fileName + ".txt“ teilen", primary: true, onClick: function () { tryShare(txtFile); } });
+    }
+    actions.push({ label: "GPX herunterladen und Text teilen", onClick: function () {
+      downloadFile(fileName, gpxText, "application/gpx+xml");
+      tryShare(null);
+    } });
+    actionSheet("GPX-Datei teilen", "Dieser Browser erlaubt keine .gpx-Dateien beim Teilen." +
+      (canTxt ? " Als .txt kommt sie an – zum Öffnen „.txt“ entfernen (GoAhead liest sie auch so)." : ""), actions);
+  }
+
   function downloadFile(fileName, text, mime) {
     var blob = new Blob([text], { type: mime || "application/octet-stream" });
     var a = document.createElement("a");
@@ -1536,6 +1612,9 @@
     actionSheet: actionSheet,
     downloadFile: downloadFile,
     makeResizable: makeResizable,
+    getSettings: function () { return settings; },
+    onSettingsChange: function (fn) { settingsListeners.push(fn); },
+    shareGpx: shareGpx,
     icon: icon
   };
 

@@ -195,7 +195,10 @@
       return fetchJson(url, 15000).then(function (gj) {
         var f = gj && gj.features && gj.features[0];
         if (!f || !f.geometry || !f.geometry.coordinates || f.geometry.coordinates.length < 2) throw new Error("keine Route");
-        var latlngs = f.geometry.coordinates.map(function (c) { return [round6(c[1]), round6(c[0])]; });
+        // Höhe (dritter Wert) behalten, wenn vorhanden – für Höhenprofil, Höhenmeter und Dauer
+        var latlngs = f.geometry.coordinates.map(function (c) {
+          return c.length > 2 && c[2] != null ? [round6(c[1]), round6(c[0]), Math.round(c[2] * 10) / 10] : [round6(c[1]), round6(c[0])];
+        });
         var props = f.properties || {};
         var dist = parseFloat(props["track-length"]);
         var asc = parseFloat(props["filtered ascend"]);
@@ -361,11 +364,24 @@
 
   // ---------- Bedienung auf der Karte ----------
 
+  // Regel für alle vorläufigen (orangen) Punkte: antippen = übernehmen, ziehen = verschieben,
+  // Tipp woanders = Versehen, wieder wegnehmen.
+  function discardCandidate() {
+    if (!candidate) return false;
+    candidate = null;
+    selected = null;
+    armed = false;
+    routeVersion++;
+    render();
+    return true;
+  }
+
   function onMapTap(latlng) {
     if (fresh && !candidate) {          // vorläufiger Zwischenpunkt: Tipp woanders nimmt ihn weg
       discardFresh();
       return;
     }
+    if (discardCandidate()) return;     // Vorschlagspunkt: Tipp woanders nimmt ihn weg
     if (selected !== null && armed) {   // Löschmodus durch Tipp daneben abbrechen
       selected = null;
       armed = false;
@@ -413,6 +429,12 @@
       discardFresh();
       if (lastSegTap) clearTimeout(lastSegTap.timer);
       lastSegTap = { ref: refAfterDiscard(ref, f), t: Date.now(), timer: null };
+      return;
+    }
+    if (candidate) {                     // offener Vorschlag: Tipp auf eine Strecke nimmt ihn weg
+      discardCandidate();
+      if (lastSegTap) clearTimeout(lastSegTap.timer);
+      lastSegTap = { ref: ref, t: Date.now(), timer: null };
       return;
     }
     if (selected !== null && !armed) {   // beim Verschieben zählt der Tipp als neue Stelle
@@ -540,9 +562,12 @@
       var b = map.project(L.latLng(latlngs[k + 1]), zoom);
       var c = L.LineUtil.closestPointOnSegment(p, a, b);
       var d = c.distanceTo(p);
-      if (d < best.d) best = { d: d, k: k, q: map.unproject(c, zoom) };
+      if (d < best.d) best = { d: d, k: k, q: map.unproject(c, zoom), t: a.distanceTo(b) ? a.distanceTo(c) / a.distanceTo(b) : 0 };
     }
     var q = [round6(best.q.lat), round6(best.q.lng)];
+    var e0 = latlngs[best.k][2];
+    var e1 = latlngs[best.k + 1][2];
+    if (e0 != null && e1 != null) q.push(Math.round((e0 + (e1 - e0) * best.t) * 10) / 10);
     return {
       p: q,
       a: latlngs.slice(0, best.k + 1).concat([q]),
@@ -681,20 +706,150 @@
     if (candidate) setCandidate(candidate.latlng);   // Vorschlag neu berechnen
   }
 
-  function totals() {
+  // ---------- Höhenprofil, Höhenmeter, Dauer ----------
+
+  var PROFILE_STEP = 25;      // m: Raster für Profil und Dauer
+  var CLIMB_THRESHOLD = 3;    // m: kleinere Höhenänderungen zählen nicht (Rauschen)
+
+  // Punkte der gesamten Route mit Entfernung ab Start und Höhe (Lücken linear aufgefüllt)
+  function buildProfile(segments, closing, roundtrip) {
+    var segs = (segments || []).slice();
+    if (roundtrip && closing) segs.push(closing);
+    var pts = [];
+    var d = 0;
+    var prev = null;
+    segs.forEach(function (seg) {
+      if (!seg || !seg.latlngs) return;
+      seg.latlngs.forEach(function (ll, i) {
+        var e = ll.length > 2 && ll[2] != null ? ll[2] : null;
+        if (prev && i === 0 && prev[0] === ll[0] && prev[1] === ll[1]) {
+          if (e != null && pts[pts.length - 1].e == null) pts[pts.length - 1].e = e;
+          return;   // Anschlusspunkt doppelt
+        }
+        if (prev) d += L.latLng(prev[0], prev[1]).distanceTo(L.latLng(ll[0], ll[1]));
+        pts.push({ d: d, e: e, lat: ll[0], lng: ll[1] });
+        prev = ll;
+      });
+    });
+    var known = pts.filter(function (p) { return p.e != null; }).length;
+    if (known) {
+      // Lücken zwischen bekannten Höhen über die Strecke interpolieren, Ränder mit dem nächsten Wert füllen
+      var last = -1;
+      for (var i = 0; i < pts.length; i++) {
+        if (pts[i].e == null) continue;
+        if (last < 0) {
+          for (var j = 0; j < i; j++) pts[j].e = pts[i].e;
+        } else if (i - last > 1) {
+          for (var k = last + 1; k < i; k++) {
+            var t = (pts[k].d - pts[last].d) / ((pts[i].d - pts[last].d) || 1);
+            pts[k].e = pts[last].e + (pts[i].e - pts[last].e) * t;
+          }
+        }
+        last = i;
+      }
+      for (var m = last + 1; m < pts.length; m++) pts[m].e = pts[last].e;
+    }
+    return { pts: pts, dist: d, hasEle: known > 0 };
+  }
+
+  // gleichmäßiges Raster (alle PROFILE_STEP m) für Diagramm und Dauer
+  function resample(prof) {
+    var out = [];
+    var pts = prof.pts;
+    if (pts.length < 2) return out;
+    var j = 0;
+    for (var d = 0; d <= prof.dist; d += PROFILE_STEP) {
+      while (j < pts.length - 2 && pts[j + 1].d < d) j++;
+      var a = pts[j];
+      var b = pts[j + 1];
+      var t = b.d > a.d ? Math.min(1, Math.max(0, (d - a.d) / (b.d - a.d))) : 0;
+      out.push({
+        d: d,
+        e: prof.hasEle ? a.e + (b.e - a.e) * t : null,
+        lat: a.lat + (b.lat - a.lat) * t,
+        lng: a.lng + (b.lng - a.lng) * t
+      });
+    }
+    var endPt = pts[pts.length - 1];
+    if (!out.length || out[out.length - 1].d < prof.dist) out.push({ d: prof.dist, e: endPt.e, lat: endPt.lat, lng: endPt.lng });
+    return out;
+  }
+
+  function slopeClass(de, dd, thr) {
+    if (!dd) return "flat";
+    var g = de / dd;
+    return g > thr ? "up" : (g < -thr ? "down" : "flat");
+  }
+
+  // Kennzahlen einer Route (Plan oder gespeicherter Datensatz)
+  function routeStats(r) {
     var dist = 0;
-    var asc = 0;
-    var ascKnown = true;
     var lines = 0;
-    var segs = plan.segments.slice();
-    if (plan.roundtrip && plan.closing) segs.push(plan.closing);
+    var segs = (r.segments || []).slice();
+    if (r.roundtrip && r.closing) segs.push(r.closing);
     segs.forEach(function (s) {
       if (!s) return;
       dist += s.distance || 0;
-      if (s.ascent == null) { if (s.source !== "direkt") ascKnown = false; } else asc += s.ascent;
       if (s.source === "Luftlinie" && !s.pending) lines++;
     });
-    return { dist: dist, asc: ascKnown && segs.length ? asc : null, lines: lines };
+    var prof = buildProfile(r.segments, r.closing, r.roundtrip);
+    var grid = resample(prof);
+    var up = 0;
+    var down = 0;
+    var hours = 0;
+    var st = G.getSettings ? G.getSettings() : { speedFlat: 4.5, speedUp: 3, speedDown: 4, slopePercent: 5 };
+    var thr = st.slopePercent / 100;
+    if (prof.hasEle && grid.length) {
+      var ref = grid[0].e;
+      grid.forEach(function (p) {
+        var diff = p.e - ref;
+        if (diff >= CLIMB_THRESHOLD) { up += diff; ref = p.e; }
+        else if (diff <= -CLIMB_THRESHOLD) { down -= diff; ref = p.e; }
+      });
+    }
+    for (var i = 1; i < grid.length; i++) {
+      var dd = grid[i].d - grid[i - 1].d;
+      var cls = prof.hasEle ? slopeClass(grid[i].e - grid[i - 1].e, dd, thr) : "flat";
+      var v = cls === "up" ? st.speedUp : (cls === "down" ? st.speedDown : st.speedFlat);
+      hours += dd / 1000 / v;
+    }
+    // Profil-Länge (Geometrie) und Routing-Länge weichen leicht ab: Dauer auf die Routing-Länge umrechnen
+    if (prof.dist > 0 && dist > 0) hours *= dist / prof.dist;
+    return {
+      dist: dist,
+      up: prof.hasEle ? up : null,
+      down: prof.hasEle ? down : null,
+      hours: hours,
+      lines: lines,
+      grid: grid,
+      hasEle: prof.hasEle,
+      profile: prof,
+      thr: thr
+    };
+  }
+
+  function totals() {
+    var t = routeStats(plan);
+    return { dist: t.dist, asc: t.up, desc: t.down, hours: t.hours, lines: t.lines, stats: t };
+  }
+
+  function hm(hours) {
+    var mins = Math.round(hours * 60);
+    return Math.floor(mins / 60) + ":" + (mins % 60 < 10 ? "0" : "") + (mins % 60);
+  }
+
+  // kurze Zusammenfassung für Listen, Teilen und GPX
+  function statsText(t, withSpeeds) {
+    var parts = [km(t.dist)];
+    if (t.up != null) parts.push("↑ " + Math.round(t.up) + " m", "↓ " + Math.round(t.down) + " m");
+    if (t.hours) parts.push("≈ " + hm(t.hours) + " h");
+    var txt = parts.join(" · ");
+    if (withSpeeds && G.getSettings) {
+      var st = G.getSettings();
+      txt += " (Gehzeit bei " + String(st.speedFlat).replace(".", ",") + " km/h eben, " +
+        String(st.speedUp).replace(".", ",") + " km/h bergauf, " + String(st.speedDown).replace(".", ",") + " km/h bergab)";
+    }
+    return txt;
   }
 
   function km(m) { return (m / 1000).toFixed(1).replace(".", ",") + " km"; }
@@ -840,8 +995,10 @@
         '<button type="button" class="icon-btn plan-start" title="Zum Startpunkt" aria-label="Zum Startpunkt"><span class="icon-letter">S</span></button>' +
         iconBtn("plan-round", "roundtrip", "Rundtour") +
         iconBtn("plan-profile", null, "Routing") +
+        iconBtn("plan-chart", "chart", "Höhenprofil ein/aus") +
         iconBtn("plan-find", "search", "Adresse oder Koordinaten suchen") +
       "</div>" +
+      '<div class="plan-profile-box" hidden><svg class="pf-svg" aria-label="Höhenprofil"></svg></div>' +
       '<form class="plan-search" autocomplete="off" hidden>' +
         '<input type="search" enterkeyhint="search" placeholder="Adresse oder Koordinaten (auch UTM 32)">' +
         iconBtn("plan-go", "search", "Suchen").replace('type="button"', 'type="submit"') +
@@ -865,6 +1022,9 @@
     round: panel.querySelector(".plan-round"),
     profile: panel.querySelector(".plan-profile"),
     find: panel.querySelector(".plan-find"),
+    chart: panel.querySelector(".plan-chart"),
+    profBox: panel.querySelector(".plan-profile-box"),
+    profSvg: panel.querySelector(".pf-svg"),
     form: panel.querySelector(".plan-search"),
     input: panel.querySelector(".plan-search input"),
     results: panel.querySelector(".plan-results")
@@ -891,6 +1051,14 @@
     }
   });
   el.save.addEventListener("click", saveRoute);
+  var PROFILE_KEY = "goahead.planProfile.v1";
+  var showProfile = true;
+  try { showProfile = window.localStorage.getItem(PROFILE_KEY) !== "0"; } catch (e) { /* Standard: an */ }
+  el.chart.addEventListener("click", function () {
+    showProfile = !showProfile;
+    try { window.localStorage.setItem(PROFILE_KEY, showProfile ? "1" : "0"); } catch (e) { /* egal */ }
+    renderPanel();
+  });
   el.undo.addEventListener("click", undo);
   el.redo.addEventListener("click", redo);
   el.round.addEventListener("click", toggleRoundtrip);
@@ -913,7 +1081,10 @@
     var html = "";
     if (n) {
       var t = totals();
-      html = n + " Pkt · " + km(t.dist) + (t.asc != null ? " · ↑ " + Math.round(t.asc) + " m" : "");
+      lastStats = t.stats;
+      html = n + " Pkt · " + km(t.dist) +
+        (t.asc != null ? " · ↑" + Math.round(t.asc) + " ↓" + Math.round(t.desc) + " m" : "") +
+        (t.hours ? " · ≈" + hm(t.hours) + " h" : "");
       if (t.lines) html += ' · <span class="plan-warn" title="Abschnitte ohne gefundenen Weg">⚠ ' + t.lines + "</span>";
     }
     if (candidate) {
@@ -937,6 +1108,95 @@
     el.profile.innerHTML = G.icon(prof.icon);
     el.profile.title = "Routing: " + prof.label + " (antippen zum Wechseln)";
     el.profile.setAttribute("aria-label", el.profile.title);
+    renderProfile(n ? lastStats : null);
+  }
+
+  // ---------- Höhenprofil als Säulendiagramm (Farbe nach Steigung/Ebene/Gefälle) ----------
+
+  var lastStats = null;
+  var profMarker = null;
+  var SVG_NS = "http://www.w3.org/2000/svg";
+
+  function svgEl(name, attrs, parent) {
+    var e = document.createElementNS(SVG_NS, name);
+    Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  function renderProfile(t) {
+    var has = !!(t && t.hasEle && t.grid.length > 1);
+    el.chart.disabled = !has;
+    el.chart.classList.toggle("on", has && showProfile);
+    el.chart.title = has ? "Höhenprofil ein/aus" : "Höhenprofil (Höhendaten nur mit BRouter-Routing)";
+    el.chart.setAttribute("aria-label", el.chart.title);
+    el.profBox.hidden = !(has && showProfile);
+    if (el.profBox.hidden) { hideProfileMarker(); return; }
+
+    var svg = el.profSvg;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var W = Math.max(200, el.profBox.clientWidth || 320);
+    var H = 76;
+    var padL = 34;
+    var padB = 14;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.setAttribute("width", W);
+    svg.setAttribute("height", H);
+    var grid = t.grid;
+    var minE = Infinity;
+    var maxE = -Infinity;
+    grid.forEach(function (p) { minE = Math.min(minE, p.e); maxE = Math.max(maxE, p.e); });
+    if (maxE - minE < 20) { var mid = (maxE + minE) / 2; minE = mid - 10; maxE = mid + 10; }
+    var total = grid[grid.length - 1].d || 1;
+    var plotW = W - padL;
+    var plotH = H - padB - 4;
+    function x(d) { return padL + d / total * plotW; }
+    function y(e) { return 4 + plotH - (e - minE) / (maxE - minE) * plotH; }
+    // Säulen: pro Bildpunkt-Spalte höchstens eine, Farbe nach Neigung
+    var cols = Math.min(grid.length - 1, Math.floor(plotW / 3));
+    var per = (grid.length - 1) / cols;
+    for (var c = 0; c < cols; c++) {
+      var i0 = Math.floor(c * per);
+      var i1 = Math.max(i0 + 1, Math.floor((c + 1) * per));
+      var a = grid[i0];
+      var b = grid[Math.min(i1, grid.length - 1)];
+      var cls = slopeClass(b.e - a.e, b.d - a.d, t.thr);
+      var top = y(Math.max(a.e, b.e));
+      svgEl("rect", { x: x(a.d), y: top, width: Math.max(1, x(b.d) - x(a.d) - 0.5), height: 4 + plotH - top, "class": "pf-" + cls }, svg);
+    }
+    svgEl("text", { x: padL - 4, y: 12, "text-anchor": "end", "class": "pf-label" }, svg).textContent = Math.round(maxE) + " m";
+    svgEl("text", { x: padL - 4, y: 4 + plotH, "text-anchor": "end", "class": "pf-label" }, svg).textContent = Math.round(minE) + " m";
+    svgEl("text", { x: W - 2, y: H - 2, "text-anchor": "end", "class": "pf-label" }, svg).textContent = km(t.dist);
+    svgEl("text", { x: padL, y: H - 2, "class": "pf-label" }, svg).textContent = "0";
+    var cursor = svgEl("line", { x1: 0, x2: 0, y1: 2, y2: 4 + plotH, "class": "pf-cursor", visibility: "hidden" }, svg);
+    var readout = svgEl("text", { x: padL + 4, y: 12, "class": "pf-readout", visibility: "hidden" }, svg);
+
+    // Tippen/Ziehen im Profil: Stelle anzeigen und auf der Karte markieren
+    function show(ev) {
+      var r = svg.getBoundingClientRect();
+      var px = (ev.clientX - r.left) / r.width * W;
+      var d = Math.max(0, Math.min(total, (px - padL) / plotW * total));
+      var k = Math.min(grid.length - 1, Math.round(d / PROFILE_STEP));
+      var p = grid[k];
+      cursor.setAttribute("x1", x(p.d));
+      cursor.setAttribute("x2", x(p.d));
+      cursor.setAttribute("visibility", "visible");
+      readout.textContent = km(p.d * (t.dist / total)) + " · " + Math.round(p.e) + " m";
+      readout.setAttribute("x", x(p.d) > W / 2 ? x(p.d) - 4 : x(p.d) + 4);
+      readout.setAttribute("text-anchor", x(p.d) > W / 2 ? "end" : "start");
+      readout.setAttribute("visibility", "visible");
+      if (!profMarker) {
+        profMarker = L.circleMarker([p.lat, p.lng], { radius: 7, color: "#ffffff", weight: 3, fillColor: COLOR_CANDIDATE, fillOpacity: 1, interactive: false });
+      }
+      profMarker.setLatLng([p.lat, p.lng]).addTo(layer);
+    }
+    svg.onpointerdown = function (ev) { svg.setPointerCapture(ev.pointerId); show(ev); };
+    svg.onpointermove = function (ev) { if (ev.buttons || ev.pointerType === "mouse") show(ev); };
+    svg.onpointerup = function () { setTimeout(hideProfileMarker, 2500); };
+  }
+
+  function hideProfileMarker() {
+    if (profMarker) layer.removeLayer(profMarker);
   }
 
   // ---------- Speichern und „Geplant“ ----------
@@ -975,7 +1235,7 @@
       roundtrip: plan.roundtrip,
       closing: plan.closing ? clone(plan.closing) : null,
       profile: plan.profile,
-      stats: { length: t.dist, ascent: t.asc, points: plan.points.length, lines: t.lines }
+      stats: { length: t.dist, ascent: t.asc, descent: t.desc, hours: t.hours, points: plan.points.length, lines: t.lines }
     };
     G.db.put("routes", rec).then(function () {
       plan.savedId = rec.id;
@@ -1012,11 +1272,8 @@
       return;
     }
     box.innerHTML = newBtn + savedRoutes.map(function (r) {
-      var st = r.stats || {};
-      var info = [];
-      if (st.length) info.push(km(st.length));
-      if (st.ascent != null) info.push("↑ " + Math.round(st.ascent) + " m");
-      info.push((st.points || r.points.length) + " Punkte");
+      var info = [statsText(routeStats(r))];
+      info.push(r.points.length + " Punkte");
       if (r.roundtrip) info.push("Rundtour");
       info.push(new Date(r.updatedAt).toLocaleDateString("de-DE"));
       var editing = plan.savedId === r.id && plan.dirty;
@@ -1098,12 +1355,12 @@
   })();
 
   function routeMenu(rec) {
-    var st = rec.stats || {};
-    var sub = [st.length ? km(st.length) : null, (st.points || rec.points.length) + " Punkte", rec.roundtrip ? "Rundtour" : null]
+    var sub = [statsText(routeStats(rec)), rec.points.length + " Punkte", rec.roundtrip ? "Rundtour" : null]
       .filter(Boolean).join(" · ");
     var actions = [];
     if (G.nav) actions.push({ label: "▶ Los geht's", primary: true, onClick: function () { G.nav.start(rec); } });
     actions.push({ label: "✎ Verändern", onClick: function () { editRoute(rec); } });
+    actions.push({ label: "↗ Teilen (z. B. WhatsApp)", onClick: function () { shareRoute(rec); } });
     actions.push({ label: "⬇ GPX exportieren", onClick: function () { exportRouteGpx(rec); } });
     actions.push({ label: "🗑 Löschen", danger: true, onClick: function () { deleteRoute(rec); } });
     G.actionSheet(rec.name, sub, actions);
@@ -1140,16 +1397,24 @@
   }
 
   // GPX 1.1: Track (berechnete Linie) und Wegpunkte (geplante Punkte)
+  function routeDetails(rec) {
+    return statsText(routeStats(rec), true) + " · " + rec.points.length + " Punkte" + (rec.roundtrip ? " · Rundtour" : "");
+  }
+
   function routeToGpx(rec) {
+    var desc = routeDetails(rec);
     var lines = ['<?xml version="1.0" encoding="UTF-8"?>',
       '<gpx version="1.1" creator="GoAhead" xmlns="http://www.topografix.com/GPX/1/1">',
-      "  <metadata><name>" + xmlEsc(rec.name) + "</name><time>" + new Date().toISOString() + "</time></metadata>"];
+      "  <metadata><name>" + xmlEsc(rec.name) + "</name><desc>" + xmlEsc(desc) + "</desc><time>" + new Date().toISOString() + "</time></metadata>"];
     rec.points.forEach(function (p, i) {
       lines.push('  <wpt lat="' + p.lat + '" lon="' + p.lng + '"><name>' + (i === 0 ? "Start" : "Punkt " + i) + "</name></wpt>");
     });
-    lines.push("  <trk><name>" + xmlEsc(rec.name) + "</name><trkseg>");
-    routeLine(rec).forEach(function (ll) {
-      lines.push('    <trkpt lat="' + ll[0] + '" lon="' + ll[1] + '"></trkpt>');
+    lines.push("  <trk><name>" + xmlEsc(rec.name) + "</name><desc>" + xmlEsc(desc) + "</desc><trkseg>");
+    // Höhen aus dem Profil (BRouter-Werte, Lücken interpoliert)
+    var prof = buildProfile(rec.segments, rec.closing, rec.roundtrip);
+    var pts = prof.pts.length ? prof.pts : rec.points.map(function (p) { return { lat: p.lat, lng: p.lng, e: null }; });
+    pts.forEach(function (p) {
+      lines.push('    <trkpt lat="' + p.lat + '" lon="' + p.lng + '">' + (prof.hasEle && p.e != null ? "<ele>" + Math.round(p.e * 10) / 10 + "</ele>" : "") + "</trkpt>");
     });
     lines.push("  </trkseg></trk>", "</gpx>");
     return lines.join("\n");
@@ -1157,6 +1422,10 @@
 
   function exportRouteGpx(rec) {
     G.downloadFile(fileNameFor(rec.name), routeToGpx(rec), "application/gpx+xml");
+  }
+
+  function shareRoute(rec) {
+    G.shareGpx(fileNameFor(rec.name), routeToGpx(rec), rec.name, rec.name + "\n" + routeDetails(rec) + "\n(GPX-Datei, erstellt mit GoAhead)");
   }
 
   // Neue, leere Planung beginnen (Knopf in Tracks → Geplant)
@@ -1248,6 +1517,10 @@
 
   loadPlan();
   loadRoutes();
+  if (G.onSettingsChange) G.onSettingsChange(function () {
+    if (active) render();
+    renderRoutesList();
+  });
 
   // für Tests und spätere Module
   G.planner = {
@@ -1259,6 +1532,9 @@
     parseCoordinates: parseCoordinates,
     getPlan: function () { return plan; },
     routeLine: routeLine,
+    routeStats: routeStats,
+    statsText: statsText,
+    hm: hm,
     xmlEsc: xmlEsc,
     fileNameFor: fileNameFor,
     isActive: function () { return active; }

@@ -165,7 +165,7 @@
     '<div class="nav-stats">' +
       '<div><span class="nav-val nav-dist">0,00 km</span><span class="nav-lbl">gewandert</span></div>' +
       '<div><span class="nav-val nav-time">0:00:00</span><span class="nav-lbl">unterwegs</span></div>' +
-      '<div><span class="nav-val nav-plan">–</span><span class="nav-lbl">geplant</span></div>' +
+      '<div><span class="nav-val nav-plan">–</span><span class="nav-lbl nav-plan-lbl">geplant</span></div>' +
     "</div>" +
     "</div>";
   document.body.appendChild(panel);
@@ -179,6 +179,7 @@
     dist: panel.querySelector(".nav-dist"),
     time: panel.querySelector(".nav-time"),
     plan: panel.querySelector(".nav-plan"),
+    planLbl: panel.querySelector(".nav-plan-lbl"),
     state: panel.querySelector(".nav-state"),
     pause: panel.querySelector(".nav-pause")
   };
@@ -196,6 +197,7 @@
     el.dist.textContent = km(walk.distance);
     el.time.textContent = duration(movingTime(walk));
     el.plan.textContent = walk.planLength ? km(walk.planLength) : "–";
+    el.planLbl.textContent = walk.planHours && G.planner ? "geplant · ≈" + G.planner.hm(walk.planHours) + " h" : "geplant";
     var pt = walk.paused ? "Weiter aufzeichnen" : "Pause";
     el.pause.innerHTML = G.icon(walk.paused ? "play" : "pause");
     el.pause.title = pt;
@@ -246,6 +248,7 @@
       routeName: rec.name,
       planLine: line,
       planLength: (rec.stats && rec.stats.length) || lineLength(line),
+      planHours: G.planner && G.planner.routeStats ? G.planner.routeStats(rec).hours : null,
       startedAt: Date.now(),
       paused: false,
       pausedAt: null,
@@ -436,6 +439,12 @@
       shown[w.id]
         ? { label: "Von der Karte entfernen", onClick: function () { hideWalk(w); } }
         : { label: "👁 Auf der Karte zeigen", primary: true, onClick: function () { showWalk(w); } },
+      { label: "↗ Teilen (z. B. WhatsApp)", onClick: function () {
+        var fn = G.planner ? G.planner.fileNameFor(w.name) : "tour.gpx";
+        var details = km(w.distance) + " · " + duration(w.movingMs) + " h unterwegs" +
+          (w.ascent ? " · ↑ ca. " + Math.round(w.ascent) + " m" : "") + " · " + new Date(w.startedAt).toLocaleDateString("de-DE");
+        G.shareGpx(fn, walkToGpx(w), w.name, w.name + "\n" + details + "\n(GPX-Datei, aufgezeichnet mit GoAhead)");
+      } },
       { label: "⬇ GPX exportieren", onClick: function () {
         var fn = G.planner ? G.planner.fileNameFor(w.name) : "tour.gpx";
         G.downloadFile(fn, walkToGpx(w), "application/gpx+xml");
