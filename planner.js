@@ -49,6 +49,7 @@
   var candidate = null;  // {latlng, loading, seg (Anhängen) | replace: Index, before, after (Ersetzen)}
   var selected = null;   // Index des markierten Punkts
   var armed = false;     // markierter Punkt im Löschmodus
+  var fresh = null;      // eben eingefügter, noch vorläufiger Zwischenpunkt {index, ref, wasDirty}
   var active = false;
   var routeVersion = 0;  // verwirft veraltete Routing-Antworten
   var past = [];         // Rückgängig-Stapel (JSON-Schnappschüsse)
@@ -100,6 +101,7 @@
 
   // vor jeder Änderung aufrufen
   function pushHistory() {
+    fresh = null;   // jede weitere Änderung übernimmt einen vorläufigen Zwischenpunkt
     past.push(snapshot());
     if (past.length > HISTORY_MAX) past.shift();
     future = [];
@@ -119,10 +121,32 @@
     candidate = null;
     selected = null;
     armed = false;
+    fresh = null;
     routeVersion++;
     markDirty();
     resumePending();
     render();
+  }
+
+  // Vorläufigen Zwischenpunkt wieder wegnehmen (Tipp woanders = Versehen):
+  // Stand vor dem Einfügen wiederherstellen, ohne Spur im Rückgängig-Verlauf.
+  function discardFresh() {
+    if (!fresh) return false;
+    var wasDirty = fresh.wasDirty;
+    restore(past.pop());
+    plan.dirty = wasDirty;
+    savePlan();
+    if (typeof renderRoutesList === "function") renderRoutesList();
+    render();
+    return true;
+  }
+
+  // Abschnittsbezug nach dem Wegnehmen des vorläufigen Punkts umrechnen
+  function refAfterDiscard(ref, f) {
+    if (ref === "closing") return "closing";
+    if (f.ref === "closing") return ref === f.index - 1 ? "closing" : ref;
+    if (ref === f.ref || ref === f.ref + 1) return f.ref;
+    return ref > f.ref + 1 ? ref - 1 : ref;
   }
 
   function undo() {
@@ -287,8 +311,9 @@
     }
 
     plan.points.forEach(function (p, i) {
-      var kind = i === selected ? (armed ? "del" : "sel") : (i === 0 ? "start" : (i === n - 1 ? "last" : "mid"));
-      var label = i === selected && armed ? "−" : (i === 0 ? "S" : String(i));
+      var isFresh = fresh && fresh.index === i;
+      var kind = isFresh ? "cand" : i === selected ? (armed ? "del" : "sel") : (i === 0 ? "start" : (i === n - 1 ? "last" : "mid"));
+      var label = isFresh ? "+" : i === selected && armed ? "−" : (i === 0 ? "S" : String(i));
       var m = L.marker([p.lat, p.lng], {
         icon: pointIcon(label, kind),
         draggable: true,
@@ -301,6 +326,7 @@
       });
       // Punkt ziehen = Ersatzvorschlag an der neuen Stelle
       m.on("dragend", function () {
+        fresh = null;   // gezogen = gewollt; wird zum normalen Verschiebe-Vorschlag
         selected = i;
         armed = false;
         setCandidate(m.getLatLng());
@@ -336,6 +362,10 @@
   // ---------- Bedienung auf der Karte ----------
 
   function onMapTap(latlng) {
+    if (fresh && !candidate) {          // vorläufiger Zwischenpunkt: Tipp woanders nimmt ihn weg
+      discardFresh();
+      return;
+    }
     if (selected !== null && armed) {   // Löschmodus durch Tipp daneben abbrechen
       selected = null;
       armed = false;
@@ -347,6 +377,18 @@
 
   // Routenpunkt: markieren → Löschmodus → löschen
   function onPointTap(i) {
+    if (fresh) {
+      if (fresh.index === i) {          // Tipp auf den vorläufigen Punkt: übernehmen
+        fresh = null;
+        selected = null;
+        armed = false;
+        render();
+        return;
+      }
+      var fi = fresh.index;             // Tipp auf einen anderen Punkt: vorläufigen wegnehmen
+      discardFresh();
+      if (i > fi) i--;
+    }
     routeVersion++;
     candidate = null;
     if (selected !== i) {
@@ -364,6 +406,15 @@
   // Strecke: einfacher Tipp = Zwischenpunkt, Doppeltipp = Weg/direkt umschalten
   var lastSegTap = null;
   function onSegmentTap(ref, latlng) {
+    if (fresh && !candidate) {
+      // Tipp auf eine Strecke nimmt den vorläufigen Punkt weg; ein schneller zweiter Tipp
+      // gilt trotzdem als Doppeltipp (Weg/direkt), fügt aber keinen neuen Punkt ein
+      var f = fresh;
+      discardFresh();
+      if (lastSegTap) clearTimeout(lastSegTap.timer);
+      lastSegTap = { ref: refAfterDiscard(ref, f), t: Date.now(), timer: null };
+      return;
+    }
     if (selected !== null && !armed) {   // beim Verschieben zählt der Tipp als neue Stelle
       setCandidate(latlng);
       return;
@@ -518,6 +569,7 @@
   function insertPoint(ref, latlng) {
     var seg = ref === "closing" ? plan.closing : plan.segments[ref];
     if (!seg || seg.pending) return;
+    var wasDirty = plan.dirty;
     pushHistory();
     var cut = splitLine(seg.latlngs, latlng);
     var p = { lat: cut.p[0], lng: cut.p[1] };
@@ -534,6 +586,8 @@
       plan.segments.splice(ref, 1, sa, sb);
       selected = ref + 1;
     }
+    // vorläufig, bis er angetippt (übernehmen) oder gezogen wird; Tipp woanders nimmt ihn weg
+    fresh = { index: selected, ref: ref, wasDirty: wasDirty };
     armed = false;
     candidate = null;
     routeVersion++;
@@ -1135,6 +1189,7 @@
     active = true;
     selected = null;
     armed = false;
+    fresh = null;
     candidate = null;
     if (G.closeMenu) G.closeMenu();
     if (G.closeInfoPanel) G.closeInfoPanel();
@@ -1157,6 +1212,7 @@
     candidate = null;
     selected = null;
     armed = false;
+    fresh = null;
     routeVersion++;
     closeSearch();
     map.closePopup();

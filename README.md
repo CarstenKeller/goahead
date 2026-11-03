@@ -21,7 +21,9 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     - Routenpunkt: 1. Tipp markiert ihn (blau). Dann Tipp auf die Karte oder Punkt ziehen → Ersatzvorschlag mit
       neuen Anschlussstrecken; Tipp darauf übernimmt ihn. 2. Tipp: Löschmodus (rot, „−“). 3. Tipp: löschen
       (Vorgänger und Nachfolger werden neu verbunden). Tipp daneben bricht den Löschmodus ab.
-    - Strecke zwischen zwei Punkten: Tipp fügt dort einen Zwischenpunkt ein (er ist danach markiert und verschiebbar).
+    - Strecke zwischen zwei Punkten: Tipp fügt dort einen **vorläufigen** Zwischenpunkt ein (orange „+“).
+      Tipp auf ihn übernimmt ihn, Ziehen verschiebt ihn (mit Vorschlag der neuen Strecken). Ein Tipp woanders
+      (Karte, Strecke, anderer Punkt) gilt als Versehen und nimmt ihn wieder weg – ohne Spur im Rückgängig-Verlauf.
       Doppeltipp wechselt zwischen *Weg* (Routing) und *direkt* (gerade Linie, gestrichelt, mit ihrer Länge
       in der Gesamtstrecke). Gilt auch für den Rückweg einer Rundtour.
   - *Rückgängig/Wiederholen*: bis zu 20 Schritte (während der Sitzung).
