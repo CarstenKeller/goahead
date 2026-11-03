@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "25";
+  var APP_VERSION = "26";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {
@@ -155,7 +155,10 @@
 
   function makeLayer(def, isOverlay) {
     var layer;
-    if (def.type === "wms") {
+    if (def.type === "mosaic" && window.GOAHEAD_MOSAIC) {
+      // Mosaik aus mehreren Diensten je nach Gebiet (mosaic.js, Grenzen in regions.js)
+      layer = new window.GOAHEAD_MOSAIC.Layer(def, { zIndex: isOverlay ? 10 : 1 });
+    } else if (def.type === "wms") {
       layer = new ScalableWMS(def.url, {
         layers: def.layers || "",
         format: def.format,
@@ -165,6 +168,7 @@
         attribution: def.attribution,
         // 512er-Kacheln halbieren die Zahl der Anfragen an den WMS
         tileSize: 512,
+        bounds: def.region && window.GOAHEAD_MOSAIC ? window.GOAHEAD_MOSAIC.regionBounds(def.region) : undefined,
         detectRetina: false,
         zIndex: isOverlay ? 10 : 1
       });
@@ -199,6 +203,8 @@
     overlayEntries[def.name] = layer;
   });
 
+  // frühere Einzelkarten NRW → entsprechendes Mosaik (enthält sie)
+  if (saved && { "nrw-dtk": 1, "nrw-dop": 1 }[saved.layer]) saved.layer = saved.layer === "nrw-dop" ? "aerial" : "topo";
   var activeId = (saved && layerById[saved.layer] && baseEntries[layerById[saved.layer]._goaheadDef.name])
     ? saved.layer : (defaultId || cfg.baseLayers[0].id);
   layerById[activeId].addTo(map);

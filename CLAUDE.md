@@ -80,8 +80,11 @@ Platz wie möglich:
   (installierte Apps werden nicht automatisch aktualisiert). Build nur in GitHub Actions; testen am Gerät des Nutzers.
 - `sw.js`: App-Hülle (Netz zuerst) und Kacheln aus dem Offline-Speicher. Der Kachel-Cache darf beim
   Aktualisieren des Service Workers **nicht** gelöscht werden (sonst gehen Offline-Karten mitten in einer Tour verloren).
-- `config.js`: Kartendienste. Reihenfolge der Skripte in `index.html` beachten
-  (app → tracks → planner → offline → nav → backup).
+- `config.js`: Kartendienste. `mosaic.js` + `regions.js`: Hintergrundkarten als Mosaik nach Gebiet
+  (Quellen in `config.js`, unten = überall → oben = genaueste, `region` = Länderkürzel). Neue Kartendienste erst
+  im Workflow „Kartendienste prüfen“ (`.github/scripts/probe_maps.py`) testen. Overlays mit Inhalt nur in einem Gebiet
+  bekommen `region` (keine Anfragen außerhalb, auch nicht offline). Reihenfolge der Skripte in `index.html` beachten
+  (config → regions → mosaic → app → tracks → planner → offline → nav → backup).
 
 ## Bei jeder Veröffentlichung
 

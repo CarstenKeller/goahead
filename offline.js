@@ -1,7 +1,7 @@
 /* GoAhead – Kartenkacheln entlang einer Route offline speichern.
  *
  * - Gespeichert werden die Kacheln aller gerade sichtbaren Kartenebenen (Hintergrund und
- *   Overlays) in den Zoomstufen ZOOMS, in einem Korridor mit dem eingestellten Abstand
+ *   Overlays; bei Mosaiken die Dienste, die entlang der Route gelten) in den Zoomstufen ZOOMS, in einem Korridor mit dem eingestellten Abstand
  *   (Einstellung „Karten offline um die Route“, km) um die Route.
  * - Die Kachel-Adressen erzeugt Leaflet selbst (layer.getTileUrl), damit sie exakt den
  *   Anfragen der Karte entsprechen. Der Service Worker (sw.js) liefert sie aus dem Cache
@@ -70,19 +70,33 @@
               var key = x + "/" + y;
               if (seen[key]) continue;
               seen[key] = true;
-              urls[tileUrl(layer, x, y, z)] = true;
+              var reg = layer._goaheadDef.region;
+              if (reg && window.GOAHEAD_MOSAIC) {
+                // Ebene mit Inhalt nur in einem Gebiet (z. B. TFIS NRW): Kacheln außerhalb überspringen
+                var M = window.GOAHEAD_MOSAIC;
+                var f = ts / 256;
+                var tb = M.tileBounds(x * f, y * f, z);
+                var te = M.tileBounds(x * f + f - 1, y * f + f - 1, z);
+                if (M.classify(reg, [tb[0], te[1], te[2], tb[3]]).cls === 0) continue;
+              }
+              if (layer.urlsForTile) {
+                // Mosaik: alle Quellen, die an dieser Kachel gebraucht werden (je nach Gebiet)
+                layer.urlsForTile(x, y, z).forEach(function (u) { urls[u.url] = u.name; });
+              } else {
+                urls[tileUrl(layer, x, y, z)] = layer._goaheadDef.name;
+              }
             }
           }
         }
       }
     });
-    return Object.keys(urls);
+    return Object.keys(urls).map(function (u) { return { url: u, name: urls[u] }; });
   }
 
   function visibleTileLayers() {
     var list = [];
     map.eachLayer(function (l) {
-      if (l instanceof L.TileLayer && l._goaheadDef) list.push(l);
+      if ((l instanceof L.TileLayer || l.urlsForTile) && l._goaheadDef) list.push(l);
     });
     return list;
   }
@@ -102,7 +116,7 @@
     }
     var bufferM = Math.max(100, bufferKm * 1000);
     visibleTileLayers().forEach(function (layer) {
-      corridorUrls(layer, latlngs, bufferM).forEach(function (url) { jobs.push({ url: url, layer: layer }); });
+      corridorUrls(layer, latlngs, bufferM).forEach(function (j) { jobs.push(j); });
     });
     status.total = jobs.length;
 
@@ -131,7 +145,7 @@
           if (stopped || !pending.length) return Promise.resolve();
           var job = pending.shift();
           return fetchOne(cache, job).then(function (ok) {
-            var name = job.layer._goaheadDef.name;
+            var name = job.name;
             if (ok) { done++; okByLayer[name] = true; } else { failedByLayer[name] = (failedByLayer[name] || 0) + 1; }
             status.done = done;
             if (done % 10 === 0) emit();
@@ -147,7 +161,7 @@
           Object.keys(failedByLayer).forEach(function (name) {
             if (anyOk && !okByLayer[name] && status.skipped.indexOf(name) < 0) {
               status.skipped.push(name);
-              jobs = jobs.filter(function (j) { return j.layer._goaheadDef.name !== name; });
+              jobs = jobs.filter(function (j) { return j.name !== name; });
             }
           });
           status.total = jobs.length;

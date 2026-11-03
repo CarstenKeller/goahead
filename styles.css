@@ -1160,3 +1160,10 @@ button {
   stroke: #ffffff;
   stroke-width: 2;
 }
+
+/* Kartenmosaik (mosaic.js): Leinwand-Kacheln 1 px überlappen lassen – sonst feine Fugen bei
+   gebrochener Pixeldichte (z. B. 2,6 auf vielen Android-Geräten) */
+.goahead-mosaic canvas.leaflet-tile {
+  width: 257px !important;
+  height: 257px !important;
+}

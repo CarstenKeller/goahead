@@ -1297,7 +1297,7 @@
       var editing = plan.savedId === r.id && plan.dirty;
       return '<div class="trk-item trk-tap" role="button" tabindex="0" data-id="' + esc(r.id) + '">' +
         '<div class="trk-main"><span class="trk-swatch" style="background:' + COLOR_ROUTE + '"></span>' +
-          '<span class="trk-text"><span class="trk-name">' + esc(r.name) + "</span>" +
+          '<span class="trk-text"><span class="trk-name">' + esc(r.name) + (viewed[r.id] ? " 👁" : "") + "</span>" +
           '<span class="trk-info">' + esc(info.join(" · ")) + (editing ? " · <em>ungespeicherte Änderungen</em>" : "") + "</span></span>" +
         "</div>" +
         '<span class="trk-more" aria-hidden="true">›</span></div>';
@@ -1336,6 +1336,64 @@
     resetHistory();
     savePlan();
     openPlanner();
+    fitPlan();   // Karte auf die Route – die passende Karte (Mosaik) ergibt sich aus dem Ausschnitt
+  }
+
+  // Kopie als neue, noch ungespeicherte Planung (Vorlage für ähnliche Touren)
+  function copyRoute(rec) {
+    if (plan.dirty && plan.points.length &&
+        !window.confirm("Die aktuelle Planung hat ungespeicherte Änderungen. Verwerfen und eine Kopie von „" + rec.name + "“ planen?")) return;
+    var profile = plan.profile;
+    plan = newPlanState();
+    plan.points = clone(rec.points);
+    plan.segments = clone(rec.segments);
+    plan.roundtrip = !!rec.roundtrip;
+    plan.closing = rec.closing ? clone(rec.closing) : null;
+    plan.profile = PROFILES[rec.profile] ? rec.profile : profile;
+    plan.name = rec.name + " (Kopie)";
+    plan.dirty = true;   // erst „Speichern“ legt sie unter „Geplant“ ab
+    candidate = null;
+    selected = null;
+    armed = false;
+    resetHistory();
+    savePlan();
+    openPlanner();
+    fitPlan();
+  }
+
+  function fitPlan() {
+    var line = routeLine(plan);
+    if (line.length < 2) return;
+    if (G.stopFollowing) G.stopFollowing();
+    map.fitBounds(L.latLngBounds(line.map(function (p) { return [p[0], p[1]]; })), { padding: [30, 30], maxZoom: 16 });
+  }
+
+  // Nur ansehen: Route auf der Karte zeigen (ohne Planungsmodus); Antippen der Linie öffnet das Menü
+  var viewed = {};   // id -> Kartenlayer
+  function viewRoute(rec) {
+    if (!viewed[rec.id]) {
+      var line = routeLine(rec).map(function (p) { return [p[0], p[1]]; });
+      var g = L.layerGroup();
+      L.polyline(line, { color: "#ffffff", weight: 9, opacity: 0.85, interactive: false }).addTo(g);
+      var main = L.polyline(line, { color: COLOR_ROUTE, weight: 5, opacity: 0.9 }).addTo(g);
+      // breite unsichtbare Linie zum Antippen
+      var hit = L.polyline(line, { color: "#000000", weight: 22, opacity: 0 }).addTo(g);
+      L.circleMarker(line[0], { radius: 7, color: "#ffffff", weight: 2, fillColor: "#2f9e44", fillOpacity: 1, interactive: false }).addTo(g);
+      [main, hit].forEach(function (l) {
+        l.on("click", function (e) { L.DomEvent.stopPropagation(e); routeMenu(rec); });
+      });
+      viewed[rec.id] = g.addTo(map);
+    }
+    if (G.closeTracksPage) G.closeTracksPage();
+    if (G.closeMenu) G.closeMenu();
+    if (G.stopFollowing) G.stopFollowing();
+    var b = L.latLngBounds(routeLine(rec).map(function (p) { return [p[0], p[1]]; }));
+    if (b.isValid()) map.fitBounds(b, { padding: [30, 30], maxZoom: 16 });
+    renderRoutesList();
+  }
+  function unviewRoute(rec) {
+    if (viewed[rec.id]) { map.removeLayer(viewed[rec.id]); delete viewed[rec.id]; }
+    renderRoutesList();
   }
 
   function openPlanner() {
@@ -1347,6 +1405,7 @@
   function deleteRoute(rec) {
     if (!window.confirm("Geplante Route „" + rec.name + "“ löschen?")) return;
     G.db.del("routes", rec.id).then(function () {
+      if (viewed[rec.id]) { map.removeLayer(viewed[rec.id]); delete viewed[rec.id]; }
       if (plan.savedId === rec.id) {
         // die gerade geöffnete Planung bleibt als ungespeicherter Entwurf erhalten
         plan.savedId = null;
@@ -1377,7 +1436,11 @@
       .filter(Boolean).join(" · ");
     var actions = [];
     if (G.nav) actions.push({ label: "▶ Los geht's", primary: true, onClick: function () { G.nav.start(rec); } });
+    actions.push(viewed[rec.id]
+      ? { label: "Von der Karte entfernen", onClick: function () { unviewRoute(rec); } }
+      : { label: "👁 Ansehen", onClick: function () { viewRoute(rec); } });
     actions.push({ label: "✎ Verändern", onClick: function () { editRoute(rec); } });
+    actions.push({ label: "⧉ Kopieren und neu planen", onClick: function () { copyRoute(rec); } });
     actions.push({ label: "↗ Teilen (z. B. WhatsApp)", onClick: function () { shareRoute(rec); } });
     actions.push({ label: "⬇ GPX exportieren", onClick: function () { exportRouteGpx(rec); } });
     actions.push({ label: "🗑 Löschen", danger: true, onClick: function () { deleteRoute(rec); } });

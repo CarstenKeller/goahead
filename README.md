@@ -45,7 +45,9 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   - Neue Route: *Tracks → Geplant → ＋ Neue Route planen*.
 - **Tracks** (Knopf mit Linien-Symbol im Menü): eigene Seite mit den Reitern *GPX*, *Geplant*, *Erwandert*.
   - *Geplant*: gespeicherte Routen mit Länge, Anstieg, Punktzahl, Datum. Antippen öffnet ein Menü:
-    *▶ Los geht's* (Unterwegs-Modus), *✎ Verändern* (Planungsmodus), *↗ Teilen*, *⬇ GPX exportieren*, *🗑 Löschen*.
+    *▶ Los geht's* (Unterwegs-Modus), *👁 Ansehen* (nur auf der Karte zeigen; Antippen der Linie öffnet das Menü),
+    *✎ Verändern* (Planungsmodus), *⧉ Kopieren und neu planen* (Kopie als neue, ungespeicherte Planung – Vorlage für
+    ähnliche Touren), *↗ Teilen*, *⬇ GPX exportieren*, *🗑 Löschen*. Ansehen, Verändern und Kopieren zoomen auf die Route.
     GPX-Export: Track mit der berechneten Linie (inkl. Rundtour-Rückweg) und Wegpunkte für die geplanten Punkte.
   - *Erwandert*: beendete Aufzeichnungen mit Länge, Zeit in Bewegung, Anstieg (aus GPS-Höhen, daher „ca.“), Datum.
     Antippen: auf der Karte zeigen/entfernen, GPX exportieren (Track mit Höhe und Zeit), löschen.
@@ -105,7 +107,17 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
 - Positions-Knopf (unten rechts): Die Karte folgt der Position (Knopf blau). Im Folgemodus wird um die eigene
   Position gezoomt. Verschieben der Karte oder Zoomen auf einen GPX-Track beendet das Folgen, ein Tipp auf den
   Knopf zentriert wieder.
-- Kartenwahl (im Menü): Topografische Karte NRW (DTK), Luftbild NRW (DOP) oder OpenStreetMap.
+- Kartenwahl (im Menü): **Wanderkarte**, **Luftbild** (beide automatisch nach Gebiet) oder OpenStreetMap.
+  - Die beiden automatischen Karten sind Mosaike (`mosaic.js`): An jeder Stelle erscheint die genaueste Karte,
+    die dort gilt, an Landes- und Staatsgrenzen zugeschnitten (Grenzen in `regions.js`, Natural Earth, gemeinfrei,
+    vereinfacht auf etwa 150 m – an Grenzen kann daher auf einigen 100 m die nächstallgemeinere Karte zu sehen sein).
+    Plant man in Baden-Württemberg, wird keine NRW-Karte geladen; im Grenzgebiet beide.
+  - **Wanderkarte:** NRW → DTK NRW; übriges Deutschland → TopPlusOpen (BKG); Österreich → basemap.at;
+    sonst → OpenTopoMap.
+  - **Luftbild:** NRW → DOP NRW; die Luftbilder (DOP20) der Länder BY, BW, NI, HE, RP, SL, SN, TH, ST, BB/BE, MV, SH
+    ab Zoomstufe 11; Österreich → basemap.at Orthofoto; sonst (Überblick, Hamburg, Bremen, Ausland) → Esri World Imagery.
+  - Die Quellenangabe unten zeigt jeweils die Dienste im aktuellen Ausschnitt.
+  - Offline-Karten unterwegs speichern genau die Dienste, die entlang der Route gelten.
 - Die zuletzt gewählte Karte und der Ausschnitt werden auf dem Gerät gespeichert.
 - Maßstabsleiste unten links.
 - **Wanderwege ein-/ausblenden** (Kartenwahl oben rechts, Abschnitt mit Häkchen):
@@ -183,7 +195,29 @@ Routing und Suche (ohne API-Schlüssel; die Dienste sind kostenlos, aber nur fü
 |---|---|---|
 | DTK NRW | `https://www.wms.nrw.de/geobasis/wms_nw_dtk` (WMS) | Datenlizenz Deutschland – Zero 2.0 |
 | DOP NRW | `https://www.wms.nrw.de/geobasis/wms_nw_dop` (WMS) | Datenlizenz Deutschland – Zero 2.0 |
+| TopPlusOpen (Deutschland) | `sgx.geodatenzentrum.de/wmts_topplus_open` (WMTS, WEBMERCATOR) | dl-de/by-2-0 |
+| basemap.at (Österreich) | `mapsneu.wien.gv.at/basemap/geolandbasemap` und `…/bmaporthofoto30cm` | CC BY 4.0 |
+| OpenTopoMap (Rückfall) | `{a,b,c}.tile.opentopomap.org` | CC-BY-SA |
+| DOP Bayern | `geoservices.bayern.de/od/wms/dop/v1/dop20`, Ebene `by_dop20c` | CC BY 4.0 |
+| DOP Baden-Württemberg | `owsproxy.lgl-bw.de/owsproxy/ows/WMS_LGL-BW_ATKIS_DOP_20_C`, `IMAGES_DOP_20_RGB` | dl-de/by-2-0 |
+| DOP Niedersachsen | `opendata.lgln.niedersachsen.de/doorman/noauth/dop_wms`, `ni_dop20` | CC BY 4.0 |
+| DOP Hessen | `www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows`, `he_dop_rgb` | frei nach § 18 HVGG |
+| DOP Rheinland-Pfalz | `geo4.service24.rlp.de/wms/rp_dop20.fcgi`, `rp_dop20` | dl-de/by-2-0 |
+| DOP Saarland | `geoportal.saarland.de/freewms/dop2023`, `sl_dop20_rgb` | Capabilities: „noLimitations“ (laut OSM-Wiki dl-de/by-2-0) |
+| DOP Sachsen | `geodienste.sachsen.de/wms_geosn_dop-rgb/guest`, `sn_dop_020` | Nutzungsbedingungen GeoSN (laut OSM-Wiki dl-de/by-2-0) |
+| DOP Thüringen | `www.geoproxy.geoportal-th.de/geoproxy/services/DOP20`, `th_dop` | CC BY 4.0 |
+| DOP Sachsen-Anhalt | `www.geodatenportal.sachsen-anhalt.de/wss/service/ST_LVermGeo_DOP_WMS_OpenData/guest` | „OpenData“ – Lizenztext **ungeprüft** |
+| DOP Brandenburg/Berlin | `isk.geobasis-bb.de/mapproxy/dop20c/service/wms`, `bebb_dop20c` | dl-de/by-2-0 |
+| DOP Mecklenburg-Vorpommern | `www.geodaten-mv.de/dienste/adv_dop`, `mv_dop` | Quellenvermerk „© GeoBasis-DE/M-V“ |
+| DOP Schleswig-Holstein | `dienste.gdi-sh.de/WMS_SH_DOP20col_OpenGBD`, `sh_dop20_rgb` | CC BY 4.0 |
+| Esri World Imagery (Rückfall) | `server.arcgisonline.com/…/World_Imagery` | Nutzungsbedingungen **ungeprüft** |
 | OSM | `tile.openstreetmap.org` | ODbL, Namensnennung erforderlich |
+
+**Geprüft (03.11.2026, GitHub-Actions-Workflow „Kartendienste prüfen“, `.github/scripts/probe_maps.py`):**
+Capabilities bzw. Probe-Kachel, EPSG:3857, JPEG-Ausgabe, CORS und Lizenz (Fees/AccessConstraints) aller Dienste
+oben. Nicht aufgenommen: Hamburg (frei nur gemeinsam mit Maxar-Bildern unter geschlossener Lizenz), Bremen
+(kein Dienst gefunden), BKG-DOP bundesweit (Zugriff verweigert). Die in den basemap.at-Capabilities genannten
+Hosts `maps1–3.wien.gv.at` waren nicht auflösbar; `mapsneu.wien.gv.at` liefert dieselben Kacheln.
 
 Laut Metadaten gilt für die BKG-Maßstäbe DTK250/DTK500 stattdessen
 „Datenlizenz Deutschland – Namensnennung 2.0“.
@@ -220,7 +254,8 @@ Einmalig nötig: unter *Settings → Pages → Build and deployment → Source* 
 - `CLAUDE.md`: Arbeitsregeln für Änderungen (UI-Grundregeln, Versionen, Speicher, Tests)
 - `index.html`, `styles.css`, `app.js`: die App
 - `tracks.js`: Seite *Tracks*, GPX-Import, lokale Speicherung, Track-Liste
-- `planner.js`: Route planen (Routing, Suche, Planungsfeld), Liste *Geplant*, GPX-Export
+- `planner.js`: Route planen (Routing, Suche, Planungsfeld), Liste *Geplant* (Ansehen, Kopieren, Verändern …), GPX-Export
+- `mosaic.js`, `regions.js`: Kartenmosaik nach Gebiet und die Grenzen dazu
 - `offline.js`: Offline-Karten entlang der Route
 - `nav.js`: Unterwegs-Modus, Aufzeichnung, Abbiegungen, Liste *Erwandert*
 - `backup.js`: Sicherung/Wiederherstellen, Sammel-Import (GPX, ZIP) nach *Geplant*/*Erwandert*
