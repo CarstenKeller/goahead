@@ -11,28 +11,28 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
 - **Menü** (☰ oben rechts): Eine Leiste mit den Funktionsknöpfen fährt von rechts ein: Kartenwahl,
   Größe der Wegemarkierungen, Tracks, Route planen, Einstellungen. Ein Tipp auf die Karte schließt das Menü.
 - **Route planen** (Knopf mit Routen-Symbol im Menü), Modul `planner.js`:
-  - Im Planungsmodus bleibt im Menü nur die Kartenwahl. Unten erscheint das Planungsfeld.
+  - Im Planungsmodus bleibt im Menü nur die Kartenwahl. Unten erscheint ein kompaktes Feld: Kopfzeile mit Name,
+    Kennzahlen (Punkte, Länge, Anstieg; Vorschlag in Orange), *Speichern* und *Beenden*; darunter Symbolknöpfe
+    *Rückgängig*, *Wiederholen*, *S* (zum Startpunkt), *Rundtour*, *Routing-Profil* (Wandern/BRouter ↔ Fußweg/OSRM)
+    und *Suche*. Langer Druck auf einen Knopf zeigt seine Beschreibung.
+  - **Auf der Karte:**
+    - Tipp auf die Karte: Vorschlagspunkt mit vorgeschlagener Strecke (orange, gestrichelt).
+      Nochmal auf den Vorschlagspunkt tippen: einrasten.
+    - Routenpunkt: 1. Tipp markiert ihn (blau). Dann Tipp auf die Karte oder Punkt ziehen → Ersatzvorschlag mit
+      neuen Anschlussstrecken; Tipp darauf übernimmt ihn. 2. Tipp: Löschmodus (rot, „−“). 3. Tipp: löschen
+      (Vorgänger und Nachfolger werden neu verbunden). Tipp daneben bricht den Löschmodus ab.
+    - Strecke zwischen zwei Punkten: Tipp fügt dort einen Zwischenpunkt ein (er ist danach markiert und verschiebbar).
+      Doppeltipp wechselt zwischen *Weg* (Routing) und *direkt* (gerade Linie, gestrichelt, mit ihrer Länge
+      in der Gesamtstrecke). Gilt auch für den Rückweg einer Rundtour.
+  - *Rückgängig/Wiederholen*: bis zu 20 Schritte (während der Sitzung).
   - Suche: Adresse (Nominatim/OpenStreetMap) oder Koordinaten: Dezimalgrad (`51.758, 9.030`, auch mit
     Dezimalkomma oder vertauscht) oder UTM Zone 32 wie in TIM-online (`32U 494000 5735000` oder `494000 5735000`).
     Koordinaten setzen direkt einen Vorschlagspunkt.
-  - Tipp auf die Karte setzt einen Vorschlagspunkt (orange, verschiebbar). Die Strecke vom letzten bestätigten Punkt
-    erscheint orange gestrichelt. Nochmal auf den Vorschlagspunkt tippen (oder „Punkt übernehmen“) rastet ihn ein,
-    er wird zum Ausgangspunkt für den nächsten.
-  - „📍 Hier“ nimmt die eigene GPS-Position als Vorschlagspunkt.
-  - Tipp auf einen Routenpunkt markiert ihn (blau). Dann:
-    - Tipp auf die Karte schlägt einen Ersatzpunkt vor; die neuen Anschlussstrecken zu den Nachbarpunkten erscheinen
-      orange gestrichelt, die bisherigen blass. Nochmal auf den Ersatzpunkt tippen (oder „Ersatzpunkt übernehmen“)
-      ersetzt den alten Punkt.
-    - „Punkt löschen“ entfernt ihn; Vorgänger und Nachfolger werden neu verbunden.
-    - „Abbrechen“ oder erneutes Antippen hebt die Markierung auf.
-  - „Rundtour“ verbindet den letzten Punkt mit dem Startpunkt (wieder ausschaltbar).
-  - Routing-Profil: *Wandern* (BRouter, Profil `hiking-mountain`, Rückfall OSRM), *Fußweg* (OSRM der FOSSGIS,
-    Rückfall BRouter) oder *Luftlinie*. Findet kein Dienst einen Weg, wird die Luftlinie genommen und gestrichelt gezeigt.
-  - Anzeige: Punkte, Länge, Anstieg (nur bei BRouter), Zahl der Luftlinien-Abschnitte.
-  - „💾 Speichern“ legt die Route unter *Tracks → Geplant* ab (neue Route: Name im Dialog; bearbeitete Route: wird
-    überschrieben). Änderungen an einer gespeicherten Route wirken erst nach „Speichern“ – bis dahin bleibt der
-    gespeicherte Stand unverändert. Die Kopfzeile zeigt „ungespeichert“, Beenden und „Neu“ fragen nach.
-  - Der Arbeitsstand (Entwurf) wird zusätzlich lokal gesichert und ist nach einem Neustart wieder da.
+  - Findet kein Routing-Dienst einen Weg, wird die gerade Linie genommen und mit ⚠ markiert.
+  - *Speichern* legt die Route unter *Tracks → Geplant* ab (neue Route: Name im Dialog; bearbeitete Route: wird
+    überschrieben). Änderungen an einer gespeicherten Route wirken erst nach *Speichern*; ein roter Punkt hinter
+    dem Namen zeigt ungespeicherte Änderungen. Der Arbeitsstand wird zusätzlich lokal gesichert.
+  - Neue Route: *Tracks → Geplant → ＋ Neue Route planen*.
 - **Tracks** (Knopf mit Linien-Symbol im Menü): eigene Seite mit den Reitern *GPX*, *Geplant*, *Erwandert*.
   - *Geplant*: gespeicherte Routen mit Länge, Anstieg, Punktzahl, Datum. Antippen öffnet ein Menü:
     *▶ Los geht's* (Unterwegs-Modus), *✎ Verändern* (Planungsmodus), *⬇ GPX exportieren*, *🗑 Löschen*.

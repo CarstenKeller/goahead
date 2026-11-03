@@ -91,6 +91,11 @@ html, body {
   inset: 0;
 }
 
+/* Das hidden-Attribut gilt immer – auch gegen display-Regeln einzelner Bausteine */
+[hidden] {
+  display: none !important;
+}
+
 button {
   font: inherit;
   color: inherit;
@@ -141,7 +146,6 @@ button {
 
 /* Knopf-Varianten */
 .btn-primary,
-.plan-confirm,
 .dlg-ok,
 .dlg-action.primary,
 .nav-pause.on {
@@ -149,7 +153,6 @@ button {
   color: #ffffff !important;
 }
 .btn-danger,
-.plan-del,
 .nav-end,
 .dlg-action.danger {
   background: var(--c-danger-soft) !important;
@@ -159,9 +162,47 @@ button {
   background: var(--c-blue-soft) !important;
   color: var(--c-blue) !important;
 }
-.plan-round.on {
+.plan-round.on,
+.plan-find.on {
   background: var(--c-route) !important;
   color: #ffffff !important;
+}
+
+/* Symbolknöpfe (Beschriftung steht im title, langer Druck zeigt sie) */
+.sheet .icon-btn,
+.page .icon-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-letter {
+  font-weight: 800;
+  font-size: 17px;
+}
+.icon-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Tooltip (langer Druck auf einen Knopf) */
+.tip {
+  position: fixed;
+  z-index: var(--z-dialog);
+  max-width: 240px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--glass-dark);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  color: #ffffff;
+  font-size: 13px;
+  pointer-events: none;
+  box-shadow: var(--shadow);
 }
 
 /* Eingabefelder */
@@ -447,6 +488,25 @@ button {
   border-radius: 3px;
   background: rgba(0, 0, 0, 0.22);
 }
+.sheet-titles {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.sheet-titles > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sheet-titles > .nav-state {
+  white-space: normal;    /* Warnungen nicht abschneiden */
+}
+.sheet-head-btns {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
 .sheet-body {
   flex: 1;
   min-height: 0;
@@ -553,30 +613,35 @@ button {
 }
 
 /* Planen */
+/* Planen */
 .plan-dirty {
-  color: var(--c-route);
-  font-weight: normal;
-  font-size: 13px;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--c-route);
+  vertical-align: middle;
 }
-.plan-exit,
-.plan-new {
-  padding: 8px 12px !important;
-  font-size: 14px !important;
+.plan-sum {
+  font-size: 13px;
+  color: var(--c-muted);
+}
+.plan-cand {
+  color: var(--c-candidate);
+  font-weight: 600;
+}
+.plan-warn {
+  color: var(--c-danger);
 }
 .plan-search {
   display: flex;
   gap: 6px;
+  margin-top: 8px;
 }
 .plan-search input {
   flex: 1;
   min-width: 0;
-}
-.plan-search button {
-  width: 46px;
-  padding: 0 !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 .plan-results {
   margin-top: 4px;
@@ -598,32 +663,6 @@ button {
   margin: 4px 0;
   font-size: 11px;
   color: var(--c-muted);
-}
-.plan-status {
-  margin: 10px 0;
-  font-size: 14px;
-  min-height: 2.6em;
-}
-.plan-actions,
-.nav-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.plan-confirm {
-  flex: 1 1 100%;
-}
-.plan-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 10px;
-  font-size: 13px;
-  color: var(--c-muted);
-}
-.plan-profile {
-  max-width: 50%;
 }
 
 /* Unterwegs */
@@ -654,12 +693,13 @@ button {
 .nav-state {
   font-size: 13px;
   color: var(--c-muted);
-  margin: 10px 0;
 }
-.nav-actions button {
-  flex: 1;
-  padding: 13px 8px;
-  font-size: 16px;
+.nav-state.is-rec {
+  color: var(--c-danger);
+}
+.nav-state.is-warn {
+  color: var(--c-candidate);
+  font-weight: 600;
 }
 
 /* ---------- 6. Seite „Tracks“ und Listen ---------- */
@@ -922,6 +962,7 @@ button {
 .plan-pt-last { background: var(--c-route); outline: 3px solid rgba(194, 37, 92, 0.35); }
 .plan-pt-sel { background: var(--c-blue); outline: 4px solid rgba(28, 109, 208, 0.35); transform: scale(1.15); }
 .plan-pt-cand { background: var(--c-candidate); font-size: 16px; }
+.plan-pt-del { background: var(--c-danger); outline: 4px solid rgba(198, 40, 40, 0.35); transform: scale(1.15); font-size: 18px; }
 
 /* Popups (z. B. Wegpunkte aus GPX) */
 .leaflet-popup-content-wrapper {

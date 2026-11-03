@@ -2,7 +2,7 @@
  * Kartenkacheln werden bewusst (noch) NICHT gecacht – das ist ein eigener Schritt
  * (Offline-Karten), der Speicherplatz und Nutzungsbedingungen berücksichtigen muss.
  */
-var CACHE = "goahead-shell-v19";
+var CACHE = "goahead-shell-v20";
 var SHELL = [
   "./",
   "index.html",

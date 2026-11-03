@@ -154,19 +154,18 @@
   panel.innerHTML =
     '<div class="nav-head sheet-handle">' +
       '<span class="sheet-grip" aria-hidden="true"></span>' +
-      '<span class="nav-title"></span>' +
+      '<span class="sheet-titles"><span class="nav-title"></span><span class="nav-state"></span></span>' +
+      '<span class="sheet-head-btns">' +
+        '<button type="button" class="icon-btn nav-pause"></button>' +
+        '<button type="button" class="icon-btn nav-center" title="Auf meine Position" aria-label="Auf meine Position">' + G.icon("locate") + "</button>" +
+        '<button type="button" class="icon-btn nav-end" title="Tour beenden" aria-label="Tour beenden">' + G.icon("stop") + "</button>" +
+      "</span>" +
     "</div>" +
     '<div class="sheet-body">' +
     '<div class="nav-stats">' +
       '<div><span class="nav-val nav-dist">0,00 km</span><span class="nav-lbl">gewandert</span></div>' +
       '<div><span class="nav-val nav-time">0:00:00</span><span class="nav-lbl">unterwegs</span></div>' +
       '<div><span class="nav-val nav-plan">–</span><span class="nav-lbl">geplant</span></div>' +
-    "</div>" +
-    '<p class="nav-state"></p>' +
-    '<div class="nav-actions">' +
-      '<button type="button" class="nav-pause">⏸ Pause</button>' +
-      '<button type="button" class="nav-center">◎ Position</button>' +
-      '<button type="button" class="nav-end">■ Beenden</button>' +
     "</div>" +
     "</div>";
   document.body.appendChild(panel);
@@ -193,22 +192,25 @@
 
   function renderPanel() {
     if (!walk) return;
-    el.title.textContent = "Unterwegs: " + walk.routeName;
+    el.title.textContent = walk.routeName;
     el.dist.textContent = km(walk.distance);
     el.time.textContent = duration(movingTime(walk));
     el.plan.textContent = walk.planLength ? km(walk.planLength) : "–";
-    el.pause.textContent = walk.paused ? "▶ Weiter" : "⏸ Pause";
+    var pt = walk.paused ? "Weiter aufzeichnen" : "Pause";
+    el.pause.innerHTML = G.icon(walk.paused ? "play" : "pause");
+    el.pause.title = pt;
+    el.pause.setAttribute("aria-label", pt);
     el.pause.classList.toggle("on", walk.paused);
-    var msg;
-    if (walk.paused) msg = walk.interrupted
-      ? "Pausiert – die Seite wurde neu geladen. Mit „Weiter“ geht die Aufzeichnung weiter."
-      : "Pausiert – es wird nichts aufgezeichnet.";
-    else if (!walk.lastFix) msg = "Aufzeichnung läuft – warte auf GPS …";
-    else if (walk.weak) msg = "Aufzeichnung läuft – GPS gerade zu ungenau, Punkte werden übersprungen.";
-    else msg = "Aufzeichnung läuft.";
-    if (!walk.paused && wakeLockOk === true) msg += " Der Bildschirm bleibt an.";
-    if (!walk.paused && wakeLockOk === false) msg += " Hinweis: Bildschirm nicht ausschalten und die App nicht verlassen – sonst stoppt die Aufzeichnung.";
-    el.state.textContent = msg;
+    // knapper Zustand statt Erklärtext; Warnungen nur, wo Daten verloren gehen könnten
+    var st;
+    var cls = "";
+    if (walk.paused) { st = walk.interrupted ? "Pause (neu geladen)" : "Pause"; cls = "is-pause"; }
+    else if (!walk.lastFix) { st = "● Aufnahme · warte auf GPS"; cls = "is-rec"; }
+    else if (walk.weak) { st = "● Aufnahme · ⚠ GPS ungenau"; cls = "is-warn"; }
+    else { st = "● Aufnahme"; cls = "is-rec"; }
+    if (!walk.paused && wakeLockOk === false) { st += " · ⚠ Bildschirm anlassen"; cls = "is-warn"; }
+    el.state.textContent = st;
+    el.state.className = "nav-state " + cls;
   }
 
   var ticker = null;

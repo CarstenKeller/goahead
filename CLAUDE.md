@@ -15,18 +15,36 @@ schon einmal falsch gemacht wurde.
 
 ## Oberfläche – Grundregeln
 
+**Leitlinie: Das Display ist klein, die Karte ist das Wichtigste.** Bedienfelder brauchen so wenig
+Platz wie möglich:
+
+- **Keine Erklärtexte zur Bedienung** in der Oberfläche. Angezeigt werden nur Daten (Name, Kennzahlen)
+  und knappe Zustände/Warnungen, wenn sonst Daten verloren gehen könnten (z. B. „⚠ Bildschirm anlassen“).
+- **Knöpfe als Symbole mit Tooltip** statt Beschriftung: `class="icon-btn"`, Symbol aus `GOAHEAD.icon(name)`,
+  Beschriftung in `title` **und** `aria-label`. Langer Druck zeigt den Tooltip auf Touch-Geräten (global in app.js).
+  Textknöpfe nur in Dialogen/Auswahlmenüs.
+- **Wichtigste Aktionen in die Kopfzeile** der Leiste (z. B. Speichern, Beenden), Titel und Kennzahlen links daneben.
+- **Bedienung direkt auf der Karte vor Knöpfen:** Antippen, erneut antippen, Doppeltipp, Ziehen
+  (z. B. Vorschlagspunkt erneut antippen = übernehmen; Strecke antippen = Zwischenpunkt; Doppeltipp = Modus wechseln).
+  Keinen Knopf für etwas, das auf der Karte direkt geht.
+- Selten gebrauchte Eingaben (z. B. Suche) erst auf Knopfdruck einblenden.
+- Das `hidden`-Attribut blendet immer aus (globale Regel `[hidden] { display: none !important }`) –
+  nicht mit eigenen `display`-Regeln dagegen arbeiten.
+
 1. **Untere Leisten verschieben nichts.** Alle unteren Leisten (Infofenster, Planen, Unterwegs und
    künftige) verwenden die Klasse `.sheet` und liegen *über* der Karte und ihren Bedienelementen.
    Positions-Knopf, Maßstab und Quellenangabe bleiben, wo sie sind – auch beim Ziehen der Leiste.
    Keine CSS-Regeln, die `.map-btn` oder `.leaflet-bottom` abhängig von einer Leiste verschieben.
-2. **Leisten-Aufbau:** `<section class="sheet">` → Kopf `.sheet-handle` mit `.sheet-grip`
-   → Inhalt `.sheet-body` (scrollt). Ziehbar machen mit `GOAHEAD.makeResizable(panel, kopf, speicherSchlüssel)`.
+2. **Leisten-Aufbau:** `<section class="sheet">` → Kopf `.sheet-handle` mit `.sheet-grip`,
+   `.sheet-titles` (Titel + Kennzahlen) und `.sheet-head-btns` → Inhalt `.sheet-body` (scrollt).
+   Ziehbar machen mit `GOAHEAD.makeResizable(panel, kopf, speicherSchlüssel)`.
 3. **Design:** modern, leicht transparent („Glas“). Farben, Flächen, Radien, Schatten und
    Ebenen (z-index) ausschließlich über die Variablen am Anfang von `styles.css`
    (`--c-*`, `--glass*`, `--r-*`, `--shadow*`, `--z-*`). Keine fest eingetragenen Farben in neuen Regeln.
    Neue Flächen in die Liste „Gemeinsame Glas-Fläche“ in `styles.css` aufnehmen.
-4. **Knöpfe:** in `.sheet`, `.page`, `.dlg` automatisch einheitlich. Varianten über die vorhandenen
-   Klassen (`.btn-primary`, `.btn-danger` bzw. die dort gelisteten). Mindestgröße für Touch ca. 44 px.
+4. **Knöpfe:** in `.sheet`, `.page`, `.dlg` automatisch einheitlich; Symbolknöpfe `.icon-btn` (44 × 44 px),
+   Reihen davon in `.icon-row`. Varianten über die vorhandenen Klassen (`.btn-primary`, `.btn-danger`
+   bzw. die dort gelisteten). Mindestgröße für Touch 44 px.
 5. **Dialoge:** nie `window.prompt`/`alert` (werden teils unterdrückt). Stattdessen
    `GOAHEAD.askText(...)` und `GOAHEAD.actionSheet(...)`. `window.confirm` nur, wo bereits verwendet.
 6. **Menü:** Funktionen kommen als Knopf in die Leiste per `GOAHEAD.addToToolbar(control)`.
@@ -57,6 +75,7 @@ schon einmal falsch gemacht wurde.
 - Andere offene Tabs mit älterer Version blockieren eine Umstellung – das ist abgefangen
   (`onblocked`, `onversionchange`, Zeitlimit). Beim Erhöhen der Version den Nutzer darauf hinweisen.
 - Bearbeitete Daten erst beim ausdrücklichen „Speichern“ überschreiben; Entwürfe getrennt sichern.
+- Bearbeitungsschritte rückgängig machbar halten (Planen: Schnappschuss mit `pushHistory()` vor jeder Änderung).
 
 ## Testen
 

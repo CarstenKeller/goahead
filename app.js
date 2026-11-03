@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "19";
+  var APP_VERSION = "20";
   var STORAGE_KEY = "goahead.view.v1";
 
   // ---------- kleine Helfer ----------
@@ -1427,6 +1427,81 @@
     handle.addEventListener("pointercancel", end);
   }
 
+  // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil) ----------
+  var ICONS = {
+    save: '<path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><path d="M8 20v-6h8v6"/>',
+    close: '<path d="M6 6l12 12M18 6L6 18"/>',
+    undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+    redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>',
+    roundtrip: '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/>',
+    search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/>',
+    hiking: '<path d="M3 20l6-10 4 6 2-3 6 7z"/>',
+    road: '<path d="M8 3L5 21M16 3l3 18M12 4v3M12 11v3M12 18v2"/>',
+    pause: '<path d="M8 5v14M16 5v14"/>',
+    play: '<path d="M7 4l13 8-13 8z" fill="currentColor"/>',
+    stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>',
+    locate: '<circle cx="12" cy="12" r="3.5" fill="currentColor"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>'
+  };
+  function icon(name) {
+    return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || "") + "</svg>";
+  }
+
+  // ---------- Tooltips per langem Druck (Touch zeigt title-Texte sonst nicht an) ----------
+  (function () {
+    var tip = document.createElement("div");
+    tip.className = "tip";
+    tip.hidden = true;
+    document.body.appendChild(tip);
+    var timer = null;
+    var shown = false;
+    var startX = 0;
+    var startY = 0;
+    function hide() {
+      clearTimeout(timer);
+      tip.hidden = true;
+    }
+    document.addEventListener("pointerdown", function (e) {
+      if (e.pointerType !== "touch") return;
+      var el = e.target.closest("button[title], a[title]");
+      if (!el) return;
+      shown = false;
+      startX = e.clientX;
+      startY = e.clientY;
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        tip.textContent = el.getAttribute("title");
+        tip.hidden = false;
+        var r = el.getBoundingClientRect();
+        var w = tip.offsetWidth;
+        var x = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
+        var y = r.top - tip.offsetHeight - 8;
+        if (y < 8) y = r.bottom + 8;
+        tip.style.left = x + "px";
+        tip.style.top = y + "px";
+        shown = true;
+        setTimeout(hide, 1800);
+      }, 450);
+    }, true);
+    document.addEventListener("pointermove", function (e) {
+      if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) clearTimeout(timer);
+    }, true);
+    document.addEventListener("pointerup", function () { clearTimeout(timer); }, true);
+    document.addEventListener("pointercancel", hide, true);
+    // nach angezeigtem Tooltip den Knopf nicht auslösen
+    document.addEventListener("click", function (e) {
+      if (shown) {
+        shown = false;
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+    document.addEventListener("contextmenu", function (e) {
+      if (e.target.closest("button[title], a[title]")) e.preventDefault();
+    });
+  })();
+
   function downloadFile(fileName, text, mime) {
     var blob = new Blob([text], { type: mime || "application/octet-stream" });
     var a = document.createElement("a");
@@ -1460,7 +1535,8 @@
     askText: askText,
     actionSheet: actionSheet,
     downloadFile: downloadFile,
-    makeResizable: makeResizable
+    makeResizable: makeResizable,
+    icon: icon
   };
 
   // ---------- Service Worker (App-Hülle offline verfügbar) ----------
