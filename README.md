@@ -107,6 +107,8 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   Planung). Die Treffer werden erst angezeigt (mit Begründung), dann auf Wunsch gelöscht bzw. nach „Geplant“
   verschoben. Die Erkennung „geplant“ ist eine Heuristik, an echten komoot-Daten nicht geprüft. Einzelne Touren
   lassen sich auch über ihr Menü nach „Geplant“ verschieben. Eigene GoAhead-Aufnahmen gelten nie als geplant.
+  Dritte Gruppe: *zu schnell* – Durchschnitt in Bewegung über 7 km/h (vermutlich Rad oder Auto; Schwelle gewählt,
+  nicht gemessen). Die Liste zeigt bei jeder Tour „Ø … km/h“.
 - **Untere Leisten ziehen:** Planungsfeld und Unterwegs-Feld lassen sich am Griff oben größer oder kleiner ziehen
   (Höhe wird gespeichert). Alle unteren Leisten legen sich über Positions-Knopf, Maßstab und Quellenangabe,
   ohne sie zu verschieben.

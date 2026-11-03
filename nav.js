@@ -776,12 +776,16 @@
     var note = "";
     if (check && check.mode) {
       var n = Object.keys(check[check.mode]).length;
-      note = '<div class="list-note"><span>' + (check.mode === "dups" ? n + " vermutlich doppelt" : n + " vermutlich geplant") + "</span>" +
-        '<button type="button" class="list-check-act">' + (check.mode === "dups" ? "Doppelte löschen" : "Nach „Geplant“ verschieben") + "</button>" +
+      var lbl = { dups: [" vermutlich doppelt", "Doppelte löschen"], planned: [" vermutlich geplant", "Nach „Geplant“ verschieben"],
+        fast: [" schneller als " + FAST_KMH + " km/h", "Alle löschen"] }[check.mode];
+      note = '<div class="list-note"><span>' + n + lbl[0] + "</span>" +
+        '<button type="button" class="list-check-act">' + lbl[1] + "</button>" +
         '<button type="button" class="icon-btn list-check-off" title="Prüfung beenden" aria-label="Prüfung beenden">' + G.icon("close") + "</button></div>";
     }
     box.innerHTML = hd.html + note + hd.items.map(function (w) {
       var info = [km(w.distance), duration(w.movingMs)];
+      var v = avgKmh(w);
+      if (v != null) info.push("Ø " + num(v, 1) + " km/h");
       if (check && check.mode === "planned" && check.why[w.id]) info.push(check.why[w.id]);
       if (w.ascent) info.push("↑ ca. " + Math.round(w.ascent) + " m");
       info.push(new Date(w.startedAt).toLocaleDateString("de-DE"));
@@ -800,7 +804,13 @@
     if (act) act.addEventListener("click", function (e) { e.stopPropagation(); applyCheck(); });
   }
 
-  // ---------- Liste prüfen: Doppelte und vermutlich geplante Touren ----------
+  // Durchschnitt in Bewegung (km/h); null, wenn keine Bewegungszeit bekannt ist
+  function avgKmh(w) {
+    return w.movingMs > 60000 && w.distance > 0 ? w.distance / 1000 / (w.movingMs / 3600000) : null;
+  }
+  var FAST_KMH = 7;   // schneller im Schnitt: vermutlich nicht zu Fuß (Rad, Auto) – Annahme, nicht gemessen
+
+  // ---------- Liste prüfen: Doppelte, vermutlich geplante und zu schnelle Touren ----------
   //
   // Doppelt: gleicher Tag, gleicher Start (auf ~100 m) und gleiche Länge (auf 200 m). Behalten wird die erste.
   // Vermutlich geplant (Heuristik, nicht sicher – daher erst anzeigen, dann auf Wunsch verschieben):
@@ -835,13 +845,15 @@
 
   function runCheck() {
     var seen = {};
-    var dups = {}, planned = {}, why = {};
+    var dups = {}, planned = {}, why = {}, fast = {};
     walks.slice().sort(function (a, b) { return a.id < b.id ? -1 : 1; }).forEach(function (w) {
       var p = w.segments[0] && w.segments[0][0];
       if (p) {
         var key = String(w.startedAt).slice(0, 10) + "|" + Math.round((w.distance || 0) / 200) + "|" + p[0].toFixed(3) + "," + p[1].toFixed(3);
         if (seen[key]) dups[w.id] = 1; else seen[key] = 1;
       }
+      var v = avgKmh(w);
+      if (v != null && v > FAST_KMH) fast[w.id] = 1;
       if (w.free || !w.importKey) return;   // eigene Aufzeichnungen aus GoAhead sind sicher erwandert
       var st = walkStats(w);
       if (st.timedShare < 0.5) { planned[w.id] = 1; why[w.id] = "ohne Zeitstempel"; }
@@ -850,25 +862,28 @@
         why[w.id] = "Pausen " + Math.round(st.stopShare * 100) + " %, Takt " + Math.round(st.takt * 100) + " %";
       }
     });
-    var nd = Object.keys(dups).length, np = Object.keys(planned).length;
+    var nd = Object.keys(dups).length, np = Object.keys(planned).length, nf = Object.keys(fast).length;
+    function show(mode) { return function () { check = { dups: dups, planned: planned, fast: fast, why: why, mode: mode }; renderWalks(); }; }
     var kmOf = function (set) { return walks.filter(function (w) { return set[w.id]; }).reduce(function (s, w) { return s + (w.distance || 0); }, 0) / 1000; };
     var acts = [];
-    if (nd) acts.push({ label: "Doppelte zeigen (" + nd + ", " + num(kmOf(dups), 0) + " km)", primary: true, onClick: function () { check = { dups: dups, planned: planned, why: why, mode: "dups" }; renderWalks(); } });
-    if (np) acts.push({ label: "Vermutlich geplante zeigen (" + np + ", " + num(kmOf(planned), 0) + " km)", primary: !nd, onClick: function () { check = { dups: dups, planned: planned, why: why, mode: "planned" }; renderWalks(); } });
-    G.actionSheet("Liste prüfen", walks.length + " Touren: " + nd + " vermutlich doppelt, " + np + " vermutlich geplant (Zeiten ohne Pausen und ohne festen Aufnahmetakt)." +
-      (nd || np ? " Erst ansehen, dann entscheiden." : ""), acts);
+    if (nd) acts.push({ label: "Doppelte zeigen (" + nd + ", " + num(kmOf(dups), 0) + " km)", onClick: show("dups") });
+    if (np) acts.push({ label: "Vermutlich geplante zeigen (" + np + ", " + num(kmOf(planned), 0) + " km)", onClick: show("planned") });
+    if (nf) acts.push({ label: "Zu schnelle zeigen (Ø über " + FAST_KMH + " km/h: " + nf + ", " + num(kmOf(fast), 0) + " km)", onClick: show("fast") });
+    G.actionSheet("Liste prüfen", walks.length + " Touren: " + nd + " vermutlich doppelt, " + np + " vermutlich geplant, " + nf +
+      " schneller als " + FAST_KMH + " km/h im Schnitt (Rad, Auto?)." + (nd || np || nf ? " Erst ansehen, dann entscheiden." : ""), acts);
   }
 
   function applyCheck() {
     if (!check || !check.mode) return;
     var ids = Object.keys(check[check.mode]);
-    if (check.mode === "dups") {
-      G.actionSheet(ids.length + " doppelte Touren löschen?", "Die jeweils erste bleibt erhalten.", [
+    if (check.mode === "dups" || check.mode === "fast") {
+      G.actionSheet(ids.length + (check.mode === "dups" ? " doppelte Touren löschen?" : " Touren löschen?"),
+        check.mode === "dups" ? "Die jeweils erste bleibt erhalten." : "Einzelne lassen sich vorher über ihr Menü löschen oder behalten.", [
         { label: "Löschen", danger: true, onClick: function () {
           Promise.all(ids.map(function (id) { return G.db.del("walks", id); })).then(function () {
             check = null;
             loadWalks();
-            G.showStatus(ids.length + " doppelte Touren gelöscht.", 4000);
+            G.showStatus(ids.length + " Touren gelöscht.", 4000);
           }).catch(function (err) { G.showStatus("Löschen fehlgeschlagen: " + err.message, 6000); });
         } }
       ]);
