@@ -16,17 +16,27 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     Dezimalkomma oder vertauscht) oder UTM Zone 32 wie in TIM-online (`32U 494000 5735000` oder `494000 5735000`).
     Koordinaten setzen direkt einen Vorschlagspunkt.
   - Tipp auf die Karte setzt einen Vorschlagspunkt (orange, verschiebbar). Die Strecke vom letzten bestätigten Punkt
-    erscheint orange gestrichelt. „Punkt übernehmen“ rastet ihn ein, er wird zum Ausgangspunkt für den nächsten.
+    erscheint orange gestrichelt. Nochmal auf den Vorschlagspunkt tippen (oder „Punkt übernehmen“) rastet ihn ein,
+    er wird zum Ausgangspunkt für den nächsten.
   - „📍 Hier“ nimmt die eigene GPS-Position als Vorschlagspunkt.
-  - Tipp auf einen Routenpunkt → „Punkt löschen“; Vorgänger und Nachfolger werden neu verbunden.
+  - Tipp auf einen Routenpunkt markiert ihn (blau). Dann:
+    - Tipp auf die Karte schlägt einen Ersatzpunkt vor; die neuen Anschlussstrecken zu den Nachbarpunkten erscheinen
+      orange gestrichelt, die bisherigen blass. Nochmal auf den Ersatzpunkt tippen (oder „Ersatzpunkt übernehmen“)
+      ersetzt den alten Punkt.
+    - „Punkt löschen“ entfernt ihn; Vorgänger und Nachfolger werden neu verbunden.
+    - „Abbrechen“ oder erneutes Antippen hebt die Markierung auf.
   - „Rundtour“ verbindet den letzten Punkt mit dem Startpunkt (wieder ausschaltbar).
   - Routing-Profil: *Wandern* (BRouter, Profil `hiking-mountain`, Rückfall OSRM), *Fußweg* (OSRM der FOSSGIS,
     Rückfall BRouter) oder *Luftlinie*. Findet kein Dienst einen Weg, wird die Luftlinie genommen und gestrichelt gezeigt.
   - Anzeige: Punkte, Länge, Anstieg (nur bei BRouter), Zahl der Luftlinien-Abschnitte.
-  - Die laufende Planung wird lokal gespeichert und ist nach einem Neustart wieder da. „Neu“ verwirft sie.
-    Speichern als „Geplant“ ist noch offen.
+  - „💾 Speichern“ legt die Route unter *Tracks → Geplant* ab (neue Route: mit Namen; bearbeitete Route: wird
+    überschrieben). Änderungen an einer gespeicherten Route wirken erst nach „Speichern“ – bis dahin bleibt der
+    gespeicherte Stand unverändert. Die Kopfzeile zeigt „ungespeichert“, Beenden und „Neu“ fragen nach.
+  - Der Arbeitsstand (Entwurf) wird zusätzlich lokal gesichert und ist nach einem Neustart wieder da.
 - **Tracks** (Knopf mit Linien-Symbol im Menü): eigene Seite mit den Reitern *GPX*, *Geplant*, *Erwandert*.
-  *Geplant* und *Erwandert* sind noch Platzhalter.
+  - *Geplant*: gespeicherte Routen mit Länge, Anstieg, Punktzahl, Datum; „✎“ öffnet die Route im Planungsmodus,
+    „🗑“ löscht sie. Gespeichert wird lokal (IndexedDB, Speicher `routes`).
+  - *Erwandert* ist noch ein Platzhalter.
 - **Einstellungen:** Zoom-Knöpfe ein/aus (wird gespeichert), App-Version, Link zur Diagnose.
 - Positions-Knopf (unten rechts): Die Karte folgt der Position (Knopf blau). Im Folgemodus wird um die eigene
   Position gezoomt. Verschieben der Karte oder Zoomen auf einen GPX-Track beendet das Folgen, ein Tipp auf den

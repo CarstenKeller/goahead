@@ -43,32 +43,47 @@
 
   // ---------- Zustand ----------
 
-  var plan = {
-    points: [],      // [{lat, lng}]
-    segments: [],    // segments[i]: Weg von points[i] nach points[i+1] -> {latlngs, distance, ascent, source}
-    roundtrip: false,
-    closing: null,   // Weg vom letzten Punkt zum Start (bei Rundtour)
-    profile: "hiking"
-  };
-  var candidate = null; // {latlng, seg, loading}
+  var plan = newPlanState();
+  var candidate = null; // {latlng, loading, seg (Anhängen) | replace: Index, before, after (Ersetzen)}
+  var selected = null;  // Index des markierten Punkts (zum Ersetzen oder Löschen)
   var active = false;
   var routeVersion = 0;  // verwirft veraltete Routing-Antworten
+
+  function newPlanState() {
+    return {
+      points: [],      // [{lat, lng}]
+      segments: [],    // segments[i]: Weg von points[i] nach points[i+1] -> {latlngs, distance, ascent, source}
+      roundtrip: false,
+      closing: null,   // Weg vom letzten Punkt zum Start (bei Rundtour)
+      profile: "hiking",
+      savedId: null,   // gespeicherte Route, die gerade bearbeitet wird
+      name: "",
+      createdAt: null,
+      dirty: false     // Änderungen seit dem letzten Speichern
+    };
+  }
 
   function loadPlan() {
     try {
       var p = JSON.parse(window.localStorage.getItem(PLAN_KEY) || "null");
       if (p && Array.isArray(p.points)) {
-        plan.points = p.points;
-        plan.segments = p.segments || [];
-        plan.roundtrip = !!p.roundtrip;
-        plan.closing = p.closing || null;
-        plan.profile = PROFILES[p.profile] ? p.profile : "hiking";
+        plan = newPlanState();
+        Object.keys(plan).forEach(function (k) { if (p[k] !== undefined) plan[k] = p[k]; });
+        if (!PROFILES[plan.profile]) plan.profile = "hiking";
+        // ältere Entwürfe ohne Speicher-Kennung gelten als ungespeichert
+        if (p.dirty === undefined) plan.dirty = plan.points.length > 0;
       }
     } catch (e) { /* neue Planung */ }
   }
 
   function savePlan() {
     try { window.localStorage.setItem(PLAN_KEY, JSON.stringify(plan)); } catch (e) { /* Speicher voll o. ä. */ }
+  }
+
+  function markDirty() {
+    plan.dirty = true;
+    savePlan();
+    if (typeof renderRoutesList === "function") renderRoutesList();
   }
 
   // ---------- Routing ----------
@@ -153,10 +168,10 @@
   var pointMarkers = L.layerGroup().addTo(layer);
   var candidateLayer = L.layerGroup().addTo(layer);
 
-  function drawLine(group, latlngs, color, dashed) {
-    L.polyline(latlngs, { color: "#ffffff", weight: 8, opacity: 0.9, interactive: false }).addTo(group);
+  function drawLine(group, latlngs, color, dashed, faded) {
+    L.polyline(latlngs, { color: "#ffffff", weight: 8, opacity: faded ? 0.4 : 0.9, interactive: false }).addTo(group);
     L.polyline(latlngs, {
-      color: color, weight: 5, opacity: 1, interactive: false,
+      color: color, weight: 5, opacity: faded ? 0.3 : 1, interactive: false,
       dashArray: dashed ? "8 8" : null
     }).addTo(group);
   }
@@ -173,19 +188,25 @@
   function render() {
     routeLines.clearLayers();
     pointMarkers.clearLayers();
+    var n = plan.points.length;
 
-    plan.segments.forEach(function (seg) {
-      if (seg) drawLine(routeLines, seg.latlngs, COLOR_ROUTE, seg.source === "Luftlinie");
+    plan.segments.forEach(function (seg, i) {
+      if (!seg) return;
+      // beim Ersetzen eines Punkts die bisherigen Anschlussstrecken blass zeigen
+      var faded = selected !== null && (i === selected - 1 || i === selected);
+      drawLine(routeLines, seg.latlngs, COLOR_ROUTE, seg.source === "Luftlinie", faded);
     });
-    if (plan.roundtrip && plan.closing) drawLine(routeLines, plan.closing.latlngs, COLOR_ROUTE, plan.closing.source === "Luftlinie");
+    if (plan.roundtrip && plan.closing) {
+      var fadedClosing = selected !== null && (selected === 0 || selected === n - 1);
+      drawLine(routeLines, plan.closing.latlngs, COLOR_ROUTE, plan.closing.source === "Luftlinie", fadedClosing);
+    }
 
     plan.points.forEach(function (p, i) {
-      var last = i === plan.points.length - 1;
-      var kind = i === 0 ? "start" : (last ? "last" : "mid");
-      var m = L.marker([p.lat, p.lng], { icon: pointIcon(i === 0 ? "S" : String(i), kind), zIndexOffset: 500 });
+      var kind = i === selected ? "sel" : (i === 0 ? "start" : (i === n - 1 ? "last" : "mid"));
+      var m = L.marker([p.lat, p.lng], { icon: pointIcon(i === 0 ? "S" : String(i), kind), zIndexOffset: i === selected ? 700 : 500 });
       m.on("click", function (e) {
         L.DomEvent.stopPropagation(e);
-        openPointMenu(i, m);
+        selectPoint(i);
       });
       m.addTo(pointMarkers);
     });
@@ -197,39 +218,65 @@
   function renderCandidate() {
     candidateLayer.clearLayers();
     if (!candidate) return;
-    if (candidate.seg) drawLine(candidateLayer, candidate.seg.latlngs, COLOR_CANDIDATE, true);
+    [candidate.seg, candidate.before, candidate.after].forEach(function (seg) {
+      if (seg) drawLine(candidateLayer, seg.latlngs, COLOR_CANDIDATE, true);
+    });
     var m = L.marker(candidate.latlng, {
       icon: pointIcon("+", "cand" + (candidate.loading ? " plan-pt-loading" : "")),
       draggable: true,
       zIndexOffset: 800
     });
     m.on("dragend", function () { setCandidate(m.getLatLng()); });
-    m.on("click", function (e) { L.DomEvent.stopPropagation(e); });
-    m.addTo(candidateLayer);
-  }
-
-  function openPointMenu(i, marker) {
-    var label = i === 0 ? "Startpunkt" : "Punkt " + i;
-    var html = '<div class="plan-pop"><strong>' + esc(label) + "</strong><br>" +
-      '<button type="button" class="plan-del">Punkt löschen</button></div>';
-    marker.bindPopup(html, { closeButton: true, autoPan: true }).openPopup();
-    var el = marker.getPopup().getElement();
-    var btn = el && el.querySelector(".plan-del");
-    if (btn) btn.addEventListener("click", function () {
-      map.closePopup();
-      deletePoint(i);
+    // nochmal auf den Vorschlagspunkt tippen = einrasten
+    m.on("click", function (e) {
+      L.DomEvent.stopPropagation(e);
+      confirmCandidate();
     });
+    m.addTo(candidateLayer);
   }
 
   // ---------- Bearbeiten ----------
 
+  function selectPoint(i) {
+    routeVersion++;
+    candidate = null;
+    selected = selected === i ? null : i;   // erneutes Antippen hebt die Markierung auf
+    render();
+  }
+
+  function clearSelection() {
+    routeVersion++;
+    candidate = null;
+    selected = null;
+    render();
+  }
+
   function setCandidate(latlng) {
     var version = ++routeVersion;
-    candidate = { latlng: L.latLng(latlng), seg: null, loading: plan.points.length > 0 };
+    var ll = L.latLng(latlng);
+    var n = plan.points.length;
+
+    if (selected !== null) {
+      // Ersatz für den markierten Punkt: Strecken von den Nachbarpunkten neu berechnen
+      var idx = selected;
+      var prev = idx > 0 ? plan.points[idx - 1] : null;
+      var next = idx < n - 1 ? plan.points[idx + 1] : null;
+      candidate = { latlng: ll, replace: idx, before: null, after: null, loading: !!(prev || next) };
+      render();
+      Promise.all([prev ? route(prev, ll) : null, next ? route(ll, next) : null]).then(function (r) {
+        if (version !== routeVersion || !candidate) return;
+        candidate.before = r[0];
+        candidate.after = r[1];
+        candidate.loading = false;
+        render();
+      });
+      return;
+    }
+
+    candidate = { latlng: ll, seg: null, loading: n > 0 };
     render();
-    if (!plan.points.length) return;   // erster Punkt = Startpunkt, keine Strecke
-    var from = plan.points[plan.points.length - 1];
-    route(from, candidate.latlng).then(function (seg) {
+    if (!n) return;   // erster Punkt = Startpunkt, keine Strecke
+    route(plan.points[n - 1], ll).then(function (seg) {
       if (version !== routeVersion || !candidate) return;
       candidate.seg = seg;
       candidate.loading = false;
@@ -240,11 +287,19 @@
   function confirmCandidate() {
     if (!candidate || candidate.loading) return;
     var p = { lat: round6(candidate.latlng.lat), lng: round6(candidate.latlng.lng) };
-    if (plan.points.length) plan.segments.push(candidate.seg);
-    plan.points.push(p);
+    if (candidate.replace !== undefined && candidate.replace !== null) {
+      var idx = candidate.replace;
+      plan.points[idx] = p;
+      if (idx > 0) plan.segments[idx - 1] = candidate.before;
+      if (idx < plan.points.length - 1) plan.segments[idx] = candidate.after;
+      selected = null;
+    } else {
+      if (plan.points.length) plan.segments.push(candidate.seg);
+      plan.points.push(p);
+    }
     candidate = null;
     routeVersion++;
-    savePlan();
+    markDirty();
     updateClosing();
     render();
   }
@@ -253,6 +308,7 @@
     var n = plan.points.length;
     if (i < 0 || i >= n) return;
     candidate = null;
+    selected = null;
     routeVersion++;
     if (n === 1) {
       plan.points = [];
@@ -273,13 +329,13 @@
       pending.pending = true;
       replaceWhenRouted(pending, a, b);
     }
-    savePlan();
+    markDirty();
     updateClosing();
     render();
   }
 
   // Ersetzt einen vorläufigen Abschnitt (Luftlinie) durch die berechnete Strecke.
-  // Ist der Abschnitt inzwischen entfernt (weil ein Nachbarpunkt gelöscht wurde), passiert nichts.
+  // Ist der Abschnitt inzwischen entfernt (weil ein Nachbarpunkt geändert wurde), passiert nichts.
   function replaceWhenRouted(pending, a, b) {
     route(a, b).then(function (seg) {
       var j = plan.segments.indexOf(pending);
@@ -315,18 +371,18 @@
 
   function toggleRoundtrip() {
     plan.roundtrip = !plan.roundtrip;
+    markDirty();
     updateClosing();
-    savePlan();
     render();
   }
 
   function newPlan() {
-    if (plan.points.length && !window.confirm("Aktuelle Planung verwerfen und neu beginnen?")) return;
-    plan.points = [];
-    plan.segments = [];
-    plan.closing = null;
-    plan.roundtrip = false;
+    if (plan.dirty && plan.points.length && !window.confirm("Ungespeicherte Änderungen verwerfen und neu beginnen?")) return;
+    var profile = plan.profile;
+    plan = newPlanState();
+    plan.profile = profile;
     candidate = null;
+    selected = null;
     routeVersion++;
     savePlan();
     render();
@@ -469,7 +525,7 @@
   panel.setAttribute("aria-label", "Route planen");
   panel.innerHTML =
     '<div class="plan-head">' +
-      '<span class="plan-title">Route planen</span>' +
+      '<span class="plan-title"><span class="plan-name">Route planen</span><span class="plan-dirty" hidden> · ungespeichert</span></span>' +
       '<button type="button" class="plan-exit">Beenden</button>' +
     "</div>" +
     '<form class="plan-search" autocomplete="off">' +
@@ -482,8 +538,11 @@
     '<p class="plan-status"></p>' +
     '<div class="plan-actions">' +
       '<button type="button" class="plan-confirm">✓ Punkt übernehmen</button>' +
+      '<button type="button" class="plan-del" hidden>🗑 Punkt löschen</button>' +
+      '<button type="button" class="plan-unsel" hidden>Abbrechen</button>' +
       '<button type="button" class="plan-here" title="Eigene Position als Vorschlagspunkt">📍 Hier</button>' +
       '<button type="button" class="plan-round" aria-pressed="false">⟲ Rundtour</button>' +
+      '<button type="button" class="plan-save">💾 Speichern</button>' +
       '<button type="button" class="plan-new">Neu</button>' +
     "</div>" +
     '<div class="plan-foot">' +
@@ -495,9 +554,16 @@
   L.DomEvent.disableScrollPropagation(panel);
 
   var el = {
+    name: panel.querySelector(".plan-name"),
+    dirty: panel.querySelector(".plan-dirty"),
     status: panel.querySelector(".plan-status"),
     confirm: panel.querySelector(".plan-confirm"),
+    del: panel.querySelector(".plan-del"),
+    unsel: panel.querySelector(".plan-unsel"),
+    here: panel.querySelector(".plan-here"),
     round: panel.querySelector(".plan-round"),
+    save: panel.querySelector(".plan-save"),
+    newBtn: panel.querySelector(".plan-new"),
     sum: panel.querySelector(".plan-sum"),
     profile: panel.querySelector(".plan-profile"),
     results: panel.querySelector(".plan-results"),
@@ -517,10 +583,17 @@
     search(el.input.value, el.results);
   });
   el.confirm.addEventListener("click", confirmCandidate);
+  el.del.addEventListener("click", function () { if (selected !== null) deletePoint(selected); });
+  el.unsel.addEventListener("click", clearSelection);
   el.round.addEventListener("click", toggleRoundtrip);
-  panel.querySelector(".plan-new").addEventListener("click", newPlan);
-  panel.querySelector(".plan-exit").addEventListener("click", stop);
-  panel.querySelector(".plan-here").addEventListener("click", function () {
+  el.save.addEventListener("click", saveRoute);
+  el.newBtn.addEventListener("click", newPlan);
+  panel.querySelector(".plan-exit").addEventListener("click", function () {
+    if (plan.dirty && plan.points.length &&
+        !window.confirm("Die Änderungen sind noch nicht gespeichert. Trotzdem beenden?\n(Der Entwurf bleibt erhalten und ist beim nächsten Planen wieder da.)")) return;
+    stop();
+  });
+  el.here.addEventListener("click", function () {
     var pos = G.getPosition && G.getPosition();
     if (!pos) {
       G.showStatus("Noch keine GPS-Position verfügbar.", 4000);
@@ -535,20 +608,57 @@
     if (candidate) setCandidate(candidate.latlng);   // Vorschlag neu berechnen
   });
 
+  function pointLabel(i) { return i === 0 ? "Startpunkt" : "Punkt " + i; }
+
+  function candidateDistance() {
+    var d = 0;
+    [candidate.seg, candidate.before, candidate.after].forEach(function (s) { if (s) d += s.distance; });
+    return d;
+  }
+
+  function candidateIsLine() {
+    return [candidate.seg, candidate.before, candidate.after].some(function (s) { return s && s.source === "Luftlinie" && s.note; });
+  }
+
   function renderPanel() {
     var n = plan.points.length;
+    var replacing = candidate && candidate.replace !== undefined && candidate.replace !== null;
     var msg;
-    if (candidate && candidate.loading) msg = "Strecke zum Vorschlagspunkt wird berechnet …";
-    else if (candidate && !n) msg = "Startpunkt gewählt. Mit „Punkt übernehmen“ festlegen (oder den Punkt verschieben).";
-    else if (candidate && candidate.seg && candidate.seg.source === "Luftlinie") {
+    if (candidate && candidate.loading) {
+      msg = replacing ? "Neue Strecke über den Ersatzpunkt wird berechnet …" : "Strecke zum Vorschlagspunkt wird berechnet …";
+    } else if (replacing) {
+      msg = (candidateIsLine() ? "Kein Weg gefunden, Luftlinie. " : "") +
+        "Vorschlag (orange) ersetzt " + pointLabel(candidate.replace) +
+        (candidate.before || candidate.after ? " – Anschlussstrecken " + km(candidateDistance()) : "") +
+        ". Passt es? Nochmal auf den neuen Punkt tippen oder übernehmen.";
+    } else if (selected !== null) {
+      msg = pointLabel(selected) + " markiert (blau): Auf die Karte tippen, um einen Ersatzpunkt vorzuschlagen – oder den Punkt löschen.";
+    } else if (candidate && !n) {
+      msg = "Startpunkt gewählt. Nochmal auf den Punkt tippen oder „Punkt übernehmen“ (verschieben ist möglich).";
+    } else if (candidate && candidate.seg && candidate.seg.source === "Luftlinie") {
       msg = (candidate.seg.note ? "Kein Weg gefunden. " : "") + "Vorschlag als Luftlinie (orange): " +
-        km(candidate.seg.distance) + ". Passt es? Dann übernehmen.";
+        km(candidate.seg.distance) + ". Passt es? Nochmal auf den Punkt tippen oder übernehmen.";
     } else if (candidate && candidate.seg) {
-      msg = "Vorschlag (orange): " + km(candidate.seg.distance) + " über " + candidate.seg.source + ". Passt es? Dann übernehmen.";
-    } else if (!n) msg = "Auf die Karte tippen, um den Startpunkt zu setzen.";
-    else msg = "Auf die Karte tippen, um den nächsten Punkt vorzuschlagen. Tipp auf einen Punkt: löschen.";
+      msg = "Vorschlag (orange): " + km(candidate.seg.distance) + " über " + candidate.seg.source +
+        ". Passt es? Nochmal auf den Punkt tippen oder übernehmen.";
+    } else if (!n) {
+      msg = "Auf die Karte tippen, um den Startpunkt zu setzen.";
+    } else {
+      msg = "Auf die Karte tippen für den nächsten Punkt. Tipp auf einen Routenpunkt: ändern oder löschen.";
+    }
     el.status.textContent = msg;
+
+    el.name.textContent = plan.savedId ? plan.name : (plan.name || "Route planen");
+    el.dirty.hidden = !(plan.dirty && n);
+    el.confirm.textContent = replacing ? "✓ Ersatzpunkt übernehmen" : "✓ Punkt übernehmen";
     el.confirm.disabled = !candidate || !!candidate.loading;
+    var sel = selected !== null;
+    el.del.hidden = !sel;
+    el.unsel.hidden = !sel;
+    el.round.hidden = sel;
+    el.save.hidden = sel;
+    el.newBtn.hidden = sel;
+    el.save.disabled = !n || (!plan.dirty && !!plan.savedId);
     el.round.setAttribute("aria-pressed", plan.roundtrip ? "true" : "false");
     el.round.classList.toggle("on", plan.roundtrip);
     el.profile.value = plan.profile;
@@ -567,11 +677,163 @@
     if (!panel.hidden) document.documentElement.style.setProperty("--plan-h", panel.offsetHeight + "px");
   }
 
+  // ---------- Speichern und „Geplant“ ----------
+
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  function defaultName() {
+    return "Route vom " + new Date().toLocaleDateString("de-DE");
+  }
+
+  function saveRoute() {
+    if (!plan.points.length || !G.db) return;
+    var name = plan.name;
+    if (!plan.savedId) {
+      name = window.prompt("Name der Route:", plan.name || defaultName());
+      if (name === null) return;
+      name = name.trim() || defaultName();
+    }
+    var t = totals();
+    var now = new Date().toISOString();
+    var rec = {
+      id: plan.savedId || (Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
+      name: name,
+      createdAt: plan.createdAt || now,
+      updatedAt: now,
+      points: clone(plan.points),
+      segments: clone(plan.segments),
+      roundtrip: plan.roundtrip,
+      closing: plan.closing ? clone(plan.closing) : null,
+      profile: plan.profile,
+      stats: { length: t.dist, ascent: t.asc, points: plan.points.length, lines: t.lines }
+    };
+    G.db.put("routes", rec).then(function () {
+      plan.savedId = rec.id;
+      plan.name = rec.name;
+      plan.createdAt = rec.createdAt;
+      plan.dirty = false;
+      savePlan();
+      render();
+      loadRoutes();
+      G.showStatus("Route „" + rec.name + "“ gespeichert.", 3000);
+    }).catch(function (err) {
+      G.showStatus("Speichern fehlgeschlagen: " + err.message, 6000);
+    });
+  }
+
+  var savedRoutes = [];
+
+  function loadRoutes() {
+    if (!G.db) return Promise.resolve();
+    return G.db.all("routes").then(function (all) {
+      savedRoutes = (all || []).sort(function (a, b) { return a.updatedAt < b.updatedAt ? 1 : -1; });
+      renderRoutesList();
+    }).catch(function (err) {
+      console.warn("[GoAhead] Geplante Routen nicht lesbar:", err);
+    });
+  }
+
+  function renderRoutesList() {
+    var box = G.tracksPanel && G.tracksPanel("planned");
+    if (!box) return;
+    if (!savedRoutes.length) {
+      box.innerHTML = '<p class="trk-empty">Noch keine geplanten Routen. Eine Route planen und im Planungsfeld „Speichern“ wählen.</p>';
+      return;
+    }
+    box.innerHTML = savedRoutes.map(function (r) {
+      var st = r.stats || {};
+      var info = [];
+      if (st.length) info.push(km(st.length));
+      if (st.ascent != null) info.push("↑ " + Math.round(st.ascent) + " m");
+      info.push((st.points || r.points.length) + " Punkte");
+      if (r.roundtrip) info.push("Rundtour");
+      info.push(new Date(r.updatedAt).toLocaleDateString("de-DE"));
+      var editing = plan.savedId === r.id && plan.dirty;
+      return '<div class="trk-item" data-id="' + esc(r.id) + '">' +
+        '<div class="trk-main"><span class="trk-swatch" style="background:' + COLOR_ROUTE + '"></span>' +
+          '<span class="trk-text"><span class="trk-name">' + esc(r.name) + "</span>" +
+          '<span class="trk-info">' + esc(info.join(" · ")) + (editing ? " · <em>ungespeicherte Änderungen</em>" : "") + "</span></span>" +
+        "</div>" +
+        '<div class="trk-actions">' +
+          '<button type="button" data-act="edit" title="Verändern" aria-label="Verändern">✎</button>' +
+          '<button type="button" data-act="delete" title="Löschen" aria-label="Löschen">🗑</button>' +
+        "</div></div>";
+    }).join("");
+  }
+
+  function findRoute(id) {
+    for (var i = 0; i < savedRoutes.length; i++) if (savedRoutes[i].id === id) return savedRoutes[i];
+    return null;
+  }
+
+  function editRoute(rec) {
+    var sameDraft = plan.savedId === rec.id;
+    if (plan.dirty && plan.points.length) {
+      var q = sameDraft
+        ? "Für diese Route gibt es ungespeicherte Änderungen. Mit den Änderungen weitermachen?\n(Abbrechen = Änderungen verwerfen und gespeicherten Stand laden)"
+        : "Die aktuelle Planung hat ungespeicherte Änderungen. Verwerfen und „" + rec.name + "“ laden?";
+      var ok = window.confirm(q);
+      if (sameDraft && ok) { openPlanner(); return; }
+      if (!sameDraft && !ok) return;
+    }
+    var profile = plan.profile;
+    plan = newPlanState();
+    plan.points = clone(rec.points);
+    plan.segments = clone(rec.segments);
+    plan.roundtrip = !!rec.roundtrip;
+    plan.closing = rec.closing ? clone(rec.closing) : null;
+    plan.profile = PROFILES[rec.profile] ? rec.profile : profile;
+    plan.savedId = rec.id;
+    plan.name = rec.name;
+    plan.createdAt = rec.createdAt;
+    plan.dirty = false;
+    savePlan();
+    openPlanner();
+  }
+
+  function openPlanner() {
+    if (G.closeTracksPage) G.closeTracksPage();
+    if (active) stop();
+    start();
+  }
+
+  function deleteRoute(rec) {
+    if (!window.confirm("Geplante Route „" + rec.name + "“ löschen?")) return;
+    G.db.del("routes", rec.id).then(function () {
+      if (plan.savedId === rec.id) {
+        // die gerade geöffnete Planung bleibt als ungespeicherter Entwurf erhalten
+        plan.savedId = null;
+        plan.dirty = plan.points.length > 0;
+        savePlan();
+        if (active) render();
+      }
+      return loadRoutes();
+    }).catch(function (err) {
+      G.showStatus("Löschen fehlgeschlagen: " + err.message, 6000);
+    });
+  }
+
+  (function wireRoutesList() {
+    var box = G.tracksPanel && G.tracksPanel("planned");
+    if (!box) return;
+    box.addEventListener("click", function (e) {
+      var actEl = e.target.closest("[data-act]");
+      var item = e.target.closest(".trk-item");
+      if (!actEl || !item) return;
+      var rec = findRoute(item.getAttribute("data-id"));
+      if (!rec) return;
+      if (actEl.getAttribute("data-act") === "edit") editRoute(rec);
+      else if (actEl.getAttribute("data-act") === "delete") deleteRoute(rec);
+    });
+  })();
+
   // ---------- Modus ein/aus ----------
 
   function start() {
     if (active) return;
     active = true;
+    selected = null;
+    candidate = null;
     if (G.closeMenu) G.closeMenu();
     if (G.closeInfoPanel) G.closeInfoPanel();
     if (G.stopFollowing) G.stopFollowing();
@@ -595,12 +857,14 @@
     if (!active) return;
     active = false;
     candidate = null;
+    selected = null;
     routeVersion++;
     map.closePopup();
     G.setMapClickHandler(null);
     document.body.classList.remove("mode-plan");
     panel.hidden = true;
     map.removeLayer(layer);
+    renderRoutesList();
   }
 
   // ---------- Menüknopf ----------
@@ -627,6 +891,7 @@
   if (G.addToToolbar) G.addToToolbar(new PlannerControl());
 
   loadPlan();
+  loadRoutes();
 
   // für Tests und spätere Module
   G.planner = {

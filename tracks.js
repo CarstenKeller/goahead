@@ -26,12 +26,13 @@
         reject(new Error("Dieser Browser bietet keinen lokalen Speicher (IndexedDB)."));
         return;
       }
-      var req = window.indexedDB.open("goahead", 1);
+      // Version 2: zusätzlicher Speicher "routes" für geplante Routen (planner.js)
+      var req = window.indexedDB.open("goahead", 2);
       req.onupgradeneeded = function () {
         var db = req.result;
-        if (!db.objectStoreNames.contains("tracks")) {
-          db.createObjectStore("tracks", { keyPath: "id" });
-        }
+        ["tracks", "routes"].forEach(function (name) {
+          if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: "id" });
+        });
       };
       req.onsuccess = function () { resolve(req.result); };
       req.onerror = function () { reject(req.error || new Error("IndexedDB nicht verfügbar")); };
@@ -39,12 +40,12 @@
     return dbPromise;
   }
 
-  function store(mode, action) {
+  function storeIn(name, mode, action) {
     return openDb().then(function (db) {
       return new Promise(function (resolve, reject) {
-        var tx = db.transaction("tracks", mode);
+        var tx = db.transaction(name, mode);
         var result;
-        var req = action(tx.objectStore("tracks"));
+        var req = action(tx.objectStore(name));
         if (req) req.onsuccess = function () { result = req.result; };
         tx.oncomplete = function () { resolve(result); };
         tx.onerror = function () { reject(tx.error); };
@@ -52,6 +53,15 @@
       });
     });
   }
+
+  function store(mode, action) { return storeIn("tracks", mode, action); }
+
+  // Für andere Module (z. B. planner.js: Speicher "routes")
+  G.db = {
+    all: function (name) { return storeIn(name, "readonly", function (s) { return s.getAll(); }); },
+    put: function (name, rec) { return storeIn(name, "readwrite", function (s) { return s.put(rec); }); },
+    del: function (name, id) { return storeIn(name, "readwrite", function (s) { return s["delete"](id); }); }
+  };
 
   function dbAll() { return store("readonly", function (s) { return s.getAll(); }); }
   function dbPut(rec) { return store("readwrite", function (s) { return s.put(rec); }); }
@@ -391,7 +401,7 @@
           '<p class="trk-note">Tracks werden nur auf diesem Gerät gespeichert.</p>' +
         "</div>" +
         '<div class="page-panel" data-panel="planned" role="tabpanel" hidden>' +
-          '<p class="trk-empty">Hier erscheinen geplante Routen. Was genau hier hineinkommt, legen wir noch fest.</p>' +
+          '<p class="trk-empty">Noch keine geplanten Routen. Eine Route planen und im Planungsfeld „Speichern“ wählen.</p>' +
         "</div>" +
         '<div class="page-panel" data-panel="walked" role="tabpanel" hidden>' +
           '<p class="trk-empty">Hier erscheinen erwanderte Strecken. Was genau hier hineinkommt, legen wir noch fest.</p>' +
@@ -473,6 +483,8 @@
     new TracksControl().addTo(map);
   }
   G.openTracksPage = openPage;
+  G.closeTracksPage = closePage;
+  G.tracksPanel = function (tab) { return pageEl.querySelector('[data-panel="' + tab + '"]'); };
 
   // ---------- Beim Start gespeicherte Tracks laden ----------
 

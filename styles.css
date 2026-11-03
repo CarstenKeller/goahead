@@ -779,3 +779,26 @@ html, body {
   align-items: center;
   justify-content: center;
 }
+.plan-pt-sel {
+  background: #1c7ed6;
+  outline: 4px solid rgba(28, 126, 214, 0.35);
+  transform: scale(1.15);
+}
+.plan-dirty {
+  color: #c2255c;
+  font-weight: normal;
+  font-size: 13px;
+}
+.plan-actions button:disabled {
+  opacity: 0.45;
+}
+.plan-del {
+  border-color: #b00020 !important;
+  color: #b00020;
+  background: #fff5f5 !important;
+}
+.plan-save {
+  border-color: #1971c2 !important;
+  color: #0b4f8a;
+  background: #e7f1fb !important;
+}
