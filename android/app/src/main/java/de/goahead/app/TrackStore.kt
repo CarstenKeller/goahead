@@ -2,6 +2,7 @@ package de.goahead.app
 
 import android.content.Context
 import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 
 /**
@@ -34,7 +35,7 @@ object TrackStore {
         val arr = JSONArray()
         arr.put(Math.round(lat * 1e6) / 1e6)
         arr.put(Math.round(lon * 1e6) / 1e6)
-        if (alt != null) arr.put(Math.round(alt * 10) / 10.0) else arr.put(JSONArray.NULL)
+        if (alt != null) arr.put(Math.round(alt * 10) / 10.0) else arr.put(JSONObject.NULL)
         arr.put(time)
         arr.put(Math.round(acc).toInt())
         val line = arr.toString()
