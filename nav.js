@@ -137,7 +137,7 @@
   }
 
   function computeRouteData() {
-    stats = G.planner && walk ? G.planner.routeStats(routeOf(walk)) : null;
+    stats = G.planner && walk && !walk.free ? G.planner.routeStats(routeOf(walk)) : null;
     turns = stats ? findTurns(stats.profile.pts) : [];
   }
 
@@ -397,7 +397,10 @@
   panel.querySelector(".nav-center").addEventListener("click", function () { G.follow(); });
   function startPoint() {
     var line = walk && walk.planLine;
-    return line && line.length ? L.latLng(line[0][0], line[0][1]) : null;
+    if (line && line.length) return L.latLng(line[0][0], line[0][1]);
+    // freie Aufnahme: Start = erster aufgezeichneter Punkt
+    var s0 = walk && walk.segments && walk.segments[0] && walk.segments[0][0];
+    return s0 ? L.latLng(s0[0], s0[1]) : null;
   }
   panel.querySelector(".nav-start").addEventListener("click", function () {
     var s0 = startPoint();
@@ -513,6 +516,29 @@
 
   var ticker = null;
 
+  // ---------- Fotos unterwegs ----------
+
+  var photoBtn = document.createElement("button");
+  photoBtn.type = "button";
+  photoBtn.className = "map-btn photo-btn";
+  photoBtn.title = "Foto aufnehmen";
+  photoBtn.setAttribute("aria-label", "Foto aufnehmen");
+  photoBtn.innerHTML = G.icon("camera");
+  photoBtn.hidden = true;
+  document.body.appendChild(photoBtn);
+  L.DomEvent.disableClickPropagation(photoBtn);
+  photoBtn.addEventListener("click", function () { if (walk && G.photos) G.photos.take(walk.id); });
+
+  var walkPhotos = null;   // Fotos der laufenden Tour auf der Karte
+  function showWalkPhotos() {
+    if (walkPhotos) { map.removeLayer(walkPhotos.layer); walkPhotos = null; }
+    if (walk && G.photos) walkPhotos = G.photos.layerFor(walk.id), walkPhotos.layer.addTo(map);
+  }
+  if (G.photos) {
+    G.photos.onAdded(function (ph) { if (walk && walkPhotos && ph.walkId === walk.id) walkPhotos.add(ph); });
+    G.photos.onDeleted(function () { if (walk) showWalkPhotos(); });
+  }
+
   // ---------- Ablauf ----------
 
   function enter() {
@@ -522,7 +548,10 @@
     if (G.closeInfoPanel) G.closeInfoPanel();
     if (G.planner && G.planner.isActive()) G.planner.stop();
     document.body.classList.add("mode-nav");
+    if (G.tourView) G.tourView.close();
     panel.hidden = false;
+    photoBtn.hidden = !G.photos;
+    showWalkPhotos();
     layer.addTo(map);
     drawPlan();
     drawWalk();
@@ -581,6 +610,39 @@
     requestWakeLock();
   }
 
+  // Aufnahme ohne geplante Route (spontane Tour)
+  function startFree() {
+    if (active && walk) {
+      G.showStatus("Es läuft bereits eine Tour. Bitte zuerst beenden.", 5000);
+      enter();
+      return;
+    }
+    walk = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      free: true,
+      routeId: null,
+      routeName: "Tour vom " + new Date().toLocaleDateString("de-DE"),
+      planLine: [],
+      route: null,
+      planLength: 0,
+      planHours: null,
+      startedAt: Date.now(),
+      paused: false,
+      pausedAt: null,
+      pausedTotal: 0,
+      segments: [[]],
+      distance: 0,
+      lastFix: null,
+      nativeIdx: 0
+    };
+    if (NATIVE) NATIVE.call("startRecording", true);
+    saveWalk();
+    enter();
+    G.follow();
+    if (NATIVE && nativeBattery) setTimeout(NATIVE.batteryDialog, 800);
+    requestWakeLock();
+  }
+
   function pause() {
     if (NATIVE) { pullNative(); NATIVE.call("pauseRecording"); }
     walk.paused = true;
@@ -610,7 +672,7 @@
     if (!walk.paused) pause();
     var pts = walk.segments.reduce(function (n, s) { return n + s.length; }, 0);
     G.actionSheet("Tour beenden?", km(walk.distance) + " · " + duration(movingTime(walk)) + " · " + pts + " Punkte", [
-      { label: "✓ Beenden und unter „Erwandert“ speichern", primary: true, onClick: finish },
+      { label: "✓ Beenden und unter „Erwandert“ speichern", primary: true, onClick: function () { finish(); } },
       { label: "▶ Weiterwandern", onClick: resume },
       { label: "Aufzeichnung verwerfen", danger: true, onClick: function () {
         G.actionSheet("Aufzeichnung wirklich verwerfen?", "Die gewanderte Strecke geht verloren.", [
@@ -620,8 +682,14 @@
     ]);
   }
 
-  function finish() {
+  function finish(nameGiven) {
     var segs = walk.segments.filter(function (s) { return s.length > 1; });
+    if (walk.free && nameGiven === undefined && segs.length) {
+      G.askText("Name der Tour", walk.routeName, function (name) {
+        finish(String(name).trim() || walk.routeName);
+      }, "Speichern");
+      return;
+    }
     if (!segs.length) {
       G.actionSheet("Keine Strecke aufgezeichnet", "Es liegen weniger als zwei GPS-Punkte vor. Trotzdem beenden?", [
         { label: "Beenden ohne Speichern", danger: true, onClick: leave },
@@ -637,7 +705,8 @@
     });
     var rec = {
       id: walk.id,
-      name: walk.routeName + " – " + new Date(walk.startedAt).toLocaleDateString("de-DE"),
+      name: walk.free ? nameGiven : walk.routeName + " – " + new Date(walk.startedAt).toLocaleDateString("de-DE"),
+      free: !!walk.free,
       routeId: walk.routeId,
       routeName: walk.routeName,
       startedAt: new Date(walk.startedAt).toISOString(),
@@ -674,6 +743,8 @@
     releaseWakeLock();
     document.body.classList.remove("mode-nav");
     panel.hidden = true;
+    photoBtn.hidden = true;
+    if (walkPhotos) { map.removeLayer(walkPhotos.layer); walkPhotos = null; }
     map.removeLayer(layer);
   }
 
@@ -694,10 +765,15 @@
     var box = G.tracksPanel && G.tracksPanel("walked");
     if (!box) return;
     if (!walks.length) {
-      box.innerHTML = '<p class="trk-empty">Noch keine erwanderten Touren. Eine geplante Route unter „Geplant“ antippen und „Los geht\'s“ wählen.</p>';
+      box.innerHTML = '<p class="trk-empty">Noch keine erwanderten Touren.</p>';
       return;
     }
-    box.innerHTML = walks.map(function (w) {
+    var hd = G.listTools ? G.listTools.head("walks", walks, {
+      yearOf: function (w) { return new Date(w.startedAt).getFullYear(); },
+      metersOf: function (w) { return w.distance; },
+      nameOf: function (w) { return w.name; }
+    }) : { html: "", items: walks };
+    box.innerHTML = hd.html + hd.items.map(function (w) {
       var info = [km(w.distance), duration(w.movingMs)];
       if (w.ascent) info.push("↑ ca. " + Math.round(w.ascent) + " m");
       info.push(new Date(w.startedAt).toLocaleDateString("de-DE"));
@@ -707,6 +783,7 @@
           '<span class="trk-info">' + esc(info.join(" · ")) + "</span></span>" +
         '</div><span class="trk-more" aria-hidden="true">›</span></div>';
     }).join("");
+    if (G.listTools) G.listTools.wire(box, "walks", renderWalks);
   }
 
   function findWalk(id) {
@@ -714,7 +791,37 @@
     return null;
   }
 
+  // Kennzahlen einer erwanderten Tour für die Detail-Leiste
+  function walkDetails(w) {
+    var pts = [];
+    w.segments.forEach(function (s) { s.forEach(function (p) { pts.push(p); }); });
+    var hasEle = pts.some(function (p) { return p[2] != null; });
+    var prof = G.planner && G.planner.routeStats && hasEle
+      ? G.planner.routeStats({ segments: w.segments.map(function (s) { return { latlngs: s.map(function (p) { return [p[0], p[1], p[2]]; }), distance: 0 }; }) })
+      : null;
+    var ele = pts.map(function (p) { return p[2]; }).filter(function (e) { return e != null; });
+    var avg = w.movingMs > 60000 ? num(w.distance / 1000 / (w.movingMs / 3600000), 1) : "–";
+    var t0 = new Date(w.startedAt);
+    var t1 = w.endedAt ? new Date(w.endedAt) : null;
+    function hhmm(d) { return d ? d.getHours() + ":" + (d.getMinutes() < 10 ? "0" : "") + d.getMinutes() : "–"; }
+    return {
+      stats: [
+        [num(w.distance / 1000, 2), "km"],
+        [duration(w.movingMs || 0), "in Bewegung"],
+        [avg, "Ø km/h"],
+        [prof && prof.up != null ? String(Math.round(prof.up)) : (w.ascent ? String(Math.round(w.ascent)) : "–"), "↑ m"],
+        [prof && prof.down != null ? String(Math.round(prof.down)) : "–", "↓ m"],
+        [ele.length ? Math.round(Math.min.apply(null, ele)) + "–" + Math.round(Math.max.apply(null, ele)) : "–", "Höhe m"],
+        [hhmm(t0), "Start"],
+        [hhmm(t1), "Ende"],
+        [t0.toLocaleDateString("de-DE"), "Datum"]
+      ],
+      profile: prof
+    };
+  }
+
   function showWalk(w) {
+    if (G.tourView) G.tourView.close();   // andere offene Tour schließen (entfernt deren Linie)
     if (!shown[w.id]) {
       var g = L.layerGroup();
       w.segments.forEach(function (s) {
@@ -730,6 +837,26 @@
     if (G.closeTracksPage) G.closeTracksPage();
     map.fitBounds(L.latLngBounds(all), { padding: [30, 30], maxZoom: 17 });
     renderWalks();
+    openWalkSheet(w);
+  }
+
+  // Detail-Leiste (ziehbar) mit Kennzahlen, Höhenprofil und Fotos; Fotos zusätzlich auf der Karte
+  function openWalkSheet(w) {
+    if (!G.tourView) return;
+    var d = walkDetails(w);
+    var ph = G.photos ? G.photos.layerFor(w.id) : null;
+    if (ph) ph.layer.addTo(map);
+    var opts = {
+      title: w.name,
+      sub: num(w.distance / 1000, 1) + " km · " + new Date(w.startedAt).toLocaleDateString("de-DE"),
+      stats: d.stats,
+      profile: d.profile,
+      photos: [],
+      onMenu: function () { walkMenu(w); },
+      onClose: function () { if (ph) map.removeLayer(ph.layer); hideWalk(w); }
+    };
+    if (ph) ph.onLoad = function (list) { G.tourView.setPhotos(opts, list.slice()); };
+    G.tourView.open(opts);
   }
 
   function hideWalk(w) {
@@ -760,8 +887,8 @@
     var sub = km(w.distance) + " · " + duration(w.movingMs) + " · " + new Date(w.startedAt).toLocaleString("de-DE");
     G.actionSheet(w.name, sub, [
       shown[w.id]
-        ? { label: "Von der Karte entfernen", onClick: function () { hideWalk(w); } }
-        : { label: "👁 Auf der Karte zeigen", primary: true, onClick: function () { showWalk(w); } },
+        ? { label: "Von der Karte entfernen", onClick: function () { if (G.tourView && G.tourView.isOpen()) G.tourView.close(); else hideWalk(w); } }
+        : { label: "👁 Ansehen (Karte und Details)", primary: true, onClick: function () { showWalk(w); } },
       { label: "↗ Teilen (z. B. WhatsApp)", onClick: function () {
         var fn = G.planner ? G.planner.fileNameFor(w.name) : "tour.gpx";
         var details = km(w.distance) + " · " + duration(w.movingMs) + " h unterwegs" +
@@ -821,8 +948,29 @@
   loadWalks();
   window.addEventListener("goahead:data", loadWalks);
 
+  var RecordControl = L.Control.extend({
+    onAdd: function () {
+      var box = L.DomUtil.create("div", "leaflet-bar rec-control");
+      var btn = L.DomUtil.create("a", "rec-toggle", box);
+      btn.href = "#";
+      btn.setAttribute("role", "button");
+      btn.title = "Aufnahme ohne Route starten";
+      btn.setAttribute("aria-label", "Aufnahme ohne Route starten");
+      btn.innerHTML = G.icon("rec");
+      L.DomEvent.on(btn, "click", function (e) {
+        L.DomEvent.preventDefault(e);
+        if (G.closeMenu) G.closeMenu();
+        startFree();
+      });
+      L.DomEvent.disableClickPropagation(box);
+      return box;
+    }
+  });
+  if (G.addToToolbar) G.addToToolbar(new RecordControl());
+
   G.nav = {
     start: start,
+    startFree: startFree,
     isActive: function () { return active; },
     getWalk: function () { return walk; },
     getTurns: function () { return turns; },

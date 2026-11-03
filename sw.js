@@ -3,7 +3,7 @@
  * - Kartenkacheln: Liegen sie im Offline-Speicher TILE_CACHE (von offline.js beim Start einer
  *   Tour entlang der Route gefüllt), werden sie von dort geliefert – sonst ganz normal aus dem Netz.
  */
-var CACHE = "goahead-shell-v26";
+var CACHE = "goahead-shell-v27";
 var TILE_CACHE = "goahead-tiles-v1";   // gleicher Name wie in offline.js; bei Updates NICHT löschen
 var SHELL = [
   "./",
@@ -15,7 +15,9 @@ var SHELL = [
   "app.js",
   "tracks.js",
   "planner.js",
+  "tourview.js",
   "offline.js",
+  "photos.js",
   "nav.js",
   "backup.js",
   "manifest.webmanifest",

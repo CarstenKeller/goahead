@@ -24,7 +24,7 @@
   var G = window.GOAHEAD;
   if (!G || !G.map) return;
 
-  var STORES = ["tracks", "routes", "walks"];
+  var STORES = ["tracks", "routes", "walks", "photos"];
   var POINT_SPACING = 1000;   // m: Abstand der Wegpunkte bei importierten Routen
   var CLIMB_THRESHOLD = 3;    // m: wie planner.js
   // Nicht wiederherstellen: laufende Tour und Planungsentwurf des Geräts (sonst gingen diese verloren)
@@ -56,8 +56,39 @@
       } catch (e) { /* kein Zugriff */ }
       var data = { app: "GoAhead", format: 1, version: G.version, createdAt: new Date().toISOString(), stores: {}, local: local };
       STORES.forEach(function (n, i) { data.stores[n] = res[i] || []; });
-      return data;
+      // Fotos: Bild (Blob) als data:-URL, damit es in die JSON-Datei passt
+      return Promise.all(data.stores.photos.map(function (ph) {
+        if (!(ph.blob instanceof Blob)) return ph;
+        return blobToDataUrl(ph.blob).then(function (url) {
+          var c = {};
+          Object.keys(ph).forEach(function (k) { if (k !== "blob") c[k] = ph[k]; });
+          c.dataUrl = url;
+          return c;
+        });
+      })).then(function (photos) { data.stores.photos = photos; return data; });
     });
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise(function (resolve, reject) {
+      var fr = new FileReader();
+      fr.onload = function () { resolve(fr.result); };
+      fr.onerror = function () { reject(fr.error); };
+      fr.readAsDataURL(blob);
+    });
+  }
+
+  // Fotos aus der Sicherung: data:-URL wieder als Blob speichern
+  function revivePhotos(list) {
+    return Promise.all(list.map(function (ph) {
+      if (!ph.dataUrl) return ph;
+      return fetch(ph.dataUrl).then(function (r) { return r.blob(); }).then(function (b) {
+        var c = {};
+        Object.keys(ph).forEach(function (k) { if (k !== "dataUrl") c[k] = ph[k]; });
+        c.blob = b;
+        return c;
+      });
+    }));
   }
 
   function save() {
@@ -67,7 +98,7 @@
       var text = JSON.stringify(data);
       var name = "goahead-sicherung-" + today() + ".json";
       var sub = data.stores.routes.length + " geplant · " + data.stores.walks.length + " erwandert · " +
-        data.stores.tracks.length + " GPX · " + (text.length / 1048576).toFixed(1).replace(".", ",") + " MB";
+        data.stores.tracks.length + " GPX · " + data.stores.photos.length + " Fotos · " + (text.length / 1048576).toFixed(1).replace(".", ",") + " MB";
       if (G.hideStatus) G.hideStatus();
       var actions = [{ label: "⬇ Speichern (Downloads)", primary: true, onClick: function () { G.downloadFile(name, text, "application/json"); } }];
       if (G.native) {
@@ -120,7 +151,10 @@
           var chain = Promise.resolve();
           STORES.forEach(function (n) {
             var recs = (data.stores[n] || []).filter(function (r) { return r && r.id; });
-            if (recs.length) chain = chain.then(function () { return G.db.putMany(n, recs); });
+            if (!recs.length) return;
+            chain = chain.then(function () {
+              return (n === "photos" ? revivePhotos(recs) : Promise.resolve(recs)).then(function (r) { return G.db.putMany(n, r); });
+            });
           });
           chain.then(function () {
             var hasLocal = false;

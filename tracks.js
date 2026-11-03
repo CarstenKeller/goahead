@@ -20,7 +20,8 @@
   var dbPromise = null;
 
   // Version 3: Speicher "tracks" (GPX), "routes" (geplant, planner.js), "walks" (erwandert, nav.js)
-  var DB_VERSION = 3;
+  // Version 4: zusätzlich "photos" (Fotos unterwegs, photos.js)
+  var DB_VERSION = 4;
 
   function openDb() {
     if (dbPromise) return dbPromise;
@@ -32,7 +33,7 @@
       var req = window.indexedDB.open("goahead", DB_VERSION);
       req.onupgradeneeded = function () {
         var db = req.result;
-        ["tracks", "routes", "walks"].forEach(function (name) {
+        ["tracks", "routes", "walks", "photos"].forEach(function (name) {
           if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: "id" });
         });
       };

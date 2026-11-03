@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "26";
+  var APP_VERSION = "27";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {
@@ -28,7 +28,11 @@
     share: '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/>',
     download: '<path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/>',
     upload: '<path d="M12 15V4"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/>',
-    battery: '<rect x="3" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/><path d="M7 10v4M10 10v4"/>'
+    battery: '<rect x="3" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/><path d="M7 10v4M10 10v4"/>',
+    camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+    rec: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4" fill="currentColor"/>',
+    more: '<circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/>',
+    trash: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/>'
   };
   function icon(name) {
     return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" ' +
@@ -1575,21 +1579,39 @@
       if (f > 0 && f < 1) apply(f * window.innerHeight);
     } catch (e) { /* Standardhöhe */ }
 
+    // Ziehen geht auch, wenn der Finger auf einem Kopfknopf beginnt: erst ab 8 px Bewegung gilt es als
+    // Ziehen, dann wird der Klick auf den Knopf verschluckt (Sperre gilt nur für diese Berührung).
     var dragging = false;
+    var pending = false;
+    var swallow = false;
     var startY = 0;
     var startH = 0;
     handle.addEventListener("pointerdown", function (e) {
-      if (e.target.closest("button, input, select, a")) return;
-      dragging = true;
+      swallow = false;
+      if (e.target.closest("input, select, a")) return;
+      pending = true;
+      dragging = false;
       startY = e.clientY;
       startH = panel.getBoundingClientRect().height;
-      handle.setPointerCapture(e.pointerId);
-      e.preventDefault();
+      if (!e.target.closest("button")) {
+        dragging = true;
+        handle.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      }
     });
     handle.addEventListener("pointermove", function (e) {
+      if (pending && !dragging && Math.abs(e.clientY - startY) > 8) {
+        dragging = true;
+        swallow = true;
+        try { handle.setPointerCapture(e.pointerId); } catch (err) { /* egal */ }
+      }
       if (dragging) apply(startH + (startY - e.clientY));
     });
+    handle.addEventListener("click", function (e) {
+      if (swallow) { swallow = false; e.stopPropagation(); e.preventDefault(); }
+    }, true);
     function end() {
+      pending = false;
       if (!dragging) return;
       dragging = false;
       var h = panel.getBoundingClientRect().height;

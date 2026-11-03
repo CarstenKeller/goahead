@@ -40,6 +40,7 @@
   --glass: rgba(255, 255, 255, 0.72);
   --glass-strong: rgba(255, 255, 255, 0.86);
   --glass-dark: rgba(28, 31, 35, 0.72);
+  --glass-sheet: rgba(222, 240, 222, 0.62);   /* untere Leisten: leicht grünlich, durchscheinend */
   --glass-border: rgba(255, 255, 255, 0.55);
   --glass-blur: blur(18px) saturate(170%);
   --btn-soft: rgba(0, 0, 0, 0.06);
@@ -63,6 +64,8 @@
   --z-settings: 1600;           /* Einstellungen */
   --z-page: 2500;               /* Vollbildseiten */
   --z-dialog: 3000;
+  --z-photo: 3100;              /* Foto-Anzeige (über Dialogen) */
+  --c-photo: #7048e8;           /* Foto-Marker */
 
   --info-height: 34vh;          /* Standardhöhe Infofenster (per Ziehen änderbar) */
 }
@@ -73,6 +76,7 @@
     --glass: rgba(255, 255, 255, 0.94);
     --glass-strong: rgba(255, 255, 255, 0.97);
     --glass-dark: rgba(28, 31, 35, 0.92);
+    --glass-sheet: rgba(228, 243, 228, 0.95);
   }
 }
 
@@ -116,6 +120,7 @@ button {
 .sheet,
 .page,
 .dlg,
+.photo-view-bar,
 #diagnose,
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
@@ -453,6 +458,7 @@ button {
    Gemeinsames Verhalten: volle Breite unten, über der Karte und ihren Bedienelementen,
    Kopf mit Ziehgriff (.sheet-handle + .sheet-grip), Inhalt scrollt (.sheet-body). */
 .sheet {
+  background: var(--glass-sheet);
   position: absolute;
   left: 0;
   right: 0;
@@ -498,7 +504,7 @@ button {
   background: rgba(0, 0, 0, 0.22);
 }
 .sheet-titles {
-  min-width: 0;
+  min-width: 34%;   /* Titel und Zustand bleiben lesbar, auch bei 5 Knöpfen */
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -511,8 +517,17 @@ button {
 /* Zustandszeile unterwegs: einzeilig (Kopfhöhe ist fest), Wichtigstes steht vorn */
 .sheet-head-btns {
   display: flex;
-  gap: 6px;
+  gap: 0;
   flex: none;
+  min-width: 0;
+}
+/* Kopfknöpfe schlank und ohne Fläche (Platz für Titel, Leiste bleibt am Knopf ziehbar) */
+.sheet .sheet-head-btns .icon-btn {
+  width: 42px;
+  background: transparent;
+}
+.sheet .sheet-head-btns .icon-btn:active {
+  background: var(--btn-soft);
 }
 .sheet-body {
   flex: 1;
@@ -531,6 +546,7 @@ button {
 }
 .info-title,
 .plan-title,
+.tour-title,
 .nav-title {
   font-weight: 650;
   font-size: 16px;
@@ -630,7 +646,8 @@ button {
   background: var(--c-route);
   vertical-align: middle;
 }
-.plan-sum {
+.plan-sum,
+.tour-sub {
   font-size: 13px;
   color: var(--c-muted);
 }
@@ -1166,4 +1183,140 @@ button {
 .goahead-mosaic canvas.leaflet-tile {
   width: 257px !important;
   height: 257px !important;
+}
+
+/* Foto-Knopf unterwegs: links, auf gleicher Höhe wie der Positions-Knopf (über der Mindesthöhe) */
+.map-btn.photo-btn {
+  right: auto;
+  left: calc(12px + env(safe-area-inset-left));
+}
+.photo-btn svg {
+  width: 26px;
+  height: 26px;
+}
+/* Foto-Marker auf der Karte */
+.photo-pin {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--c-photo);
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.photo-pin svg {
+  width: 18px;
+  height: 18px;
+}
+/* Foto-Anzeige */
+.photo-view {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-photo);
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.photo-view img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.photo-view-bar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 4px 14px;
+  border-radius: var(--r-md);
+  color: var(--c-text);
+}
+.photo-view-info {
+  flex: 1;
+  font-size: 14px;
+}
+.photo-view-bar .icon-btn {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Fotos in der Tour-Leiste */
+.tour-photos {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin-top: 10px;
+  padding-bottom: 4px;
+}
+.sheet .tour-photo {
+  flex: none;
+  width: 84px;
+  height: 84px;
+  padding: 0;
+  overflow: hidden;
+}
+.tour-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* Listen: Kopf mit Anzahl, km, Jahr, Suche */
+.list-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 6px;
+}
+.list-sum {
+  flex: 1;
+  font-weight: 600;
+  font-size: 14px;
+}
+.list-year {
+  font-size: 15px;
+  padding: 8px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-sm);
+  background: var(--glass-strong);
+  color: var(--c-text);
+}
+.page .list-find.on {
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+}
+.list-q {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 16px;
+  padding: 9px 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-sm);
+  background: var(--glass-strong);
+  color: var(--c-text);
+}
+/* Menü-Knopf „Aufnahme“ */
+.rec-toggle {
+  color: var(--c-danger) !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+.rec-toggle svg {
+  width: 26px;
+  height: 26px;
 }

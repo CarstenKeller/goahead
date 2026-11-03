@@ -1289,7 +1289,12 @@
       box.innerHTML = newBtn + '<p class="trk-empty">Noch keine geplanten Routen.</p>';
       return;
     }
-    box.innerHTML = newBtn + savedRoutes.map(function (r) {
+    var hd = G.listTools ? G.listTools.head("routes", savedRoutes, {
+      yearOf: function (r) { return new Date(r.createdAt || r.updatedAt).getFullYear(); },
+      metersOf: function (r) { return (r.stats && r.stats.length) || 0; },
+      nameOf: function (r) { return r.name; }
+    }) : { html: "", items: savedRoutes };
+    box.innerHTML = newBtn + hd.html + hd.items.map(function (r) {
       var info = [statsText(routeStats(r))];
       info.push(r.points.length + " Punkte");
       if (r.roundtrip) info.push("Rundtour");
@@ -1302,6 +1307,7 @@
         "</div>" +
         '<span class="trk-more" aria-hidden="true">›</span></div>';
     }).join("");
+    if (G.listTools) G.listTools.wire(box, "routes", renderRoutesList);
   }
 
   function findRoute(id) {
@@ -1371,6 +1377,7 @@
   // Nur ansehen: Route auf der Karte zeigen (ohne Planungsmodus); Antippen der Linie öffnet das Menü
   var viewed = {};   // id -> Kartenlayer
   function viewRoute(rec) {
+    if (G.tourView) G.tourView.close();
     if (!viewed[rec.id]) {
       var line = routeLine(rec).map(function (p) { return [p[0], p[1]]; });
       var g = L.layerGroup();
@@ -1390,6 +1397,24 @@
     var b = L.latLngBounds(routeLine(rec).map(function (p) { return [p[0], p[1]]; }));
     if (b.isValid()) map.fitBounds(b, { padding: [30, 30], maxZoom: 16 });
     renderRoutesList();
+    if (G.tourView) {
+      var t = routeStats(rec);
+      G.tourView.open({
+        title: rec.name,
+        sub: statsText(t),
+        stats: [
+          [km(t.dist).replace(" km", ""), "km"],
+          [t.up != null ? String(Math.round(t.up)) : "–", "↑ m"],
+          [t.down != null ? String(Math.round(t.down)) : "–", "↓ m"],
+          [hm(t.hours), "Gehzeit ≈ h"],
+          [String(rec.points.length), "Punkte"],
+          [new Date(rec.createdAt || rec.updatedAt).toLocaleDateString("de-DE"), "angelegt"]
+        ],
+        profile: t,
+        onMenu: function () { routeMenu(rec); },
+        onClose: function () { unviewRoute(rec); }
+      });
+    }
   }
   function unviewRoute(rec) {
     if (viewed[rec.id]) { map.removeLayer(viewed[rec.id]); delete viewed[rec.id]; }
@@ -1437,7 +1462,7 @@
     var actions = [];
     if (G.nav) actions.push({ label: "▶ Los geht's", primary: true, onClick: function () { G.nav.start(rec); } });
     actions.push(viewed[rec.id]
-      ? { label: "Von der Karte entfernen", onClick: function () { unviewRoute(rec); } }
+      ? { label: "Von der Karte entfernen", onClick: function () { if (G.tourView && G.tourView.isOpen()) G.tourView.close(); else unviewRoute(rec); } }
       : { label: "👁 Ansehen", onClick: function () { viewRoute(rec); } });
     actions.push({ label: "✎ Verändern", onClick: function () { editRoute(rec); } });
     actions.push({ label: "⧉ Kopieren und neu planen", onClick: function () { copyRoute(rec); } });
@@ -1536,6 +1561,7 @@
 
   function start() {
     if (active) return;
+    if (G.tourView) G.tourView.close();
     active = true;
     selected = null;
     armed = false;

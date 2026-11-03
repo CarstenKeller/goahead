@@ -4,16 +4,23 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ClipData
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.PowerManager
 import android.provider.MediaStore
 import android.provider.Settings
+import android.util.Base64
 import android.webkit.GeolocationPermissions
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
@@ -22,7 +29,12 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.content.FileProvider
+import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * GoAhead als App: zeigt die Web-App (GitHub Pages) bildschirmfüllend in einer WebView.
@@ -40,7 +52,11 @@ class MainActivity : Activity() {
         const val START_URL = "https://carstenkeller.github.io/goahead/"
         private const val REQ_PERMS = 1
         private const val REQ_FILES = 2
+        private const val REQ_PHOTO = 3
+        private const val PHOTO_MAX_PX = 1600   // verkleinerte Kopie für die Web-App
     }
+
+    private var photoUri: Uri? = null
 
     private lateinit var web: WebView
     private var fileCallback: ValueCallback<Array<Uri>>? = null
@@ -154,6 +170,7 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_PHOTO) { photoDone(resultCode == RESULT_OK); return }
         if (requestCode != REQ_FILES) return
         val cb = fileCallback ?: return
         fileCallback = null
@@ -163,6 +180,87 @@ class MainActivity : Activity() {
         if (clip != null) for (i in 0 until clip.itemCount) uris += clip.getItemAt(i).uri
         else data.data?.let { uris += it }
         cb.onReceiveValue(uris.toTypedArray())
+    }
+
+    /**
+     * Foto aufnehmen: Eintrag in der Galerie anlegen (Pictures/GoAhead → Album „GoAhead“), die Kamera-App
+     * schreibt das Bild dort hinein. Danach geht eine verkleinerte Kopie an die Web-App (photoDone).
+     */
+    private fun startPhoto(): Boolean {
+        val name = "GoAhead_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.GERMANY).format(Date()) + ".jpg"
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, name)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/GoAhead")
+        }
+        val uri = try {
+            contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+        } catch (e: Exception) { null } ?: return false
+        photoUri = uri
+        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+            putExtra(MediaStore.EXTRA_OUTPUT, uri)
+            clipData = ClipData.newRawUri("", uri)
+            addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        return try {
+            startActivityForResult(intent, REQ_PHOTO)
+            true
+        } catch (e: ActivityNotFoundException) {
+            try { contentResolver.delete(uri, null, null) } catch (x: Exception) { }
+            photoUri = null
+            false
+        }
+    }
+
+    private fun photoDone(ok: Boolean) {
+        val uri = photoUri ?: return
+        photoUri = null
+        Thread {
+            val res = JSONObject()
+            try {
+                val bytes = if (ok) contentResolver.openInputStream(uri)?.use { it.readBytes() } else null
+                if (bytes == null || bytes.isEmpty()) {
+                    try { contentResolver.delete(uri, null, null) } catch (x: Exception) { }   // abgebrochen: leeren Eintrag entfernen
+                    res.put("ok", false)
+                } else {
+                    res.put("ok", true)
+                    res.put("uri", uri.toString())
+                    res.put("name", uri.lastPathSegment ?: "")
+                    res.put("dataUrl", "data:image/jpeg;base64," + Base64.encodeToString(shrink(bytes), Base64.NO_WRAP))
+                }
+            } catch (e: Exception) {
+                res.put("ok", false)
+                res.put("error", e.message ?: "Fehler")
+            }
+            val js = "window.GOAHEAD_PHOTO_RESULT && window.GOAHEAD_PHOTO_RESULT(" + res.toString() + ")"
+            runOnUiThread { web.evaluateJavascript(js, null) }
+        }.start()
+    }
+
+    // auf höchstens PHOTO_MAX_PX verkleinern und nach EXIF-Ausrichtung drehen
+    private fun shrink(bytes: ByteArray): ByteArray {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= PHOTO_MAX_PX) sample *= 2
+        var bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
+            ?: return bytes
+        val f = PHOTO_MAX_PX.toFloat() / maxOf(bmp.width, bmp.height)
+        val rot = when (ExifInterface(bytes.inputStream()).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            else -> 0f
+        }
+        if (f < 1f || rot != 0f) {
+            val m = Matrix()
+            if (f < 1f) m.postScale(f, f)
+            if (rot != 0f) m.postRotate(rot)
+            bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+        }
+        val out = ByteArrayOutputStream()
+        bmp.compress(Bitmap.CompressFormat.JPEG, 82, out)
+        return out.toByteArray()
     }
 
     private fun appVersion(): String = try {
@@ -211,6 +309,21 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface fun pointCount(): Int = TrackStore.count(ctx)
+
+        /** true: diese App kann Fotos aufnehmen (takePhoto). Ältere App-Versionen kennen die Methode nicht. */
+        @JavascriptInterface fun hasCamera(): Boolean = true
+
+        /** Kamera öffnen; Ergebnis kommt später über window.GOAHEAD_PHOTO_RESULT({ok, dataUrl, uri, name}). */
+        @JavascriptInterface fun takePhoto(): Boolean {
+            var ok = false
+            val latch = java.util.concurrent.CountDownLatch(1)
+            runOnUiThread {
+                ok = startPhoto()
+                latch.countDown()
+            }
+            latch.await(3, java.util.concurrent.TimeUnit.SECONDS)
+            return ok
+        }
 
         /** Punkte ab Index [from]: JSON [[lat, lon, höhe|null, zeit ms, genauigkeit m], …] */
         @JavascriptInterface fun getPoints(from: Int): String = TrackStore.since(ctx, from)
