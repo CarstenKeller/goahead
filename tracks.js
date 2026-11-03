@@ -19,6 +19,9 @@
 
   var dbPromise = null;
 
+  // Version 3: Speicher "tracks" (GPX), "routes" (geplant, planner.js), "walks" (erwandert, nav.js)
+  var DB_VERSION = 3;
+
   function openDb() {
     if (dbPromise) return dbPromise;
     dbPromise = new Promise(function (resolve, reject) {
@@ -26,22 +29,48 @@
         reject(new Error("Dieser Browser bietet keinen lokalen Speicher (IndexedDB)."));
         return;
       }
-      // Version 2: zusätzlicher Speicher "routes" für geplante Routen (planner.js)
-      var req = window.indexedDB.open("goahead", 2);
+      var req = window.indexedDB.open("goahead", DB_VERSION);
       req.onupgradeneeded = function () {
         var db = req.result;
-        ["tracks", "routes"].forEach(function (name) {
+        ["tracks", "routes", "walks"].forEach(function (name) {
           if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: "id" });
         });
       };
-      req.onsuccess = function () { resolve(req.result); };
+      req.onsuccess = function () {
+        var db = req.result;
+        // Fordert eine neuere App-Version (in einem anderen Tab) die Datenbank an: Verbindung freigeben
+        db.onversionchange = function () {
+          db.close();
+          dbPromise = null;
+          G.showStatus("GoAhead wurde in einem anderen Tab aktualisiert. Bitte diese Seite neu laden.", 10000);
+        };
+        resolve(db);
+      };
+      // Ein anderer Tab mit älterer App-Version hält die Datenbank offen und verhindert die Umstellung
+      req.onblocked = function () {
+        G.showStatus("Speicher blockiert: GoAhead ist noch in einem anderen Tab geöffnet. Bitte die anderen Tabs schließen und neu laden.", 15000);
+      };
       req.onerror = function () { reject(req.error || new Error("IndexedDB nicht verfügbar")); };
     });
+    // Fehlschlag nicht dauerhaft merken, damit ein späterer Versuch neu öffnen kann
+    dbPromise.catch(function () { dbPromise = null; });
     return dbPromise;
   }
 
+  function withTimeout(promise, ms) {
+    var timer;
+    return Promise.race([
+      promise,
+      new Promise(function (resolve, reject) {
+        timer = setTimeout(function () {
+          reject(new Error("Lokaler Speicher antwortet nicht. Ist GoAhead noch in einem anderen Tab geöffnet? Diese schließen und neu laden."));
+        }, ms);
+      })
+    ]).then(function (v) { clearTimeout(timer); return v; }, function (e) { clearTimeout(timer); throw e; });
+  }
+
   function storeIn(name, mode, action) {
-    return openDb().then(function (db) {
+    return withTimeout(openDb(), 8000).then(function (db) {
       return new Promise(function (resolve, reject) {
         var tx = db.transaction(name, mode);
         var result;

@@ -29,14 +29,28 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   - Routing-Profil: *Wandern* (BRouter, Profil `hiking-mountain`, Rückfall OSRM), *Fußweg* (OSRM der FOSSGIS,
     Rückfall BRouter) oder *Luftlinie*. Findet kein Dienst einen Weg, wird die Luftlinie genommen und gestrichelt gezeigt.
   - Anzeige: Punkte, Länge, Anstieg (nur bei BRouter), Zahl der Luftlinien-Abschnitte.
-  - „💾 Speichern“ legt die Route unter *Tracks → Geplant* ab (neue Route: mit Namen; bearbeitete Route: wird
+  - „💾 Speichern“ legt die Route unter *Tracks → Geplant* ab (neue Route: Name im Dialog; bearbeitete Route: wird
     überschrieben). Änderungen an einer gespeicherten Route wirken erst nach „Speichern“ – bis dahin bleibt der
     gespeicherte Stand unverändert. Die Kopfzeile zeigt „ungespeichert“, Beenden und „Neu“ fragen nach.
   - Der Arbeitsstand (Entwurf) wird zusätzlich lokal gesichert und ist nach einem Neustart wieder da.
 - **Tracks** (Knopf mit Linien-Symbol im Menü): eigene Seite mit den Reitern *GPX*, *Geplant*, *Erwandert*.
-  - *Geplant*: gespeicherte Routen mit Länge, Anstieg, Punktzahl, Datum; „✎“ öffnet die Route im Planungsmodus,
-    „🗑“ löscht sie. Gespeichert wird lokal (IndexedDB, Speicher `routes`).
-  - *Erwandert* ist noch ein Platzhalter.
+  - *Geplant*: gespeicherte Routen mit Länge, Anstieg, Punktzahl, Datum. Antippen öffnet ein Menü:
+    *▶ Los geht's* (Unterwegs-Modus), *✎ Verändern* (Planungsmodus), *⬇ GPX exportieren*, *🗑 Löschen*.
+    GPX-Export: Track mit der berechneten Linie (inkl. Rundtour-Rückweg) und Wegpunkte für die geplanten Punkte.
+  - *Erwandert*: beendete Aufzeichnungen mit Länge, Zeit in Bewegung, Anstieg (aus GPS-Höhen, daher „ca.“), Datum.
+    Antippen: auf der Karte zeigen/entfernen, GPX exportieren (Track mit Höhe und Zeit), löschen.
+  - Gespeichert wird lokal (IndexedDB `goahead`, Version 3, Speicher `tracks`, `routes`, `walks`).
+- **Unterwegs** (*Los geht's*), Modul `nav.js`:
+  - Zeigt die geplante Route, die eigene Position (Folgemodus) und die gewanderte Strecke (blau). Im Menü bleibt nur
+    die Kartenwahl. Das Feld unten zeigt gewanderte Strecke, Zeit in Bewegung und Länge der Planung.
+  - *⏸ Pause* / *▶ Weiter*: Während der Pause wird nichts aufgezeichnet; danach beginnt ein neues Teilstück.
+    *◎ Position* zentriert wieder. *■ Beenden*: speichern unter *Erwandert*, weiterwandern oder verwerfen.
+  - Aufgezeichnet werden Positionen mit höchstens 50 m Ungenauigkeit und mindestens 5 m Abstand.
+  - Der Zwischenstand wird laufend lokal gesichert. Wird die Seite neu geladen, geht die Tour pausiert weiter.
+  - **Grenze:** Eine Web-App zeichnet nur auf, solange sie sichtbar ist. Die App hält deshalb den Bildschirm an
+    (Screen Wake Lock), sofern der Browser das kann; sonst erscheint ein Hinweis.
+- **Untere Leisten ziehen:** Planungsfeld und Unterwegs-Feld lassen sich am Griff oben größer oder kleiner ziehen
+  (Höhe wird gespeichert).
 - **Einstellungen:** Zoom-Knöpfe ein/aus (wird gespeichert), App-Version, Link zur Diagnose.
 - Positions-Knopf (unten rechts): Die Karte folgt der Position (Knopf blau). Im Folgemodus wird um die eigene
   Position gezoomt. Verschieben der Karte oder Zoomen auf einen GPX-Track beendet das Folgen, ein Tipp auf den
@@ -89,6 +103,12 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   einmal im Monat nach `symbols/tfis/<Signaturnummer>.svg`. Die App zeigt das passende Zeichen im Infofenster.
 - Die App lässt sich zum Startbildschirm hinzufügen. Die App-Hülle funktioniert dann auch offline, die Kartenkacheln **noch nicht**.
 
+## Hinweis zum lokalen Speicher
+
+Ändert sich die Datenbank-Version (zuletzt auf 3), müssen andere offene Tabs mit einer älteren App-Version
+geschlossen werden – sonst blockiert der Browser die Umstellung. Die App meldet das jetzt, statt still zu hängen,
+und gibt die Datenbank ab dieser Version selbst frei, wenn eine neuere Version sie anfordert.
+
 ## Kartendienste und Lizenz
 
 Routing und Suche (ohne API-Schlüssel; die Dienste sind kostenlos, aber nur für maßvolle Nutzung gedacht):
@@ -139,7 +159,8 @@ Einmalig nötig: unter *Settings → Pages → Build and deployment → Source* 
 
 - `index.html`, `styles.css`, `app.js`: die App
 - `tracks.js`: Seite *Tracks*, GPX-Import, lokale Speicherung, Track-Liste
-- `planner.js`: Route planen (Routing, Suche, Planungsfeld)
+- `planner.js`: Route planen (Routing, Suche, Planungsfeld), Liste *Geplant*, GPX-Export
+- `nav.js`: Unterwegs-Modus, Aufzeichnung, Liste *Erwandert*
 - `config.js`: Kartendienste, Startansicht, Zoomstufe
 - `sw.js`, `manifest.webmanifest`, `icons/`: PWA (installierbar, App-Hülle offline)
 - `vendor/leaflet/`: Leaflet 1.9.4 (BSD-2-Clause), lokal eingebunden

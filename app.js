@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "16";
+  var APP_VERSION = "18";
   var STORAGE_KEY = "goahead.view.v1";
 
   // ---------- kleine Helfer ----------
@@ -1225,7 +1225,12 @@
   // Wer die Karte selbst verschiebt, will nicht zurückgezogen werden
   map.on("dragstart", stopFollowing);
 
+  var positionListeners = [];
+
   function onPosition(pos) {
+    positionListeners.forEach(function (fn) {
+      try { fn(pos); } catch (e) { console.warn("[GoAhead] Positions-Empfänger:", e); }
+    });
     var latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
     var acc = pos.coords.accuracy;
     lastPos = latlng;
@@ -1324,6 +1329,114 @@
 
   startWatching();
 
+  // ---------- Dialoge (statt window.prompt, das manche Browser unterdrücken) ----------
+
+  function openDialog(buildBody) {
+    var back = document.createElement("div");
+    back.className = "dlg-back";
+    var box = document.createElement("div");
+    box.className = "dlg";
+    box.setAttribute("role", "dialog");
+    back.appendChild(box);
+    document.body.appendChild(back);
+    function close() { back.remove(); }
+    back.addEventListener("click", function (e) { if (e.target === back) close(); });
+    buildBody(box, close);
+    return close;
+  }
+
+  // Texteingabe; ruft onOk(text) auf, bei Abbruch nichts
+  function askText(title, value, onOk, okLabel) {
+    openDialog(function (box, close) {
+      box.innerHTML = '<div class="dlg-title"></div><input class="dlg-input" type="text">' +
+        '<div class="dlg-buttons"><button type="button" class="dlg-cancel">Abbrechen</button>' +
+        '<button type="button" class="dlg-ok"></button></div>';
+      box.querySelector(".dlg-title").textContent = title;
+      box.querySelector(".dlg-ok").textContent = okLabel || "OK";
+      var input = box.querySelector(".dlg-input");
+      input.value = value || "";
+      box.querySelector(".dlg-cancel").addEventListener("click", close);
+      function ok() { var v = input.value; close(); onOk(v); }
+      box.querySelector(".dlg-ok").addEventListener("click", ok);
+      input.addEventListener("keydown", function (e) { if (e.key === "Enter") ok(); });
+      setTimeout(function () { input.focus(); input.select(); }, 50);
+    });
+  }
+
+  // Auswahl: actions = [{label, onClick, danger, primary}]
+  function actionSheet(title, subtitle, actions) {
+    openDialog(function (box, close) {
+      box.classList.add("dlg-sheet");
+      var t = document.createElement("div");
+      t.className = "dlg-title";
+      t.textContent = title;
+      box.appendChild(t);
+      if (subtitle) {
+        var st = document.createElement("div");
+        st.className = "dlg-sub";
+        st.textContent = subtitle;
+        box.appendChild(st);
+      }
+      actions.concat([{ label: "Abbrechen" }]).forEach(function (a) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "dlg-action" + (a.danger ? " danger" : "") + (a.primary ? " primary" : "");
+        b.textContent = a.label;
+        b.addEventListener("click", function () { close(); if (a.onClick) a.onClick(); });
+        box.appendChild(b);
+      });
+    });
+  }
+
+  // Untere Leiste in der Höhe ziehbar machen (Griff = handle; Knöpfe darin bleiben bedienbar).
+  // Die Höhe wird als Anteil der Bildschirmhöhe gespeichert. onResize(px) nach jeder Änderung.
+  function makeResizable(panel, handle, storageKey, onResize) {
+    var minH = 64;
+    function apply(px) {
+      var h = Math.round(Math.max(minH, Math.min(window.innerHeight * 0.88, px)));
+      panel.style.height = h + "px";
+      panel.style.maxHeight = "none";
+      if (onResize) onResize(h);
+    }
+    try {
+      var f = parseFloat(window.localStorage.getItem(storageKey));
+      if (f > 0 && f < 1) apply(f * window.innerHeight);
+    } catch (e) { /* Standardhöhe */ }
+
+    var dragging = false;
+    var startY = 0;
+    var startH = 0;
+    handle.addEventListener("pointerdown", function (e) {
+      if (e.target.closest("button, input, select, a")) return;
+      dragging = true;
+      startY = e.clientY;
+      startH = panel.getBoundingClientRect().height;
+      handle.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    handle.addEventListener("pointermove", function (e) {
+      if (dragging) apply(startH + (startY - e.clientY));
+    });
+    function end() {
+      if (!dragging) return;
+      dragging = false;
+      var h = panel.getBoundingClientRect().height;
+      try { window.localStorage.setItem(storageKey, String(h / window.innerHeight)); } catch (err) { /* egal */ }
+    }
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+  }
+
+  function downloadFile(fileName, text, mime) {
+    var blob = new Blob([text], { type: mime || "application/octet-stream" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+
   // ---------- Schnittstelle für weitere Module (z. B. tracks.js) ----------
 
   window.GOAHEAD = {
@@ -1336,7 +1449,18 @@
     openMenu: openMenu,
     setMapClickHandler: setMapClickHandler,
     closeInfoPanel: function () { infoRequest++; closeInfoPanel(); },
-    getPosition: function () { return lastPos; }
+    getPosition: function () { return lastPos; },
+    onPosition: function (fn) { positionListeners.push(fn); },
+    // Folgemodus einschalten und auf die eigene Position zentrieren
+    follow: function () {
+      setFollowing(true);
+      if (lastPos) map.setView(lastPos, Math.max(map.getZoom(), cfg.locateZoom));
+      startWatching();
+    },
+    askText: askText,
+    actionSheet: actionSheet,
+    downloadFile: downloadFile,
+    makeResizable: makeResizable
   };
 
   // ---------- Service Worker (App-Hülle offline verfügbar) ----------

@@ -524,7 +524,8 @@
   panel.hidden = true;
   panel.setAttribute("aria-label", "Route planen");
   panel.innerHTML =
-    '<div class="plan-head">' +
+    '<div class="plan-head sheet-handle">' +
+      '<span class="sheet-grip" aria-hidden="true"></span>' +
       '<span class="plan-title"><span class="plan-name">Route planen</span><span class="plan-dirty" hidden> · ungespeichert</span></span>' +
       '<button type="button" class="plan-exit">Beenden</button>' +
     "</div>" +
@@ -552,6 +553,10 @@
   document.body.appendChild(panel);
   L.DomEvent.disableClickPropagation(panel);
   L.DomEvent.disableScrollPropagation(panel);
+  // Kopf des Planungsfelds ziehen: größer/kleiner, um mehr Karte zu sehen
+  G.makeResizable(panel, panel.querySelector(".plan-head"), "goahead.planHeight.v1", function (h) {
+    document.documentElement.style.setProperty("--plan-h", h + "px");
+  });
 
   var el = {
     name: panel.querySelector(".plan-name"),
@@ -686,13 +691,21 @@
   }
 
   function saveRoute() {
-    if (!plan.points.length || !G.db) return;
-    var name = plan.name;
-    if (!plan.savedId) {
-      name = window.prompt("Name der Route:", plan.name || defaultName());
-      if (name === null) return;
-      name = name.trim() || defaultName();
+    if (!plan.points.length) return;
+    if (!G.db) {
+      G.showStatus("Lokaler Speicher nicht verfügbar – Speichern nicht möglich.", 6000);
+      return;
     }
+    if (plan.savedId) {
+      writeRoute(plan.name);
+      return;
+    }
+    G.askText("Name der Route", plan.name || defaultName(), function (name) {
+      writeRoute(String(name).trim() || defaultName());
+    }, "Speichern");
+  }
+
+  function writeRoute(name) {
     var t = totals();
     var now = new Date().toISOString();
     var rec = {
@@ -749,15 +762,12 @@
       if (r.roundtrip) info.push("Rundtour");
       info.push(new Date(r.updatedAt).toLocaleDateString("de-DE"));
       var editing = plan.savedId === r.id && plan.dirty;
-      return '<div class="trk-item" data-id="' + esc(r.id) + '">' +
+      return '<div class="trk-item trk-tap" role="button" tabindex="0" data-id="' + esc(r.id) + '">' +
         '<div class="trk-main"><span class="trk-swatch" style="background:' + COLOR_ROUTE + '"></span>' +
           '<span class="trk-text"><span class="trk-name">' + esc(r.name) + "</span>" +
           '<span class="trk-info">' + esc(info.join(" · ")) + (editing ? " · <em>ungespeicherte Änderungen</em>" : "") + "</span></span>" +
         "</div>" +
-        '<div class="trk-actions">' +
-          '<button type="button" data-act="edit" title="Verändern" aria-label="Verändern">✎</button>' +
-          '<button type="button" data-act="delete" title="Löschen" aria-label="Löschen">🗑</button>' +
-        "</div></div>";
+        '<span class="trk-more" aria-hidden="true">›</span></div>';
     }).join("");
   }
 
@@ -817,15 +827,74 @@
     var box = G.tracksPanel && G.tracksPanel("planned");
     if (!box) return;
     box.addEventListener("click", function (e) {
-      var actEl = e.target.closest("[data-act]");
       var item = e.target.closest(".trk-item");
-      if (!actEl || !item) return;
+      if (!item) return;
       var rec = findRoute(item.getAttribute("data-id"));
-      if (!rec) return;
-      if (actEl.getAttribute("data-act") === "edit") editRoute(rec);
-      else if (actEl.getAttribute("data-act") === "delete") deleteRoute(rec);
+      if (rec) routeMenu(rec);
     });
   })();
+
+  function routeMenu(rec) {
+    var st = rec.stats || {};
+    var sub = [st.length ? km(st.length) : null, (st.points || rec.points.length) + " Punkte", rec.roundtrip ? "Rundtour" : null]
+      .filter(Boolean).join(" · ");
+    var actions = [];
+    if (G.nav) actions.push({ label: "▶ Los geht's", primary: true, onClick: function () { G.nav.start(rec); } });
+    actions.push({ label: "✎ Verändern", onClick: function () { editRoute(rec); } });
+    actions.push({ label: "⬇ GPX exportieren", onClick: function () { exportRouteGpx(rec); } });
+    actions.push({ label: "🗑 Löschen", danger: true, onClick: function () { deleteRoute(rec); } });
+    G.actionSheet(rec.name, sub, actions);
+  }
+
+  // Gesamte Linie einer geplanten Route (Abschnitte aneinandergehängt, inkl. Rundtour-Rückweg)
+  function routeLine(rec) {
+    var out = [];
+    var segs = (rec.segments || []).slice();
+    if (rec.roundtrip && rec.closing) segs.push(rec.closing);
+    segs.forEach(function (seg) {
+      if (!seg || !seg.latlngs) return;
+      seg.latlngs.forEach(function (ll, i) {
+        if (i === 0 && out.length) {
+          var last = out[out.length - 1];
+          if (last[0] === ll[0] && last[1] === ll[1]) return;   // doppelte Anschlusspunkte weglassen
+        }
+        out.push(ll);
+      });
+    });
+    if (!out.length) out = rec.points.map(function (p) { return [p.lat, p.lng]; });
+    return out;
+  }
+
+  function xmlEsc(t) {
+    return String(t).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" }[c];
+    });
+  }
+
+  function fileNameFor(name) {
+    // Buchstaben, Ziffern, Bindestrich, Punkt bleiben (z. B. Datum 3.11.2026); Rest entfällt
+    return (String(name).replace(/[^\w\-.äöüÄÖÜß ]+/g, "").replace(/\.+$/, "").trim().replace(/\s+/g, "_").replace(/_+/g, "_") || "route") + ".gpx";
+  }
+
+  // GPX 1.1: Track (berechnete Linie) und Wegpunkte (geplante Punkte)
+  function routeToGpx(rec) {
+    var lines = ['<?xml version="1.0" encoding="UTF-8"?>',
+      '<gpx version="1.1" creator="GoAhead" xmlns="http://www.topografix.com/GPX/1/1">',
+      "  <metadata><name>" + xmlEsc(rec.name) + "</name><time>" + new Date().toISOString() + "</time></metadata>"];
+    rec.points.forEach(function (p, i) {
+      lines.push('  <wpt lat="' + p.lat + '" lon="' + p.lng + '"><name>' + (i === 0 ? "Start" : "Punkt " + i) + "</name></wpt>");
+    });
+    lines.push("  <trk><name>" + xmlEsc(rec.name) + "</name><trkseg>");
+    routeLine(rec).forEach(function (ll) {
+      lines.push('    <trkpt lat="' + ll[0] + '" lon="' + ll[1] + '"></trkpt>');
+    });
+    lines.push("  </trkseg></trk>", "</gpx>");
+    return lines.join("\n");
+  }
+
+  function exportRouteGpx(rec) {
+    G.downloadFile(fileNameFor(rec.name), routeToGpx(rec), "application/gpx+xml");
+  }
 
   // ---------- Modus ein/aus ----------
 
@@ -898,6 +967,10 @@
     start: start,
     stop: stop,
     parseCoordinates: parseCoordinates,
-    getPlan: function () { return plan; }
+    getPlan: function () { return plan; },
+    routeLine: routeLine,
+    xmlEsc: xmlEsc,
+    fileNameFor: fileNameFor,
+    isActive: function () { return active; }
   };
 })();

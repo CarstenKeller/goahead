@@ -802,3 +802,204 @@ html, body {
   color: #0b4f8a;
   background: #e7f1fb !important;
 }
+
+/* Ziehbare untere Leisten (Planen, Unterwegs) */
+.sheet-handle {
+  position: relative;
+  touch-action: none;
+  cursor: ns-resize;
+  user-select: none;
+  -webkit-user-select: none;
+  padding-top: 12px;
+}
+.sheet-grip {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 44px;
+  height: 5px;
+  margin-left: -22px;
+  border-radius: 3px;
+  background: #c4c4c4;
+}
+#plan-panel {
+  display: flex;
+  flex-direction: column;
+}
+#plan-panel > :not(.plan-head) {
+  flex: none;
+}
+
+/* Dialoge */
+.dlg-back {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.dlg {
+  background: #ffffff;
+  color: #222222;
+  border-radius: 12px;
+  padding: 16px;
+  width: min(420px, 100%);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  font-size: 16px;
+}
+.dlg-sheet {
+  align-self: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: env(safe-area-inset-bottom);
+}
+.dlg-title {
+  font-weight: 600;
+  font-size: 17px;
+  margin-bottom: 4px;
+}
+.dlg-sub {
+  font-size: 13px;
+  color: #666666;
+  margin-bottom: 6px;
+}
+.dlg-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  font-size: 16px;
+  border: 1px solid #bbbbbb;
+  border-radius: 6px;
+  margin: 8px 0 12px;
+}
+.dlg-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.dlg-buttons button, .dlg-action {
+  padding: 12px 14px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: 1px solid #cccccc;
+  background: #ffffff;
+  cursor: pointer;
+  text-align: left;
+}
+.dlg-ok, .dlg-action.primary {
+  background: #2f9e44;
+  border-color: #2f9e44;
+  color: #ffffff;
+  font-weight: 600;
+}
+.dlg-action.danger {
+  color: #b00020;
+  border-color: #e3a0a8;
+}
+.trk-tap {
+  cursor: pointer;
+}
+.trk-more {
+  font-size: 26px;
+  color: #999999;
+  padding: 0 6px;
+}
+#plan-panel .plan-head {
+  position: sticky;
+  top: -8px;
+  background: #ffffff;
+  z-index: 1;
+  margin-top: -8px;
+  padding-bottom: 4px;
+}
+
+/* ---------- Unterwegs (Navigationsmodus) ---------- */
+.mode-nav .toolbar > :not(.leaflet-control-layers) {
+  display: none;
+}
+#nav-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1400;
+  background: #ffffff;
+  color: #222222;
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+  padding: 0 12px calc(10px + env(safe-area-inset-bottom));
+  font-size: 15px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+#nav-panel[hidden] {
+  display: none;
+}
+.mode-nav .map-btn {
+  bottom: calc(var(--nav-h, 190px) + 12px);
+}
+.mode-nav .leaflet-bottom {
+  bottom: var(--nav-h, 190px);
+}
+.nav-head {
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  padding-bottom: 6px;
+  z-index: 1;
+}
+.nav-title {
+  font-weight: 600;
+  font-size: 16px;
+}
+.nav-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: center;
+}
+.nav-stats > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.nav-val {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.nav-lbl {
+  font-size: 12px;
+  color: #666666;
+}
+.nav-state {
+  font-size: 13px;
+  color: #444444;
+  margin: 8px 0;
+}
+.nav-actions {
+  display: flex;
+  gap: 6px;
+}
+.nav-actions button {
+  flex: 1;
+  padding: 12px 8px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: 1px solid #bbbbbb;
+  background: #ffffff;
+  cursor: pointer;
+}
+.nav-pause.on {
+  background: #2f9e44;
+  border-color: #2f9e44;
+  color: #ffffff;
+}
+.nav-end {
+  border-color: #b00020 !important;
+  color: #b00020;
+}
