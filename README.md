@@ -107,8 +107,18 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   Planung). Die Treffer werden erst angezeigt (mit Begründung), dann auf Wunsch gelöscht bzw. nach „Geplant“
   verschoben. Die Erkennung „geplant“ ist eine Heuristik, an echten komoot-Daten nicht geprüft. Einzelne Touren
   lassen sich auch über ihr Menü nach „Geplant“ verschieben. Eigene GoAhead-Aufnahmen gelten nie als geplant.
-  Dritte Gruppe: *zu schnell* – Durchschnitt in Bewegung über 7 km/h (vermutlich Rad oder Auto; Schwelle gewählt,
-  nicht gemessen). Die Liste zeigt bei jeder Tour „Ø … km/h“.
+  Weitere Gruppen: *mit Fahrt am Ende* (siehe unten; „Alle kürzen“) und *Fahrzeug* (Ø schneller als „Rad bis“).
+- **Art der Tour** aus der Ø-Geschwindigkeit in Bewegung: Wandern bis 7, Laufen bis 11, Rad bis 32 km/h, darüber
+  Fahrzeug (Grenzen nach Erfahrung des Nutzers, in den Einstellungen änderbar). Kleines Symbol vor dem Namen,
+  „Ø … km/h“ in der Zeile, Filter „Alle Arten / Wandern / Laufen / Rad / Fahrzeug“.
+- **Fahrt erkannt → automatisch beenden** (Einstellung „Automatisch beenden ab“, Standard 80 km/h): Liegt die
+  Geschwindigkeit über mindestens drei 20-Sekunden-Fenster (Luftlinie, damit einzelne GPS-Ausreißer nicht zählen)
+  über der Grenze, wird die Tour bis zu der Stelle gekürzt, an der man zuletzt höchstens Lauftempo hatte, und
+  mit ⚠ gespeichert. In der Android-App prüft das die Web-App beim Abholen der Punkte, also spätestens, wenn der
+  Bildschirm wieder an ist – gekürzt wird trotzdem an der richtigen Stelle.
+- **Ende abschneiden** (Menü einer erwanderten Tour, „✂“): Schieberegler für den neuen Endpunkt oder die Linie auf der
+  Karte antippen; vorgeschlagen ist der erkannte Einstieg ins Fahrzeug. Der abgeschnittene Teil wird grau gestrichelt
+  gezeigt; „Kürzen“ speichert (Strecke, Zeit in Bewegung, Anstieg, Ende werden neu berechnet).
 - **Untere Leisten ziehen:** Planungsfeld und Unterwegs-Feld lassen sich am Griff oben größer oder kleiner ziehen
   (Höhe wird gespeichert). Alle unteren Leisten legen sich über Positions-Knopf, Maßstab und Quellenangabe,
   ohne sie zu verschieben.

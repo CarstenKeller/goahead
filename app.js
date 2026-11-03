@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "29";
+  var APP_VERSION = "30";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {
@@ -33,7 +33,13 @@
     rec: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4" fill="currentColor"/>',
     more: '<circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/>',
     trash: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/>',
-    check: '<path d="M4 6h10M4 12h7M4 18h6"/><path d="M14 16l3 3 5-6"/>'
+    check: '<path d="M4 6h10M4 12h7M4 18h6"/><path d="M14 16l3 3 5-6"/>',
+    walk: '<circle cx="13" cy="4" r="2"/><path d="M11 8l-2 6 3 2 1 6"/><path d="M11 8l4 3 3 1"/><path d="M9 14l-3 7"/>',
+    run: '<circle cx="15" cy="4" r="2"/><path d="M5 11l4-3 5 1-2 5 4 3-1 5"/><path d="M14 9l3 3 4-1"/><path d="M12 14l-5 2-3 5"/>',
+    bike: '<circle cx="6" cy="16" r="4"/><circle cx="18" cy="16" r="4"/><path d="M6 16l4-7h6l2 7"/><path d="M10 9l3 7h-7"/><path d="M15 6h3"/>',
+    car: '<path d="M3 15l2-6h14l2 6v4H3z"/><circle cx="7.5" cy="19" r="1.5"/><circle cx="16.5" cy="19" r="1.5"/><path d="M3 15h18"/>',
+    scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.5 7.5L20 18M8.5 16.5L20 6"/>',
+    warn: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>'
   };
   function icon(name) {
     return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" ' +
@@ -352,7 +358,12 @@
     slopePercent: 5,     // ab dieser Neigung (%) gilt ein Abschnitt als Steigung bzw. Gefälle
     routing: "brouter",  // Routing-Dienst beim Planen: "brouter" (mit Höhen) oder "osrm"
     offlineKm: 1,        // Unterwegs: Karten in diesem Abstand (km) um die Route offline speichern
-    turnWarnM: 20        // Unterwegs: so viele Meter vor einer Abbiegung vibrieren
+    turnWarnM: 20,       // Unterwegs: so viele Meter vor einer Abbiegung vibrieren
+    // Art einer Tour nach Ø-Geschwindigkeit in Bewegung (km/h): bis … Wandern, bis … Laufen, bis … Rad, darüber Fahrzeug
+    walkMaxKmh: 7,
+    runMaxKmh: 11,
+    bikeMaxKmh: 32,
+    autoEndKmh: 80       // Unterwegs: ab dieser Spitzengeschwindigkeit (über 20 s) Fahrt erkannt → Tour beenden
   };
   var settings = JSON.parse(JSON.stringify(SETTING_DEFAULTS));
   try {
@@ -407,6 +418,11 @@
         '<div class="settings-sub">Unterwegs</div>' +
         numRow("offlineKm", "Karten offline um die Route", "km", 0.2, 5, 0.1) +
         numRow("turnWarnM", "Vibration vor Abbiegung", "m", 5, 200, 5) +
+        numRow("autoEndKmh", "Automatisch beenden ab", "km/h", 30, 250, 5) +
+        '<div class="settings-sub">Art der Tour (Ø in Bewegung)</div>' +
+        numRow("walkMaxKmh", "Wandern bis", "km/h", 2, 15, 0.5) +
+        numRow("runMaxKmh", "Laufen bis", "km/h", 4, 30, 0.5) +
+        numRow("bikeMaxKmh", "Rad bis", "km/h", 8, 80, 1) +
         '<div class="settings-sub">Daten</div>' +
         '<div class="settings-act"><span>Sicherung</span><span class="icon-row">' +
           '<button type="button" class="icon-btn settings-backup" title="Sichern (alle Touren, Routen, Tracks, Einstellungen)" aria-label="Sichern">' + icon("download") + "</button>" +

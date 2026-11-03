@@ -65,6 +65,115 @@
     } catch (e) { /* Speicher voll – Aufzeichnung läuft im Speicher weiter */ }
   }
 
+  // ---------- Art der Tour, Fahrt-Erkennung, Kürzen ----------
+
+  function setting(k, d) { var v = G.getSettings()[k]; return typeof v === "number" ? v : d; }
+
+  // alle Punkte einer Tour in Reihenfolge: [{s, i, p}] und kumulierte Strecke
+  function flatten(segments) {
+    var out = [];
+    var cum = [];
+    var d = 0;
+    segments.forEach(function (seg, si) {
+      seg.forEach(function (p, i) {
+        if (i > 0) d += L.latLng(seg[i - 1][0], seg[i - 1][1]).distanceTo(L.latLng(p[0], p[1]));
+        out.push({ s: si, i: i, p: p });
+        cum.push(d);
+      });
+    });
+    return { pts: out, cum: cum };
+  }
+
+  // Geschwindigkeit (km/h) je Punkt: Luftlinie zum spätesten Punkt, der mindestens WIN_S Sekunden zurückliegt.
+  // Luftlinie statt Weglänge: ein einzelner GPS-Ausreißer (hin und zurück) hebt sich so auf.
+  var WIN_S = 20;
+  function windowSpeeds(f) {
+    var v = [];
+    var k = 0;
+    for (var i = 0; i < f.pts.length; i++) {
+      var pi = f.pts[i];
+      if (f.pts[k].s !== pi.s) k = i;   // neues Teilstück (nach Pause): Fenster neu beginnen
+      var ti = pi.p[3];
+      if (ti == null) { v.push(null); continue; }
+      while (k + 1 < i && f.pts[k + 1].p[3] != null && ti - f.pts[k + 1].p[3] >= WIN_S * 1000) k++;
+      var pk = f.pts[k];
+      if (k >= i || pk.p[3] == null || ti - pk.p[3] < WIN_S * 1000) { v.push(null); continue; }
+      var d = L.latLng(pk.p[0], pk.p[1]).distanceTo(L.latLng(pi.p[0], pi.p[1]));
+      v.push(d / ((ti - pk.p[3]) / 1000) * 3.6);
+    }
+    return v;
+  }
+
+  // Fahrt erkennen: erste Stelle mit mehr als autoEndKmh über WIN_S; zurück bis dahin, wo man noch höchstens
+  // so schnell wie beim Laufen war → dort kürzen. Rückgabe {keep: Anzahl Punkte, peak: km/h, at: Zeit} oder null
+  function detectDrive(segments) {
+    var f = flatten(segments);
+    var v = windowSpeeds(f);
+    var lim = setting("autoEndKmh", 80);
+    var run = setting("runMaxKmh", 11);
+    var trig = -1;
+    // mindestens 3 Fenster hintereinander über der Grenze (sonst Ausreißer)
+    var run3 = 0;
+    for (var i = 0; i < v.length; i++) {
+      if (v[i] != null && v[i] > lim) { if (++run3 >= 3) { trig = i - 2; break; } } else if (v[i] != null) run3 = 0;
+    }
+    if (trig < 0) return null;
+    var peak = 0;
+    for (var k = trig; k < v.length; k++) if (v[k] != null && v[k] > peak) peak = v[k];
+    var cut = trig;
+    while (cut > 0 && (v[cut] == null || v[cut] > run)) cut--;
+    return { keep: Math.max(2, cut + 1), peak: peak, at: f.pts[cut].p[3] };
+  }
+
+  // Segmente auf die ersten n Punkte kürzen
+  function cutSegments(segments, n) {
+    var out = [];
+    var left = n;
+    segments.forEach(function (seg) {
+      if (left <= 0) return;
+      out.push(seg.slice(0, left));
+      left -= seg.length;
+    });
+    return out.filter(function (sg) { return sg.length; });
+  }
+
+  // Zeit in Bewegung aus den Punkten (wie beim Import): Lücken über 2 min und Stillstand zählen nicht
+  function movingFromPoints(segments) {
+    var ms = 0;
+    segments.forEach(function (sg) {
+      for (var i = 1; i < sg.length; i++) {
+        if (sg[i][3] == null || sg[i - 1][3] == null) continue;
+        var dt = (sg[i][3] - sg[i - 1][3]) / 1000;
+        var d = L.latLng(sg[i - 1][0], sg[i - 1][1]).distanceTo(L.latLng(sg[i][0], sg[i][1]));
+        if (dt > 0 && dt <= 120 && d / dt >= 0.2) ms += dt * 1000;
+      }
+    });
+    return ms;
+  }
+
+  function segLength(segments) { return segments.reduce(function (n, sg) { return n + lineLength(sg); }, 0); }
+
+  function climbOf(segments) {
+    var up = 0, ref = null;
+    segments.forEach(function (sg) { sg.forEach(function (p) {
+      if (p[2] == null) return;
+      if (ref == null) { ref = p[2]; return; }
+      if (p[2] - ref >= 3) { up += p[2] - ref; ref = p[2]; } else if (ref - p[2] >= 3) ref = p[2];
+    }); });
+    return up || null;
+  }
+
+  var KINDS = [["walk", "Wandern"], ["run", "Laufen"], ["bike", "Rad"], ["car", "Fahrzeug"]];
+  function kindOf(w) {
+    var v = avgKmh(w);
+    if (v == null) return "";
+    if (v <= setting("walkMaxKmh", 7)) return "walk";
+    if (v <= setting("runMaxKmh", 11)) return "run";
+    if (v <= setting("bikeMaxKmh", 32)) return "bike";
+    return "car";
+  }
+  function kindLabel(k) { for (var i = 0; i < KINDS.length; i++) if (KINDS[i][0] === k) return KINDS[i][1]; return ""; }
+
   // ---------- Bildschirm anlassen (Screen Wake Lock) ----------
 
   var wakeLock = null;
@@ -254,6 +363,7 @@
     if (!pts.length) return 0;
     walk.nativeIdx = (walk.nativeIdx || 0) + pts.length;
     pts.forEach(function (q) { addPoint([q[0], q[1], q[2], q[3]], false); });
+    setTimeout(checkAutoEnd, 0);
     walk.lastFix = Date.now();
     var q = pts[pts.length - 1];
     progress = locateOnRoute(q[0], q[1]) || progress;
@@ -275,6 +385,25 @@
   if (NATIVE) {
     window.GOAHEAD_NATIVE_RESUME = nativeRefresh;   // ruft die App beim Zurückkehren auf
     document.addEventListener("visibilitychange", function () { if (!document.hidden) nativeRefresh(); });
+  }
+
+  // Fahrt erkannt (Spitze über „Automatisch beenden ab“): bis zum Einstieg kürzen und Tour speichern
+  var autoEnding = false;
+  function checkAutoEnd() {
+    if (!walk || walk.paused || autoEnding) return;
+    var det = detectDrive(walk.segments);
+    if (!det) return;
+    autoEnding = true;
+    if (NATIVE) { pullNative(); NATIVE.call("pauseRecording"); }
+    walk.segments = cutSegments(walk.segments, det.keep);
+    walk.distance = segLength(walk.segments);
+    walk.autoEnded = { peak: Math.round(det.peak), at: det.at };
+    walk.paused = true;
+    walk.pausedAt = Date.now();
+    saveWalk();
+    drawWalk();
+    finish(walk.free ? walk.routeName : undefined);
+    autoEnding = false;
   }
 
   // Punkt an das laufende Teilstück hängen: p = [lat, lon, höhe|null, zeit ms]
@@ -329,6 +458,8 @@
       c.altitude != null ? Math.round(c.altitude * 10) / 10 : null, pos.timestamp || Date.now()];
     if (!addPoint(p, true)) return;
     saveWalk();
+    checkAutoEnd();
+    if (!walk) return;
     renderPanel();
   });
 
@@ -708,8 +839,9 @@
       routeId: walk.routeId,
       routeName: walk.routeName,
       startedAt: new Date(walk.startedAt).toISOString(),
-      endedAt: new Date().toISOString(),
-      movingMs: movingTime(walk),
+      endedAt: new Date(walk.autoEnded && walk.autoEnded.at ? walk.autoEnded.at : Date.now()).toISOString(),
+      movingMs: walk.autoEnded ? movingFromPoints(segs) : movingTime(walk),
+      autoEnded: walk.autoEnded || null,
       distance: walk.distance,
       ascent: ascent || null,
       segments: segs
@@ -721,7 +853,8 @@
     G.db.put("walks", rec).then(function () {
       leave();
       loadWalks();
-      G.showStatus("Tour unter „Erwandert“ gespeichert: " + km(rec.distance) + ".", 5000);
+      G.showStatus((rec.autoEnded ? "⚠ Fahrt erkannt (" + rec.autoEnded.peak + " km/h) – Tour bis zum Einstieg gekürzt und " : "Tour unter „Erwandert“ ") +
+        "gespeichert: " + km(rec.distance) + ".", rec.autoEnded ? 10000 : 5000);
     }).catch(function (err) {
       // Aufzeichnung NICHT verwerfen: Sie bleibt als laufende Tour erhalten
       G.showStatus("Speichern fehlgeschlagen: " + err.message + " Die Aufzeichnung bleibt erhalten.", 10000);
@@ -770,6 +903,8 @@
       yearOf: function (w) { return new Date(w.startedAt).getFullYear(); },
       metersOf: function (w) { return w.distance; },
       nameOf: function (w) { return w.name; },
+      kindOf: kindOf,
+      kinds: KINDS,
       tools: '<button type="button" class="icon-btn list-check' + (check && check.mode ? " on" : "") +
         '" title="Liste prüfen (Doppelte, vermutlich geplante)" aria-label="Liste prüfen">' + G.icon("check") + "</button>"
     }) : { html: "", items: base };
@@ -777,7 +912,8 @@
     if (check && check.mode) {
       var n = Object.keys(check[check.mode]).length;
       var lbl = { dups: [" vermutlich doppelt", "Doppelte löschen"], planned: [" vermutlich geplant", "Nach „Geplant“ verschieben"],
-        fast: [" schneller als " + FAST_KMH + " km/h", "Alle löschen"] }[check.mode];
+        fast: [" Fahrzeug (Ø über " + setting("bikeMaxKmh", 32) + " km/h)", "Alle löschen"],
+        drive: [" mit Fahrt am Ende", "Alle kürzen"] }[check.mode];
       note = '<div class="list-note"><span>' + n + lbl[0] + "</span>" +
         '<button type="button" class="list-check-act">' + lbl[1] + "</button>" +
         '<button type="button" class="icon-btn list-check-off" title="Prüfung beenden" aria-label="Prüfung beenden">' + G.icon("close") + "</button></div>";
@@ -786,12 +922,15 @@
       var info = [km(w.distance), duration(w.movingMs)];
       var v = avgKmh(w);
       if (v != null) info.push("Ø " + num(v, 1) + " km/h");
-      if (check && check.mode === "planned" && check.why[w.id]) info.push(check.why[w.id]);
+      if (check && (check.mode === "planned" || check.mode === "drive") && check.why[w.id]) info.push(check.why[w.id]);
       if (w.ascent) info.push("↑ ca. " + Math.round(w.ascent) + " m");
       info.push(new Date(w.startedAt).toLocaleDateString("de-DE"));
       return '<div class="trk-item trk-tap" role="button" tabindex="0" data-id="' + esc(w.id) + '">' +
         '<div class="trk-main"><span class="trk-swatch" style="background:' + COLOR_WALK + '"></span>' +
-          '<span class="trk-text"><span class="trk-name">' + esc(w.name) + (shown[w.id] ? " 👁" : "") + "</span>" +
+          '<span class="trk-text"><span class="trk-name">' +
+            (w.autoEnded ? '<span class="warn-ic" title="Automatisch beendet (Fahrt erkannt)">' + G.icon("warn") + "</span>" : "") +
+            (kindOf(w) ? '<span class="kind-ic" title="' + kindLabel(kindOf(w)) + '">' + G.icon(kindOf(w)) + "</span>" : "") +
+            esc(w.name) + (shown[w.id] ? " 👁" : "") + "</span>" +
           '<span class="trk-info">' + esc(info.join(" · ")) + "</span></span>" +
         '</div><span class="trk-more" aria-hidden="true">›</span></div>';
     }).join("");
@@ -808,7 +947,6 @@
   function avgKmh(w) {
     return w.movingMs > 60000 && w.distance > 0 ? w.distance / 1000 / (w.movingMs / 3600000) : null;
   }
-  var FAST_KMH = 7;   // schneller im Schnitt: vermutlich nicht zu Fuß (Rad, Auto) – Annahme, nicht gemessen
 
   // ---------- Liste prüfen: Doppelte, vermutlich geplante und zu schnelle Touren ----------
   //
@@ -845,15 +983,16 @@
 
   function runCheck() {
     var seen = {};
-    var dups = {}, planned = {}, why = {}, fast = {};
+    var dups = {}, planned = {}, why = {}, fast = {}, drive = {};
     walks.slice().sort(function (a, b) { return a.id < b.id ? -1 : 1; }).forEach(function (w) {
       var p = w.segments[0] && w.segments[0][0];
       if (p) {
         var key = String(w.startedAt).slice(0, 10) + "|" + Math.round((w.distance || 0) / 200) + "|" + p[0].toFixed(3) + "," + p[1].toFixed(3);
         if (seen[key]) dups[w.id] = 1; else seen[key] = 1;
       }
-      var v = avgKmh(w);
-      if (v != null && v > FAST_KMH) fast[w.id] = 1;
+      if (kindOf(w) === "car") fast[w.id] = 1;
+      var det = detectDrive(w.segments);
+      if (det) { drive[w.id] = det; why[w.id] = "Fahrt " + Math.round(det.peak) + " km/h, kürzen auf " + num(segLength(cutSegments(w.segments, det.keep)) / 1000, 1) + " km"; }
       if (w.free || !w.importKey) return;   // eigene Aufzeichnungen aus GoAhead sind sicher erwandert
       var st = walkStats(w);
       if (st.timedShare < 0.5) { planned[w.id] = 1; why[w.id] = "ohne Zeitstempel"; }
@@ -862,20 +1001,36 @@
         why[w.id] = "Pausen " + Math.round(st.stopShare * 100) + " %, Takt " + Math.round(st.takt * 100) + " %";
       }
     });
-    var nd = Object.keys(dups).length, np = Object.keys(planned).length, nf = Object.keys(fast).length;
-    function show(mode) { return function () { check = { dups: dups, planned: planned, fast: fast, why: why, mode: mode }; renderWalks(); }; }
+    var nd = Object.keys(dups).length, np = Object.keys(planned).length, nf = Object.keys(fast).length, nv = Object.keys(drive).length;
+    function show(mode) { return function () { check = { dups: dups, planned: planned, fast: fast, drive: drive, why: why, mode: mode }; renderWalks(); }; }
     var kmOf = function (set) { return walks.filter(function (w) { return set[w.id]; }).reduce(function (s, w) { return s + (w.distance || 0); }, 0) / 1000; };
     var acts = [];
     if (nd) acts.push({ label: "Doppelte zeigen (" + nd + ", " + num(kmOf(dups), 0) + " km)", onClick: show("dups") });
     if (np) acts.push({ label: "Vermutlich geplante zeigen (" + np + ", " + num(kmOf(planned), 0) + " km)", onClick: show("planned") });
-    if (nf) acts.push({ label: "Zu schnelle zeigen (Ø über " + FAST_KMH + " km/h: " + nf + ", " + num(kmOf(fast), 0) + " km)", onClick: show("fast") });
-    G.actionSheet("Liste prüfen", walks.length + " Touren: " + nd + " vermutlich doppelt, " + np + " vermutlich geplant, " + nf +
-      " schneller als " + FAST_KMH + " km/h im Schnitt (Rad, Auto?)." + (nd || np || nf ? " Erst ansehen, dann entscheiden." : ""), acts);
+    if (nv) acts.push({ label: "Mit Fahrt am Ende zeigen (" + nv + ")", onClick: show("drive") });
+    if (nf) acts.push({ label: "Fahrzeug zeigen (Ø über " + setting("bikeMaxKmh", 32) + " km/h: " + nf + ", " + num(kmOf(fast), 0) + " km)", onClick: show("fast") });
+    G.actionSheet("Liste prüfen", walks.length + " Touren: " + nd + " vermutlich doppelt, " + np + " vermutlich geplant, " + nv +
+      " mit Fahrt (über " + setting("autoEndKmh", 80) + " km/h), " + nf + " im Schnitt schneller als Rad." +
+      (nd || np || nf || nv ? " Erst ansehen, dann entscheiden." : ""), acts);
   }
 
   function applyCheck() {
     if (!check || !check.mode) return;
     var ids = Object.keys(check[check.mode]);
+    if (check.mode === "drive") {
+      var det = check.drive;
+      G.actionSheet(ids.length + " Touren kürzen?", "Jede wird bis zum erkannten Einstieg ins Fahrzeug gekürzt und mit ⚠ markiert.", [
+        { label: "Kürzen", primary: true, onClick: function () {
+          var list = walks.filter(function (w) { return det[w.id]; }).map(function (w) { return trimmed(w, det[w.id].keep, det[w.id].peak); });
+          G.db.putMany("walks", list).then(function () {
+            check = null;
+            loadWalks();
+            G.showStatus(list.length + " Touren gekürzt.", 4000);
+          }).catch(function (err) { G.showStatus("Kürzen fehlgeschlagen: " + err.message, 6000); });
+        } }
+      ]);
+      return;
+    }
     if (check.mode === "dups" || check.mode === "fast") {
       G.actionSheet(ids.length + (check.mode === "dups" ? " doppelte Touren löschen?" : " Touren löschen?"),
         check.mode === "dups" ? "Die jeweils erste bleibt erhalten." : "Einzelne lassen sich vorher über ihr Menü löschen oder behalten.", [
@@ -963,6 +1118,7 @@
   }
 
   // Detail-Leiste (ziehbar) mit Kennzahlen, Höhenprofil und Fotos; Fotos zusätzlich auf der Karte
+  var openSheetOpts = null;   // {w, opts} der offenen Tour-Leiste
   function openWalkSheet(w) {
     if (!G.tourView) return;
     var d = walkDetails(w);
@@ -970,15 +1126,101 @@
     if (ph) ph.layer.addTo(map);
     var opts = {
       title: w.name,
-      sub: num(w.distance / 1000, 1) + " km · " + new Date(w.startedAt).toLocaleDateString("de-DE"),
+      sub: (w.autoEnded ? "⚠ automatisch beendet (" + w.autoEnded.peak + " km/h) · " : "") +
+        (kindOf(w) ? kindLabel(kindOf(w)) + " · " : "") +
+        num(w.distance / 1000, 1) + " km · " + new Date(w.startedAt).toLocaleDateString("de-DE"),
       stats: d.stats,
       profile: d.profile,
       photos: [],
       onMenu: function () { walkMenu(w); },
-      onClose: function () { if (ph) map.removeLayer(ph.layer); hideWalk(w); }
+      onClose: function () { if (trimState) trimState.end(); if (ph) map.removeLayer(ph.layer); hideWalk(w); }
     };
+    openSheetOpts = { w: w, opts: opts };
     if (ph) ph.onLoad = function (list) { G.tourView.setPhotos(opts, list.slice()); };
     G.tourView.open(opts);
+  }
+
+  // gekürzte Kopie einer gespeicherten Tour (erste n Punkte)
+  function trimmed(w, n, peak) {
+    var segs = cutSegments(w.segments, n);
+    var last = segs[segs.length - 1];
+    var t = last[last.length - 1][3];
+    var c = {};
+    Object.keys(w).forEach(function (k) { c[k] = w[k]; });
+    c.segments = segs;
+    c.distance = segLength(segs);
+    var mv = movingFromPoints(segs);
+    c.movingMs = mv || Math.round((w.movingMs || 0) * (c.distance / (w.distance || 1)));
+    c.ascent = climbOf(segs);
+    if (t) c.endedAt = new Date(t).toISOString();
+    c.trimmed = true;
+    if (peak) c.autoEnded = { peak: Math.round(peak), at: t };
+    return c;
+  }
+
+  // Kürzen in der Tour-Leiste: Schieberegler (Endpunkt) und Antippen der Linie; Vorschlag = erkannte Fahrt
+  var trimState = null;
+  function startTrim(w, opts) {
+    var f = flatten(w.segments);
+    var n = f.pts.length;
+    if (n < 3) return;
+    var det = detectDrive(w.segments);
+    var keep = det ? det.keep : n;
+    var cutLayer = L.layerGroup().addTo(map);
+    function redraw() {
+      cutLayer.clearLayers();
+      var rest = f.pts.slice(keep - 1).map(function (q) { return [q.p[0], q.p[1]]; });
+      if (rest.length > 1) L.polyline(rest, { color: "#868e96", weight: 6, opacity: 0.9, dashArray: "6 8", interactive: false }).addTo(cutLayer);
+      var e = f.pts[keep - 1].p;
+      L.circleMarker([e[0], e[1]], { radius: 9, color: "#ffffff", weight: 3, fillColor: "#e03131", fillOpacity: 1, interactive: false }).addTo(cutLayer);
+      var box = document.querySelector(".trim-info");
+      if (box) {
+        var tt = e[3] ? new Date(e[3]) : null;
+        box.textContent = "Behalten " + num(f.cum[keep - 1] / 1000, 2) + " km" + (tt ? " bis " + tt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "") +
+          " · weg " + num((f.cum[n - 1] - f.cum[keep - 1]) / 1000, 2) + " km";
+      }
+    }
+    var html = '<div class="trim-box">' +
+      '<div class="trim-info"></div>' +
+      '<input type="range" class="trim-range" min="2" max="' + n + '" value="' + keep + '" aria-label="Ende der Tour">' +
+      '<div class="icon-row"><button type="button" class="btn-primary trim-ok">Kürzen</button>' +
+      '<button type="button" class="trim-cancel">Abbrechen</button></div></div>';
+    function end() {
+      map.removeLayer(cutLayer);
+      G.setMapClickHandler(null);
+      trimState = null;
+      G.tourView.setExtra(opts, "");
+    }
+    G.tourView.setExtra(opts, html, function (box) {
+      var r = box.querySelector(".trim-range");
+      r.addEventListener("input", function () { keep = +r.value; redraw(); });
+      box.querySelector(".trim-cancel").addEventListener("click", end);
+      box.querySelector(".trim-ok").addEventListener("click", function () {
+        var c = trimmed(w, keep, det && keep === det.keep ? det.peak : null);
+        G.db.put("walks", c).then(function () {
+          end();
+          G.tourView.close();
+          loadWalks();
+          setTimeout(function () { var nw = findWalk(c.id); if (nw) showWalk(nw); }, 300);
+          G.showStatus("Tour gekürzt auf " + num(c.distance / 1000, 2) + " km.", 4000);
+        }).catch(function (err) { G.showStatus("Speichern fehlgeschlagen: " + err.message, 6000); });
+      });
+    });
+    // Linie antippen setzt das Ende auf den nächsten Punkt
+    G.setMapClickHandler(function (e) {
+      var best = -1, bd = Infinity;
+      for (var i = 1; i < n; i++) {
+        var dd = e.latlng.distanceTo(L.latLng(f.pts[i].p[0], f.pts[i].p[1]));
+        if (dd < bd) { bd = dd; best = i; }
+      }
+      if (best < 0 || bd > 200) return;
+      keep = best + 1;
+      var r = document.querySelector(".trim-range");
+      if (r) r.value = String(keep);
+      redraw();
+    });
+    trimState = { end: end };
+    redraw();
   }
 
   function hideWalk(w) {
@@ -1020,6 +1262,10 @@
       { label: "⬇ GPX exportieren", onClick: function () {
         var fn = G.planner ? G.planner.fileNameFor(w.name) : "tour.gpx";
         G.downloadFile(fn, walkToGpx(w), "application/gpx+xml");
+      } },
+      { label: "✂ Ende abschneiden", onClick: function () {
+        if (!G.tourView || !G.tourView.isOpen() || !openSheetOpts || openSheetOpts.w.id !== w.id) showWalk(w);
+        if (openSheetOpts && openSheetOpts.w.id === w.id) startTrim(w, openSheetOpts.opts);
       } },
       { label: "⇄ Nach „Geplant“ verschieben", onClick: function () {
         G.actionSheet("„" + w.name + "“ nach „Geplant“ verschieben?", "Sie wird zur geplanten Route und unter „Erwandert“ entfernt.", [

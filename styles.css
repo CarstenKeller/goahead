@@ -504,7 +504,7 @@ button {
   background: rgba(0, 0, 0, 0.22);
 }
 .sheet-titles {
-  min-width: 34%;   /* Titel und Zustand bleiben lesbar, auch bei 5 Knöpfen */
+  min-width: 0;     /* Titel kürzt sich; die (schlanken) Knöpfe passen immer ganz hinein */
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -519,12 +519,16 @@ button {
   display: flex;
   gap: 0;
   flex: none;
-  min-width: 0;
+  margin-right: -6px;
 }
-/* Kopfknöpfe schlank und ohne Fläche (Platz für Titel, Leiste bleibt am Knopf ziehbar) */
+/* Kopfknöpfe schlank und ohne Fläche (Platz für Titel, Leiste bleibt am Knopf ziehbar);
+   5 × 40 px lassen dem Titel auf einem 360-px-Gerät noch gut 130 px */
 .sheet .sheet-head-btns .icon-btn {
-  width: 42px;
+  width: 40px;
   background: transparent;
+}
+.sheet .sheet-head-btns .nav-end {
+  background: transparent !important;
 }
 .sheet .sheet-head-btns .icon-btn:active {
   background: var(--btn-soft);
@@ -1271,15 +1275,17 @@ button {
 /* Listen: Kopf mit Anzahl, km, Jahr, Suche */
 .list-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin: 4px 0 6px;
 }
 .list-sum {
-  flex: 1;
+  flex: 1 1 100%;
   font-weight: 600;
   font-size: 14px;
 }
+.list-kind,
 .list-year {
   font-size: 15px;
   padding: 8px;
@@ -1330,4 +1336,35 @@ button {
 }
 .list-note > span {
   flex: 1;
+}
+
+/* Art der Tour (Symbol in der Liste) und Warnzeichen (automatisch beendet) */
+.kind-ic,
+.warn-ic {
+  display: inline-flex;
+  vertical-align: -3px;
+  margin-right: 5px;
+  color: var(--c-muted);
+}
+.kind-ic svg,
+.warn-ic svg {
+  width: 17px;
+  height: 17px;
+}
+.warn-ic {
+  color: var(--c-candidate);
+}
+/* Kürzen: Schieberegler in der Tour-Leiste */
+.trim-box {
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--glass-strong);
+}
+.trim-box input[type="range"] {
+  width: 100%;
+}
+.trim-info {
+  font-size: 14px;
+  margin: 4px 0 8px;
 }

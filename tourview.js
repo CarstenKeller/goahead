@@ -32,6 +32,7 @@
       "</span>" +
     "</div>" +
     '<div class="sheet-body">' +
+      '<div class="tour-extra"></div>' +
       '<div class="nav-stats tour-stats"></div>' +
       '<div class="nav-profile-box tour-profile-box" hidden><svg class="pf-svg tour-pf" aria-label="Höhenprofil"></svg></div>' +
       '<div class="tour-photos" hidden></div>' +
@@ -52,6 +53,7 @@
 
   function open(opts) {
     if (current && current.onClose && current !== opts) { var prev = current; current = null; prev.onClose(); }
+    if (current !== opts) panel.querySelector(".tour-extra").innerHTML = "";
     current = opts;
     panel.querySelector(".tour-title").textContent = opts.title || "";
     panel.querySelector(".tour-sub").textContent = opts.sub || "";
@@ -91,7 +93,22 @@
     renderPhotos();
   }
 
-  G.tourView = { open: open, close: close, setPhotos: setPhotos, isOpen: function () { return !panel.hidden; } };
+  // Zusatzbereich oben in der Leiste (z. B. „Kürzen“); html = "" leert ihn
+  function setExtra(opts, html, wire) {
+    if (current !== opts) return;
+    var box = panel.querySelector(".tour-extra");
+    box.innerHTML = html || "";
+    if (wire && html) wire(box);
+  }
+  // Inhalte einer offenen Leiste ändern (Titel, Kennzahlen, Profil …); Zusatzbereich bleibt
+  function update(opts, fields) {
+    if (current !== opts) return;
+    Object.keys(fields).forEach(function (k) { opts[k] = fields[k]; });
+    open(opts);
+  }
+
+  G.tourView = { open: open, close: close, setPhotos: setPhotos, setExtra: setExtra, update: update,
+    isOpen: function () { return !panel.hidden; } };
 
   // ---------- Listen: Anzahl, Gesamt-km, Jahr, Suche ----------
 
@@ -103,7 +120,7 @@
   }
 
   function head(kind, items, opts) {
-    var f = filters[kind] || (filters[kind] = { year: "", q: "", search: false });
+    var f = filters[kind] || (filters[kind] = { year: "", q: "", search: false, kind: "" });
     var years = {};
     items.forEach(function (it) { var y = opts.yearOf(it); if (y) years[y] = true; });
     var ys = Object.keys(years).sort().reverse();
@@ -111,6 +128,7 @@
     var q = f.q.trim().toLowerCase();
     var shown = items.filter(function (it) {
       if (f.year && String(opts.yearOf(it)) !== f.year) return false;
+      if (f.kind && opts.kindOf && opts.kindOf(it) !== f.kind) return false;
       if (q && String(opts.nameOf(it) || "").toLowerCase().indexOf(q) < 0) return false;
       return true;
     });
@@ -122,6 +140,10 @@
           '<option value="">Alle Jahre</option>' +
           ys.map(function (y) { return '<option value="' + y + '"' + (f.year === y ? " selected" : "") + ">" + y + "</option>"; }).join("") +
         "</select>" +
+        (opts.kinds ? '<select class="list-kind" aria-label="Art" title="Art">' +
+          '<option value="">Alle Arten</option>' +
+          opts.kinds.map(function (k) { return '<option value="' + k[0] + '"' + (f.kind === k[0] ? " selected" : "") + ">" + k[1] + "</option>"; }).join("") +
+          "</select>" : "") +
         (opts.tools || "") +
         '<button type="button" class="icon-btn list-find' + (f.search || f.q ? " on" : "") + '" title="Nach Namen suchen" aria-label="Nach Namen suchen">' + G.icon("search") + "</button>" +
       "</div>" +
@@ -132,6 +154,8 @@
   function wire(box, kind, rerender) {
     var f = filters[kind];
     if (!f) return;
+    var ks = box.querySelector(".list-kind");
+    if (ks) ks.addEventListener("change", function () { f.kind = ks.value; rerender(); });
     var sel = box.querySelector(".list-year");
     if (sel) sel.addEventListener("change", function () { f.year = sel.value; rerender(); });
     var btn = box.querySelector(".list-find");
