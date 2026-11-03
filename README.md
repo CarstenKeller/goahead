@@ -50,7 +50,10 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   - **Grenze:** Eine Web-App zeichnet nur auf, solange sie sichtbar ist. Die App hält deshalb den Bildschirm an
     (Screen Wake Lock), sofern der Browser das kann; sonst erscheint ein Hinweis.
 - **Untere Leisten ziehen:** Planungsfeld und Unterwegs-Feld lassen sich am Griff oben größer oder kleiner ziehen
-  (Höhe wird gespeichert).
+  (Höhe wird gespeichert). Alle unteren Leisten legen sich über Positions-Knopf, Maßstab und Quellenangabe,
+  ohne sie zu verschieben.
+- **Oberfläche:** leicht transparente „Glas“-Flächen mit Unschärfe, einheitlich über Design-Variablen in `styles.css`.
+  Browser ohne Unschärfe-Unterstützung bekommen automatisch weniger durchsichtige Flächen.
 - **Einstellungen:** Zoom-Knöpfe ein/aus (wird gespeichert), App-Version, Link zur Diagnose.
 - Positions-Knopf (unten rechts): Die Karte folgt der Position (Knopf blau). Im Folgemodus wird um die eigene
   Position gezoomt. Verschieben der Karte oder Zoomen auf einen GPX-Track beendet das Folgen, ein Tipp auf den
@@ -157,6 +160,7 @@ Einmalig nötig: unter *Settings → Pages → Build and deployment → Source* 
 
 ## Dateien
 
+- `CLAUDE.md`: Arbeitsregeln für Änderungen (UI-Grundregeln, Versionen, Speicher, Tests)
 - `index.html`, `styles.css`, `app.js`: die App
 - `tracks.js`: Seite *Tracks*, GPX-Import, lokale Speicherung, Track-Liste
 - `planner.js`: Route planen (Routing, Suche, Planungsfeld), Liste *Geplant*, GPX-Export

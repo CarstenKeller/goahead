@@ -1,19 +1,86 @@
+/* =====================================================================
+   GoAhead – Stylesheet
+   Aufbau:
+     1. Design-Variablen (Farben, Glas-Flächen, Radien, Ebenen)
+     2. Grundlagen
+     3. Bedienelemente auf der Karte (Menü, Leiste, Positions-Knopf, Leaflet)
+     4. Untere Leisten (.sheet): Infofenster, Planen, Unterwegs
+     5. Inhalte der Leisten
+     6. Seite „Tracks“, Listen
+     7. Dialoge
+     8. Kartenmarker
+     9. Sonstiges (Diagnose)
+   Regeln (siehe auch CLAUDE.md):
+     - Farben/Flächen nur über die Variablen aus Abschnitt 1.
+     - Untere Leisten liegen ÜBER der Karte und ihren Bedienelementen
+       (Positions-Knopf, Maßstab, Quellenangabe). Sie verschieben nichts.
+     - Ebenen (z-index) nur über die --z-*-Variablen.
+   ===================================================================== */
+
+/* ---------- 1. Design-Variablen ---------- */
 :root {
-  --accent: #2e6b30;
-  --accent-active: #1f5fbf;
-  --btn-bg: #ffffff;
-  --btn-fg: #333333;
-  --status-bg: rgba(0, 0, 0, 0.75);
-  --status-fg: #ffffff;
+  /* Farben */
+  --c-text: #1d2125;
+  --c-muted: #5f6b75;
+  --c-line: rgba(0, 0, 0, 0.08);
+  --c-accent: #2e7d32;          /* Grün: bestätigen, aktiv */
+  --c-accent-soft: rgba(46, 125, 50, 0.12);
+  --c-blue: #1c6dd0;            /* Position, Aufzeichnung, Speichern */
+  --c-blue-soft: rgba(28, 109, 208, 0.12);
+  --c-danger: #c62828;
+  --c-danger-soft: rgba(198, 40, 40, 0.1);
+  --c-route: #c2255c;           /* geplante Route */
+  --c-candidate: #f08c00;       /* Vorschlag */
+  --c-start: #2f9e44;
+
+  /* Glas-Flächen (leicht transparent mit Unschärfe) */
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-strong: rgba(255, 255, 255, 0.86);
+  --glass-dark: rgba(28, 31, 35, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --glass-blur: blur(18px) saturate(170%);
+  --btn-soft: rgba(0, 0, 0, 0.06);
+  --btn-soft-hover: rgba(0, 0, 0, 0.1);
+
+  /* Formen */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-up: 0 -6px 24px rgba(0, 0, 0, 0.14);
+  --ctrl: 52px;                 /* Größe der runden Kartenknöpfe */
+
+  /* Ebenen */
+  --z-map-ctrl: 1000;           /* Positions-Knopf, Status, Leaflet-Bedienelemente */
+  --z-toolbar: 1100;
+  --z-menu: 1200;
+  --z-sheet: 1400;              /* Planen, Unterwegs */
+  --z-info: 1500;               /* Infofenster (liegt über Planen/Unterwegs) */
+  --z-page: 2500;               /* Vollbildseiten */
+  --z-dialog: 3000;
+
+  --info-height: 34vh;          /* Standardhöhe Infofenster (per Ziehen änderbar) */
 }
 
+/* Ohne Unschärfe-Unterstützung: Flächen weniger durchsichtig, damit Text lesbar bleibt */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass: rgba(255, 255, 255, 0.94);
+    --glass-strong: rgba(255, 255, 255, 0.97);
+    --glass-dark: rgba(28, 31, 35, 0.92);
+  }
+}
+
+/* ---------- 2. Grundlagen ---------- */
 html, body {
   margin: 0;
   padding: 0;
   height: 100%;
   overflow: hidden;
   background: #e8e8e8;
+  color: var(--c-text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
   /* Verhindert Browser-Zoom/Scroll, damit die Gesten bei der Karte ankommen */
   touch-action: none;
   overscroll-behavior: none;
@@ -24,50 +91,126 @@ html, body {
   inset: 0;
 }
 
-/* Größere Bedienelemente für die Benutzung mit Handschuhen / im Gelände */
-.leaflet-touch .leaflet-bar a {
-  width: 44px;
-  height: 44px;
-  line-height: 44px;
-  font-size: 24px;
-}
-.leaflet-touch .leaflet-control-layers-toggle {
-  width: 48px;
-  height: 48px;
-}
-.leaflet-control-layers-expanded {
-  font-size: 16px;
-  padding: 8px 12px;
-}
-.leaflet-control-layers label {
-  padding: 6px 0;
+button {
+  font: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.leaflet-top.leaflet-left,
-.leaflet-top.leaflet-right {
-  margin-top: env(safe-area-inset-top);
+/* Gemeinsame Glas-Fläche */
+.menu-btn,
+.map-btn,
+.toolbar .leaflet-bar,
+.toolbar .leaflet-control-layers,
+.leaflet-control-zoom.leaflet-bar,
+.sheet,
+.page,
+.dlg,
+#diagnose,
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
 }
 
+/* Weiche Knöpfe in Leisten, Seiten und Dialogen */
+.sheet button,
+.page button,
+.dlg button {
+  border: none;
+  border-radius: var(--r-sm);
+  background: var(--btn-soft);
+  padding: 11px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.sheet button:active,
+.page button:active,
+.dlg button:active {
+  transform: scale(0.97);
+}
+.sheet button:disabled,
+.dlg button:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+
+/* Knopf-Varianten */
+.btn-primary,
+.plan-confirm,
+.dlg-ok,
+.dlg-action.primary,
+.nav-pause.on {
+  background: var(--c-accent) !important;
+  color: #ffffff !important;
+}
+.btn-danger,
+.plan-del,
+.nav-end,
+.dlg-action.danger {
+  background: var(--c-danger-soft) !important;
+  color: var(--c-danger) !important;
+}
+.plan-save {
+  background: var(--c-blue-soft) !important;
+  color: var(--c-blue) !important;
+}
+.plan-round.on {
+  background: var(--c-route) !important;
+  color: #ffffff !important;
+}
+
+/* Eingabefelder */
+.sheet input[type="search"],
+.sheet input[type="text"],
+.dlg-input {
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.75);
+  padding: 10px 12px;
+  font-size: 16px;   /* verhindert Auto-Zoom auf iOS */
+  color: var(--c-text);
+  outline: none;
+}
+.sheet input:focus,
+.dlg-input:focus {
+  border-color: var(--c-blue);
+  box-shadow: 0 0 0 3px var(--c-blue-soft);
+}
+.sheet select {
+  border: 1px solid var(--c-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 5px 6px;
+  font-size: 13px;
+  color: var(--c-text);
+}
+
+/* ---------- 3. Bedienelemente auf der Karte ---------- */
+
+/* Positions-Knopf (unten rechts) */
 .map-btn {
   position: absolute;
   right: calc(12px + env(safe-area-inset-right));
   bottom: calc(40px + env(safe-area-inset-bottom));
-  z-index: 1000;
+  z-index: var(--z-map-ctrl);
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  border: none;
-  background: var(--btn-bg);
-  color: var(--btn-fg);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--glass-border);
+  color: #333333;
+  box-shadow: var(--shadow);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
 }
 .map-btn.following {
-  color: var(--accent-active);
+  color: var(--c-blue);
 }
 .map-btn.waiting svg {
   animation: pulse 1.2s ease-in-out infinite;
@@ -76,395 +219,35 @@ html, body {
   50% { opacity: 0.3; }
 }
 
-#status {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  top: calc(12px + env(safe-area-inset-top));
-  z-index: 1000;
-  max-width: calc(100% - 140px);
-  padding: 8px 14px;
-  border-radius: 8px;
-  background: var(--status-bg);
-  color: var(--status-fg);
-  font-size: 14px;
-  text-align: center;
-}
-
-/* Positionsmarker: blauer Punkt mit weißem Rand */
-.pos-dot {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--accent-active);
-  border: 3px solid #ffffff;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
-  box-sizing: border-box;
-}
-
-/* Diagnose-Anzeige (?diagnose) */
-#diagnose {
-  position: absolute;
-  inset: calc(10px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom)) 10px;
-  z-index: 2000;
-  background: #ffffff;
-  color: #222222;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
-  padding: 10px;
-  overflow: auto;
-  touch-action: pan-x pan-y;
-}
-#diagnose pre {
-  font-size: 12px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  user-select: text;
-  -webkit-user-select: text;
-}
-#diagnose button {
-  font-size: 16px;
-  padding: 8px 14px;
-  margin-right: 8px;
-}
-
-/* Regler für die Größe der Wegemarkierungen */
-.size-control {
-  background: #ffffff;
-}
-.leaflet-touch .size-control a.size-toggle {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #333333;
-}
-.size-panel {
-  padding: 10px 12px;
-  width: 220px;
-  font-size: 15px;
-}
-.size-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-}
-.size-row input[type="range"] {
-  flex: 1;
-  height: 32px;
-}
-.size-row output {
-  min-width: 48px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.size-note {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #666666;
-}
-
-/* Infofenster beim Antippen eines Weges */
-.fi-popup .leaflet-popup-content {
-  margin: 12px 14px;
-  font-size: 14px;
-}
-.fi-feature {
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #dddddd;
-}
-.fi-type {
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-.fi table {
-  border-collapse: collapse;
-  width: 100%;
-}
-.fi th, .fi td {
-  text-align: left;
-  vertical-align: top;
-  padding: 2px 6px 2px 0;
-  word-break: break-word;
-}
-.fi th {
-  font-weight: normal;
-  color: #666666;
-  white-space: nowrap;
-}
-.fi-error {
-  color: #b00020;
-}
-.fi-raw {
-  margin: 6px 0 0;
-  font-size: 12px;
-}
-.fi-details {
-  margin-top: 8px;
-  font-size: 12px;
-}
-.fi-details pre {
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-size: 11px;
-  max-height: 200px;
-  overflow: auto;
-  background: #f4f4f4;
-  padding: 6px;
-  user-select: text;
-  -webkit-user-select: text;
-}
-.fi-source {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #2e6b30;
-  margin: 6px 0 4px;
-}
-.fi-extra {
-  margin-top: 4px;
-  font-size: 12px;
-}
-
-/* Festes Infofenster im unteren Drittel, volle Breite */
-:root {
-  --info-height: 34vh;
-}
-#info-panel {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: var(--info-height);
-  z-index: 1500;
-  background: #ffffff;
-  color: #222222;
-  border-radius: 14px 14px 0 0;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
-  display: flex;
-  flex-direction: column;
-  padding-bottom: env(safe-area-inset-bottom);
-}
-#info-panel[hidden] {
-  display: none;
-}
-.info-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 8px 6px 16px;
-  border-bottom: 1px solid #e3e3e3;
-  flex: none;
-}
-.info-title {
-  font-weight: 600;
-  font-size: 15px;
-}
-#info-close {
-  width: 44px;
-  height: 44px;
-  border: none;
-  background: transparent;
-  font-size: 30px;
-  line-height: 1;
-  color: #555555;
-  cursor: pointer;
-}
-#info-body {
-  flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
-  padding: 8px 16px 12px;
-  font-size: 15px;
-}
-
-/* Positions-Knopf und Kartenleiste bleiben an ihrem Platz; das Infofenster liegt darüber (z-index 1500) */
-
-/* Markierung der Tippstelle */
-.tap-dot {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 3px solid #e8590c;
-  background: rgba(232, 89, 12, 0.25);
-  box-sizing: border-box;
-}
-.tap-dot.searching {
-  animation: tap-pulse 0.9s ease-in-out infinite;
-}
-@keyframes tap-pulse {
-  50% { transform: scale(1.5); opacity: 0.4; }
-}
-.fi table {
-  table-layout: fixed;
-}
-.fi th {
-  width: 38%;
-  white-space: normal;
-}
-
-/* Ziehgriff am Infofenster */
-.info-head {
-  position: relative;
-  touch-action: none;
-  cursor: ns-resize;
-  padding-top: 14px;
-  user-select: none;
-  -webkit-user-select: none;
-}
-.info-grip {
-  position: absolute;
-  top: 5px;
-  left: 50%;
-  width: 44px;
-  height: 5px;
-  margin-left: -22px;
-  border-radius: 3px;
-  background: #c4c4c4;
-}
-#info-panel.dragging {
-  transition: none;
-}
-.fi-type {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.fi-symbol {
-  width: 28px;
-  height: 28px;
-  flex: none;
-}
-
-/* GPX-Tracks */
-.trk-control {
-  background: #ffffff;
-}
-.leaflet-touch .trk-control a.trk-toggle {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.trk-panel {
-  width: min(320px, calc(100vw - 90px));
-  max-height: 60vh;
-  overflow-y: auto;
-  padding: 10px 12px;
-  font-size: 15px;
-  touch-action: pan-y;
-}
-.trk-title {
-  font-weight: 600;
-}
-.trk-import {
-  display: block;
-  width: 100%;
-  margin: 8px 0;
-  padding: 10px;
-  font-size: 15px;
-  border: 1px solid #1971c2;
-  border-radius: 6px;
-  background: #e7f1fb;
-  color: #0b4f8a;
-  cursor: pointer;
-}
-.trk-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 0;
-  border-top: 1px solid #eeeeee;
-}
-.trk-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-.trk-main input {
-  width: 22px;
-  height: 22px;
-  flex: none;
-}
-.trk-swatch {
-  width: 6px;
-  align-self: stretch;
-  border-radius: 3px;
-  flex: none;
-}
-.trk-text {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.trk-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.trk-info {
-  font-size: 12px;
-  color: #666666;
-}
-.trk-actions {
-  display: flex;
-  flex: none;
-}
-.trk-actions button {
-  width: 38px;
-  height: 38px;
-  border: none;
-  background: transparent;
-  font-size: 18px;
-  cursor: pointer;
-}
-.trk-empty, .trk-note {
-  font-size: 13px;
-  color: #666666;
-  margin: 6px 0 0;
-}
-.trk-src {
-  font-size: 12px;
-  color: #666666;
-}
-
-/* Hamburger-Menü und einfahrende Leiste mit Funktionsknöpfen */
+/* Hamburger-Menü */
 .menu-btn {
   position: absolute;
   top: calc(12px + env(safe-area-inset-top));
   right: calc(12px + env(safe-area-inset-right));
-  z-index: 1200;
-  width: 52px;
-  height: 52px;
-  border: none;
-  border-radius: 10px;
-  background: #ffffff;
+  z-index: var(--z-menu);
+  width: var(--ctrl);
+  height: var(--ctrl);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-md);
   color: #333333;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
+  transition: background 0.2s, color 0.2s;
 }
 .menu-btn[aria-expanded="true"] {
-  background: #2e6b30;
+  background: var(--c-accent);
   color: #ffffff;
 }
+
+/* Einfahrende Leiste mit den Funktionsknöpfen */
 .toolbar {
   position: absolute;
   top: calc(76px + env(safe-area-inset-top));
   right: calc(12px + env(safe-area-inset-right));
-  z-index: 1100;
+  z-index: var(--z-toolbar);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -486,30 +269,122 @@ html, body {
 .toolbar .settings-control {
   order: 99;        /* Einstellungen immer zuletzt */
 }
-.toolbar.leaflet-touch .leaflet-control-layers-toggle {
-  width: 48px;
-  height: 48px;
-}
-.toolbar .leaflet-control-layers-expanded {
-  max-height: calc(100vh - 160px);
-  overflow-y: auto;
+/* Im Planungs- und Unterwegs-Modus bleibt nur die Kartenwahl */
+.mode-plan .toolbar > :not(.leaflet-control-layers),
+.mode-nav .toolbar > :not(.leaflet-control-layers) {
+  display: none;
 }
 
-/* Einstellungen */
-.settings-control {
-  background: #ffffff;
+/* Leaflet-Bedienelemente als Glas-Knöpfe */
+.toolbar .leaflet-bar,
+.toolbar .leaflet-control-layers,
+.leaflet-control-zoom.leaflet-bar {
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--r-md) !important;
+  box-shadow: var(--shadow) !important;
+  overflow: hidden;
 }
-.leaflet-touch .settings-control a.settings-toggle {
+.leaflet-bar a,
+.leaflet-touch .leaflet-bar a {
+  background: transparent;
+  border-bottom-color: var(--c-line);
+  color: #333333;
+}
+.leaflet-bar a:hover {
+  background: var(--btn-soft-hover);
+}
+.leaflet-touch .leaflet-bar a {
   width: 48px;
   height: 48px;
+  line-height: 48px;
+  font-size: 24px;
+}
+.toolbar.leaflet-touch .leaflet-control-layers-toggle,
+.leaflet-touch .leaflet-control-layers-toggle {
+  width: 50px;
+  height: 50px;
+}
+.toolbar .leaflet-bar > a:first-child {
   display: flex;
   align-items: center;
   justify-content: center;
 }
+.leaflet-control-layers-expanded {
+  font-size: 16px;
+  padding: 10px 14px;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+  color: var(--c-text);
+}
+.leaflet-control-layers label {
+  padding: 6px 0;
+}
+.leaflet-control-layers-separator {
+  border-top-color: var(--c-line);
+}
+.leaflet-top.leaflet-left,
+.leaflet-top.leaflet-right {
+  margin-top: env(safe-area-inset-top);
+}
+
+/* Maßstab und Quellenangabe dezent */
+.leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.65) !important;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border-top-left-radius: 8px;
+}
+.leaflet-control-scale-line {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+/* Statusmeldung (oben) */
+#status {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(12px + env(safe-area-inset-top));
+  z-index: var(--z-map-ctrl);
+  max-width: calc(100% - 150px);
+  padding: 9px 16px;
+  border-radius: var(--r-md);
+  background: var(--glass-dark);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  color: #ffffff;
+  font-size: 14px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+/* Panels innerhalb der Leiste (Markierungsgröße, Einstellungen) */
+.size-panel,
 .settings-panel {
+  padding: 10px 14px 12px;
   width: min(280px, calc(100vw - 90px));
-  padding: 10px 12px;
   font-size: 15px;
+}
+.size-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.size-row input[type="range"] {
+  flex: 1;
+  height: 32px;
+  accent-color: var(--c-accent);
+}
+.size-row output {
+  min-width: 48px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.size-note,
+.settings-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--c-muted);
 }
 .settings-title {
   font-weight: 600;
@@ -524,27 +399,276 @@ html, body {
 .settings-row input {
   width: 22px;
   height: 22px;
-}
-.settings-note {
-  margin: 8px 0 0;
-  font-size: 12px;
-  color: #666666;
+  accent-color: var(--c-accent);
 }
 
-/* Wegzeichen: Höhe fest, Breite nach Seitenverhältnis (TFIS-Zeichen sind nicht immer quadratisch) */
+/* ---------- 4. Untere Leisten (.sheet) ----------
+   Gemeinsames Verhalten: volle Breite unten, über der Karte und ihren Bedienelementen,
+   Kopf mit Ziehgriff (.sheet-handle + .sheet-grip), Inhalt scrollt (.sheet-body). */
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-sheet);
+  display: flex;
+  flex-direction: column;
+  max-height: 60vh;
+  color: var(--c-text);
+  border-top: 1px solid var(--glass-border);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  box-shadow: var(--shadow-up);
+  padding-bottom: env(safe-area-inset-bottom);
+  font-size: 15px;
+}
+.sheet[hidden] {
+  display: none;
+}
+.sheet-handle {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 16px 12px 8px 16px;
+  touch-action: none;
+  cursor: ns-resize;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.sheet-grip {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 40px;
+  height: 5px;
+  margin-left: -20px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.22);
+}
+.sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding: 2px 16px 12px;
+}
+
+#info-panel {
+  z-index: var(--z-info);
+  height: var(--info-height);
+  max-height: none;
+}
+.info-title,
+.plan-title,
+.nav-title {
+  font-weight: 650;
+  font-size: 16px;
+}
+#info-close {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 400;
+  color: var(--c-muted);
+}
+
+/* ---------- 5. Inhalte der Leisten ---------- */
+
+/* Infofenster (Wege an dieser Stelle) */
+.fi-source {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--c-accent);
+  font-weight: 600;
+  margin: 8px 0 6px;
+}
+.fi-feature {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--c-line);
+}
+.fi-type {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 650;
+  margin-bottom: 6px;
+}
+/* Wegzeichen: Höhe fest, Breite nach Seitenverhältnis */
 .fi-symbol {
   width: auto;
   height: 32px;
   max-width: 72px;
+  flex: none;
+}
+.fi table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+}
+.fi th, .fi td {
+  text-align: left;
+  vertical-align: top;
+  padding: 3px 6px 3px 0;
+  word-break: break-word;
+}
+.fi th {
+  width: 38%;
+  font-weight: normal;
+  color: var(--c-muted);
+}
+.fi-error {
+  color: var(--c-danger);
+}
+.fi-raw {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+.fi-extra,
+.fi-details {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.fi-details pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 11px;
+  max-height: 200px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  padding: 8px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
-/* ---------- Eigene Seite (z. B. Tracks) ---------- */
+/* Planen */
+.plan-dirty {
+  color: var(--c-route);
+  font-weight: normal;
+  font-size: 13px;
+}
+.plan-exit,
+.plan-new {
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+}
+.plan-search {
+  display: flex;
+  gap: 6px;
+}
+.plan-search input {
+  flex: 1;
+  min-width: 0;
+}
+.plan-search button {
+  width: 46px;
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.plan-results {
+  margin-top: 4px;
+}
+.plan-result {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin-top: 4px;
+  font-weight: 400 !important;
+  font-size: 14px !important;
+}
+.plan-hint {
+  margin: 6px 0;
+  font-size: 13px;
+  color: var(--c-muted);
+}
+.plan-credit {
+  margin: 4px 0;
+  font-size: 11px;
+  color: var(--c-muted);
+}
+.plan-status {
+  margin: 10px 0;
+  font-size: 14px;
+  min-height: 2.6em;
+}
+.plan-actions,
+.nav-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.plan-confirm {
+  flex: 1 1 100%;
+}
+.plan-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--c-muted);
+}
+.plan-profile {
+  max-width: 50%;
+}
+
+/* Unterwegs */
+.nav-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: center;
+}
+.nav-stats > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 4px;
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--c-line);
+}
+.nav-val {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.nav-lbl {
+  font-size: 12px;
+  color: var(--c-muted);
+}
+.nav-state {
+  font-size: 13px;
+  color: var(--c-muted);
+  margin: 10px 0;
+}
+.nav-actions button {
+  flex: 1;
+  padding: 13px 8px;
+  font-size: 16px;
+}
+
+/* ---------- 6. Seite „Tracks“ und Listen ---------- */
 .page {
   position: absolute;
   inset: 0;
-  z-index: 2500;
-  background: #ffffff;
-  color: #222222;
+  z-index: var(--z-page);
+  background: var(--glass-strong);
+  color: var(--c-text);
   display: flex;
   flex-direction: column;
   padding-top: env(safe-area-inset-top);
@@ -557,196 +681,235 @@ html, body {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 12px 6px 4px;
+  padding: 8px 12px 4px 6px;
   flex: none;
 }
 .page-head h1 {
-  font-size: 20px;
+  font-size: 22px;
+  font-weight: 700;
   margin: 0;
 }
-.page-back {
-  width: 48px;
-  height: 48px;
-  border: none;
+.page .page-back {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
   background: transparent;
-  color: #333333;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
 }
+/* Reiter als Segment-Schalter */
 .page-tabs {
   display: flex;
-  border-bottom: 1px solid #dddddd;
+  gap: 4px;
+  margin: 6px 16px 8px;
+  padding: 4px;
+  border-radius: var(--r-md);
+  background: rgba(0, 0, 0, 0.06);
   flex: none;
 }
-.page-tabs button {
+.page .page-tabs button {
   flex: 1;
-  padding: 12px 6px;
-  border: none;
-  border-bottom: 3px solid transparent;
+  padding: 9px 6px;
   background: transparent;
-  font-size: 16px;
-  color: #555555;
-  cursor: pointer;
+  border-radius: var(--r-sm);
+  color: var(--c-muted);
+  font-size: 15px;
 }
-.page-tabs button.active {
-  color: #2e6b30;
-  border-bottom-color: #2e6b30;
-  font-weight: 600;
+.page .page-tabs button.active {
+  background: #ffffff;
+  color: var(--c-text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
 }
 .page-body {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
-  padding: 8px 16px 16px;
+  padding: 4px 16px 16px;
   font-size: 15px;
 }
-
-/* ---------- Route planen ---------- */
-.mode-plan .toolbar > :not(.leaflet-control-layers) {
-  display: none;
-}
-#plan-panel {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1400;
-  background: #ffffff;
-  color: #222222;
-  border-radius: 14px 14px 0 0;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
-  padding: 8px 12px calc(10px + env(safe-area-inset-bottom));
-  font-size: 15px;
-  max-height: 60vh;
-  overflow-y: auto;
-}
-#plan-panel[hidden] {
-  display: none;
-}
-.mode-plan .map-btn {
-  bottom: calc(var(--plan-h, 220px) + 12px);
-}
-.mode-plan .leaflet-bottom {
-  bottom: var(--plan-h, 220px);
-}
-.plan-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-.plan-title {
-  font-weight: 600;
-  font-size: 16px;
-}
-.plan-exit, .plan-new {
-  padding: 8px 12px;
-  border: 1px solid #bbbbbb;
-  border-radius: 6px;
-  background: #ffffff;
-  font-size: 14px;
-  cursor: pointer;
-}
-.plan-search {
-  display: flex;
-  gap: 6px;
-}
-.plan-search input {
-  flex: 1;
-  min-width: 0;
-  padding: 9px 10px;
-  font-size: 16px;   /* verhindert Auto-Zoom auf iOS */
-  border: 1px solid #bbbbbb;
-  border-radius: 6px;
-}
-.plan-search button {
-  width: 44px;
-  border: 1px solid #bbbbbb;
-  border-radius: 6px;
-  background: #f4f4f4;
-  color: #333333;
-  cursor: pointer;
-}
-.plan-results {
-  margin-top: 4px;
-}
-.plan-result {
+.page .trk-import {
   display: block;
   width: 100%;
-  text-align: left;
-  padding: 8px 6px;
-  border: none;
-  border-bottom: 1px solid #eeeeee;
-  background: transparent;
-  font-size: 14px;
-  cursor: pointer;
+  margin: 4px 0 10px;
+  background: var(--c-blue-soft);
+  color: var(--c-blue);
 }
-.plan-hint, .plan-credit {
-  margin: 4px 0;
-  font-size: 13px;
-  color: #666666;
-}
-.plan-credit {
-  font-size: 11px;
-}
-.plan-status {
-  margin: 8px 0;
-  font-size: 14px;
-  color: #333333;
-  min-height: 2.6em;
-}
-.plan-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.plan-actions button {
-  padding: 10px 12px;
-  font-size: 15px;
-  border-radius: 6px;
-  border: 1px solid #bbbbbb;
-  background: #ffffff;
-  cursor: pointer;
-}
-.plan-confirm {
-  flex: 1 1 100%;
-  background: #2f9e44 !important;
-  border-color: #2f9e44 !important;
-  color: #ffffff;
-  font-weight: 600;
-}
-.plan-confirm:disabled {
-  background: #b2d8bb !important;
-  border-color: #b2d8bb !important;
-}
-.plan-round.on {
-  background: #c2255c !important;
-  border-color: #c2255c !important;
-  color: #ffffff;
-}
-.plan-foot {
+
+/* Listeneinträge (GPX, Geplant, Erwandert) */
+.trk-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--c-line);
+}
+.trk-tap {
+  cursor: pointer;
+}
+.trk-tap:active {
+  background: rgba(255, 255, 255, 0.95);
+}
+.trk-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.trk-main input {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  accent-color: var(--c-accent);
+}
+.trk-swatch {
+  width: 6px;
+  align-self: stretch;
+  border-radius: 3px;
+  flex: none;
+}
+.trk-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.trk-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trk-info {
+  font-size: 12px;
+  color: var(--c-muted);
+}
+.trk-actions {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+.page .trk-actions button {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  background: transparent;
+  font-size: 18px;
+}
+.trk-more {
+  font-size: 26px;
+  color: var(--c-muted);
+  padding: 0 4px;
+}
+.trk-empty,
+.trk-note {
+  font-size: 13px;
+  color: var(--c-muted);
+  margin: 8px 0 0;
+}
+.trk-src {
+  font-size: 12px;
+  color: var(--c-muted);
+}
+
+/* ---------- 7. Dialoge ---------- */
+.dlg-back {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  background: rgba(0, 0, 0, 0.28);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.dlg {
+  background: var(--glass-strong);
+  color: var(--c-text);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  padding: 18px;
+  width: min(420px, 100%);
+  box-shadow: var(--shadow);
+  font-size: 16px;
+}
+.dlg-sheet {
+  align-self: flex-end;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  margin-top: 8px;
-  font-size: 13px;
-  color: #444444;
+  margin-bottom: env(safe-area-inset-bottom);
 }
-.plan-profile {
-  font-size: 13px;
-  padding: 4px;
-  max-width: 50%;
+.dlg-title {
+  font-weight: 700;
+  font-size: 17px;
 }
+.dlg-sub {
+  font-size: 13px;
+  color: var(--c-muted);
+  margin-bottom: 4px;
+}
+.dlg-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 10px 0 14px;
+}
+.dlg-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.dlg .dlg-action {
+  text-align: left;
+  padding: 13px 16px;
+  font-size: 16px;
+}
+
+/* ---------- 8. Kartenmarker ---------- */
+
+/* Eigene Position */
+.pos-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--c-blue);
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 0 6px rgba(28, 109, 208, 0.18), 0 1px 4px rgba(0, 0, 0, 0.4);
+  box-sizing: border-box;
+}
+
+/* Tippstelle bei der Wege-Abfrage */
+.tap-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 3px solid var(--c-candidate);
+  background: rgba(240, 140, 0, 0.25);
+  box-sizing: border-box;
+}
+.tap-dot.searching,
+.plan-pt-loading {
+  animation: tap-pulse 0.9s ease-in-out infinite;
+}
+@keyframes tap-pulse {
+  50% { transform: scale(1.5); opacity: 0.4; }
+}
+
+/* Routenpunkte beim Planen */
 .plan-pt {
   width: 28px;
   height: 28px;
   border-radius: 50%;
   border: 3px solid #ffffff;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -754,252 +917,46 @@ html, body {
   color: #ffffff;
   font: 700 12px/1 system-ui, sans-serif;
 }
-.plan-pt-start { background: #2f9e44; }
-.plan-pt-mid { background: #c2255c; }
-.plan-pt-last { background: #c2255c; outline: 3px solid rgba(194, 37, 92, 0.35); }
-.plan-pt-cand { background: #f08c00; font-size: 16px; }
-.plan-pt-loading { animation: tap-pulse 0.9s ease-in-out infinite; }
-.plan-pop button {
-  margin-top: 6px;
-  padding: 8px 12px;
-  font-size: 15px;
-  border: 1px solid #b00020;
-  border-radius: 6px;
-  background: #fff5f5;
-  color: #b00020;
-  cursor: pointer;
-}
-.plan-control {
-  background: #ffffff;
-}
-.toolbar .plan-control a.plan-toggle {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.plan-pt-sel {
-  background: #1c7ed6;
-  outline: 4px solid rgba(28, 126, 214, 0.35);
-  transform: scale(1.15);
-}
-.plan-dirty {
-  color: #c2255c;
-  font-weight: normal;
-  font-size: 13px;
-}
-.plan-actions button:disabled {
-  opacity: 0.45;
-}
-.plan-del {
-  border-color: #b00020 !important;
-  color: #b00020;
-  background: #fff5f5 !important;
-}
-.plan-save {
-  border-color: #1971c2 !important;
-  color: #0b4f8a;
-  background: #e7f1fb !important;
+.plan-pt-start { background: var(--c-start); }
+.plan-pt-mid { background: var(--c-route); }
+.plan-pt-last { background: var(--c-route); outline: 3px solid rgba(194, 37, 92, 0.35); }
+.plan-pt-sel { background: var(--c-blue); outline: 4px solid rgba(28, 109, 208, 0.35); transform: scale(1.15); }
+.plan-pt-cand { background: var(--c-candidate); font-size: 16px; }
+
+/* Popups (z. B. Wegpunkte aus GPX) */
+.leaflet-popup-content-wrapper {
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow);
+  color: var(--c-text);
 }
 
-/* Ziehbare untere Leisten (Planen, Unterwegs) */
-.sheet-handle {
-  position: relative;
-  touch-action: none;
-  cursor: ns-resize;
-  user-select: none;
-  -webkit-user-select: none;
-  padding-top: 12px;
-}
-.sheet-grip {
+/* ---------- 9. Sonstiges ---------- */
+
+/* Diagnose-Anzeige (?diagnose) */
+#diagnose {
   position: absolute;
-  top: 0;
-  left: 50%;
-  width: 44px;
-  height: 5px;
-  margin-left: -22px;
-  border-radius: 3px;
-  background: #c4c4c4;
+  inset: calc(10px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom)) 10px;
+  z-index: var(--z-dialog);
+  background: var(--glass-strong);
+  color: var(--c-text);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  padding: 12px;
+  overflow: auto;
+  touch-action: pan-x pan-y;
 }
-#plan-panel {
-  display: flex;
-  flex-direction: column;
-}
-#plan-panel > :not(.plan-head) {
-  flex: none;
-}
-
-/* Dialoge */
-.dlg-back {
-  position: fixed;
-  inset: 0;
-  z-index: 3000;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-}
-.dlg {
-  background: #ffffff;
-  color: #222222;
-  border-radius: 12px;
-  padding: 16px;
-  width: min(420px, 100%);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
-  font-size: 16px;
-}
-.dlg-sheet {
-  align-self: flex-end;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: env(safe-area-inset-bottom);
-}
-.dlg-title {
-  font-weight: 600;
-  font-size: 17px;
-  margin-bottom: 4px;
-}
-.dlg-sub {
-  font-size: 13px;
-  color: #666666;
-  margin-bottom: 6px;
-}
-.dlg-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 10px;
-  font-size: 16px;
-  border: 1px solid #bbbbbb;
-  border-radius: 6px;
-  margin: 8px 0 12px;
-}
-.dlg-buttons {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-.dlg-buttons button, .dlg-action {
-  padding: 12px 14px;
-  font-size: 16px;
-  border-radius: 8px;
-  border: 1px solid #cccccc;
-  background: #ffffff;
-  cursor: pointer;
-  text-align: left;
-}
-.dlg-ok, .dlg-action.primary {
-  background: #2f9e44;
-  border-color: #2f9e44;
-  color: #ffffff;
-  font-weight: 600;
-}
-.dlg-action.danger {
-  color: #b00020;
-  border-color: #e3a0a8;
-}
-.trk-tap {
-  cursor: pointer;
-}
-.trk-more {
-  font-size: 26px;
-  color: #999999;
-  padding: 0 6px;
-}
-#plan-panel .plan-head {
-  position: sticky;
-  top: -8px;
-  background: #ffffff;
-  z-index: 1;
-  margin-top: -8px;
-  padding-bottom: 4px;
-}
-
-/* ---------- Unterwegs (Navigationsmodus) ---------- */
-.mode-nav .toolbar > :not(.leaflet-control-layers) {
-  display: none;
-}
-#nav-panel {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1400;
-  background: #ffffff;
-  color: #222222;
-  border-radius: 14px 14px 0 0;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
-  padding: 0 12px calc(10px + env(safe-area-inset-bottom));
-  font-size: 15px;
-  max-height: 60vh;
-  overflow-y: auto;
-}
-#nav-panel[hidden] {
-  display: none;
-}
-.mode-nav .map-btn {
-  bottom: calc(var(--nav-h, 190px) + 12px);
-}
-.mode-nav .leaflet-bottom {
-  bottom: var(--nav-h, 190px);
-}
-.nav-head {
-  position: sticky;
-  top: 0;
-  background: #ffffff;
-  padding-bottom: 6px;
-  z-index: 1;
-}
-.nav-title {
-  font-weight: 600;
-  font-size: 16px;
-}
-.nav-stats {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  text-align: center;
-}
-.nav-stats > div {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-.nav-val {
-  font-size: 22px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.nav-lbl {
+#diagnose pre {
   font-size: 12px;
-  color: #666666;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+  -webkit-user-select: text;
 }
-.nav-state {
-  font-size: 13px;
-  color: #444444;
-  margin: 8px 0;
-}
-.nav-actions {
-  display: flex;
-  gap: 6px;
-}
-.nav-actions button {
-  flex: 1;
-  padding: 12px 8px;
+#diagnose button {
   font-size: 16px;
-  border-radius: 8px;
-  border: 1px solid #bbbbbb;
-  background: #ffffff;
-  cursor: pointer;
-}
-.nav-pause.on {
-  background: #2f9e44;
-  border-color: #2f9e44;
-  color: #ffffff;
-}
-.nav-end {
-  border-color: #b00020 !important;
-  color: #b00020;
+  padding: 8px 14px;
+  margin-right: 8px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: var(--btn-soft);
 }

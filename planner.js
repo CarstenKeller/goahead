@@ -521,6 +521,7 @@
 
   var panel = document.createElement("section");
   panel.id = "plan-panel";
+  panel.className = "sheet";
   panel.hidden = true;
   panel.setAttribute("aria-label", "Route planen");
   panel.innerHTML =
@@ -529,6 +530,7 @@
       '<span class="plan-title"><span class="plan-name">Route planen</span><span class="plan-dirty" hidden> · ungespeichert</span></span>' +
       '<button type="button" class="plan-exit">Beenden</button>' +
     "</div>" +
+    '<div class="sheet-body">' +
     '<form class="plan-search" autocomplete="off">' +
       '<input type="search" enterkeyhint="search" placeholder="Adresse oder Koordinaten (auch UTM 32)">' +
       '<button type="submit" aria-label="Suchen">' +
@@ -549,14 +551,14 @@
     '<div class="plan-foot">' +
       '<span class="plan-sum"></span>' +
       '<select class="plan-profile" aria-label="Routing-Profil"></select>' +
+    "</div>" +
     "</div>";
   document.body.appendChild(panel);
   L.DomEvent.disableClickPropagation(panel);
   L.DomEvent.disableScrollPropagation(panel);
   // Kopf des Planungsfelds ziehen: größer/kleiner, um mehr Karte zu sehen
-  G.makeResizable(panel, panel.querySelector(".plan-head"), "goahead.planHeight.v1", function (h) {
-    document.documentElement.style.setProperty("--plan-h", h + "px");
-  });
+  // (Die Leiste liegt über Positions-Knopf und Quellenangabe – diese werden nicht verschoben.)
+  G.makeResizable(panel, panel.querySelector(".plan-head"), "goahead.planHeight.v1");
 
   var el = {
     name: panel.querySelector(".plan-name"),
@@ -678,8 +680,6 @@
       if (t.lines) parts.push(t.lines + "× Luftlinie");
       el.sum.textContent = parts.join(" · ");
     }
-    // Höhe des Planungsfelds für die darüber liegenden Bedienelemente
-    if (!panel.hidden) document.documentElement.style.setProperty("--plan-h", panel.offsetHeight + "px");
   }
 
   // ---------- Speichern und „Geplant“ ----------

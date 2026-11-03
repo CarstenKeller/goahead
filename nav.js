@@ -148,6 +148,7 @@
 
   var panel = document.createElement("section");
   panel.id = "nav-panel";
+  panel.className = "sheet";
   panel.hidden = true;
   panel.setAttribute("aria-label", "Unterwegs");
   panel.innerHTML =
@@ -155,6 +156,7 @@
       '<span class="sheet-grip" aria-hidden="true"></span>' +
       '<span class="nav-title"></span>' +
     "</div>" +
+    '<div class="sheet-body">' +
     '<div class="nav-stats">' +
       '<div><span class="nav-val nav-dist">0,00 km</span><span class="nav-lbl">gewandert</span></div>' +
       '<div><span class="nav-val nav-time">0:00:00</span><span class="nav-lbl">unterwegs</span></div>' +
@@ -165,13 +167,13 @@
       '<button type="button" class="nav-pause">⏸ Pause</button>' +
       '<button type="button" class="nav-center">◎ Position</button>' +
       '<button type="button" class="nav-end">■ Beenden</button>' +
+    "</div>" +
     "</div>";
   document.body.appendChild(panel);
   L.DomEvent.disableClickPropagation(panel);
   L.DomEvent.disableScrollPropagation(panel);
-  G.makeResizable(panel, panel.querySelector(".nav-head"), "goahead.navHeight.v1", function (h) {
-    document.documentElement.style.setProperty("--nav-h", h + "px");
-  });
+  // (Die Leiste liegt über Positions-Knopf und Quellenangabe – diese werden nicht verschoben.)
+  G.makeResizable(panel, panel.querySelector(".nav-head"), "goahead.navHeight.v1");
 
   var el = {
     title: panel.querySelector(".nav-title"),
@@ -207,7 +209,6 @@
     if (!walk.paused && wakeLockOk === true) msg += " Der Bildschirm bleibt an.";
     if (!walk.paused && wakeLockOk === false) msg += " Hinweis: Bildschirm nicht ausschalten und die App nicht verlassen – sonst stoppt die Aufzeichnung.";
     el.state.textContent = msg;
-    if (!panel.hidden) document.documentElement.style.setProperty("--nav-h", panel.offsetHeight + "px");
   }
 
   var ticker = null;
