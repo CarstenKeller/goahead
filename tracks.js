@@ -248,7 +248,7 @@
       if (imported.length) {
         records = records.concat(imported);
         imported.forEach(function (rec, i) { showTrack(rec, i === imported.length - 1); });
-        if (G.closeMenu) G.closeMenu();
+        closePage();
         requestPersistentStorage();
       }
       renderList();
@@ -271,7 +271,6 @@
   // ---------- Bedienelement: Liste der Tracks ----------
 
   var listEl = null;
-  var panelEl = null;
 
   function formatKm(m) {
     return (m / 1000).toFixed(1).replace(".", ",") + " km";
@@ -339,7 +338,7 @@
         renderList();
       }
       showTrack(rec, true);
-      panelEl.hidden = true;
+      closePage();
       if (G.closeMenu) G.closeMenu();
     } else if (act === "download" && e.type === "click") {
       var blob = new Blob([rec.gpx], { type: "application/gpx+xml" });
@@ -361,63 +360,119 @@
     }
   }
 
+  // ---------- Eigene Seite „Tracks“ mit Reitern GPX / Geplant / Erwandert ----------
+
+  var TAB_KEY = "goahead.tracksTab.v1";
+  var pageEl = null;
+
+  function buildPage() {
+    pageEl = document.createElement("section");
+    pageEl.id = "tracks-page";
+    pageEl.className = "page";
+    pageEl.hidden = true;
+    pageEl.setAttribute("aria-label", "Tracks");
+    pageEl.innerHTML =
+      '<header class="page-head">' +
+        '<button type="button" class="page-back" aria-label="Zurück zur Karte">' +
+          '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        "</button>" +
+        "<h1>Tracks</h1>" +
+      "</header>" +
+      '<nav class="page-tabs" role="tablist">' +
+        '<button type="button" role="tab" data-tab="gpx">GPX</button>' +
+        '<button type="button" role="tab" data-tab="planned">Geplant</button>' +
+        '<button type="button" role="tab" data-tab="walked">Erwandert</button>' +
+      "</nav>" +
+      '<div class="page-body">' +
+        '<div class="page-panel" data-panel="gpx" role="tabpanel">' +
+          '<button type="button" class="trk-import">GPX importieren …</button>' +
+          '<input type="file" multiple hidden>' +
+          '<div class="trk-list"></div>' +
+          '<p class="trk-note">Tracks werden nur auf diesem Gerät gespeichert.</p>' +
+        "</div>" +
+        '<div class="page-panel" data-panel="planned" role="tabpanel" hidden>' +
+          '<p class="trk-empty">Hier erscheinen geplante Routen. Was genau hier hineinkommt, legen wir noch fest.</p>' +
+        "</div>" +
+        '<div class="page-panel" data-panel="walked" role="tabpanel" hidden>' +
+          '<p class="trk-empty">Hier erscheinen erwanderte Strecken. Was genau hier hineinkommt, legen wir noch fest.</p>' +
+        "</div>" +
+      "</div>";
+    document.body.appendChild(pageEl);
+
+    var input = pageEl.querySelector('input[type="file"]');
+    // Viele Android-Dateiauswahlen kennen keinen GPX-Typ; daher großzügig
+    input.accept = ".gpx,application/gpx+xml,application/xml,text/xml,application/octet-stream";
+    pageEl.querySelector(".trk-import").addEventListener("click", function () { input.click(); });
+    input.addEventListener("change", function () {
+      importFiles(input.files).then(function () { input.value = ""; });
+    });
+
+    listEl = pageEl.querySelector(".trk-list");
+    listEl.addEventListener("change", onListAction);
+    listEl.addEventListener("click", onListAction);
+
+    pageEl.querySelector(".page-back").addEventListener("click", closePage);
+    pageEl.querySelector(".page-tabs").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-tab]");
+      if (b) selectTab(b.getAttribute("data-tab"));
+    });
+
+    var tab = "gpx";
+    try { tab = window.localStorage.getItem(TAB_KEY) || "gpx"; } catch (e) { /* Standard */ }
+    selectTab(tab);
+    renderList();
+  }
+
+  function selectTab(tab) {
+    if (!pageEl.querySelector('[data-panel="' + tab + '"]')) tab = "gpx";
+    pageEl.querySelectorAll("[data-tab]").forEach(function (b) {
+      var on = b.getAttribute("data-tab") === tab;
+      b.setAttribute("aria-selected", on ? "true" : "false");
+      b.classList.toggle("active", on);
+    });
+    pageEl.querySelectorAll("[data-panel]").forEach(function (p) {
+      p.hidden = p.getAttribute("data-panel") !== tab;
+    });
+    try { window.localStorage.setItem(TAB_KEY, tab); } catch (e) { /* egal */ }
+  }
+
+  function openPage(tab) {
+    if (G.closeMenu) G.closeMenu();
+    if (tab) selectTab(tab);
+    pageEl.hidden = false;
+  }
+
+  function closePage() {
+    pageEl.hidden = true;
+  }
+
+  buildPage();
+
   var TracksControl = L.Control.extend({
-    options: { position: "topright" },
     onAdd: function () {
       var box = L.DomUtil.create("div", "leaflet-bar trk-control");
       var btn = L.DomUtil.create("a", "trk-toggle", box);
       btn.href = "#";
       btn.setAttribute("role", "button");
-      btn.title = "GPX-Tracks";
-      btn.setAttribute("aria-label", "GPX-Tracks");
+      btn.title = "Tracks";
+      btn.setAttribute("aria-label", "Tracks");
       btn.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">' +
         '<path d="M3 19c3-1 3-6 6-7s5 3 8 1 2-7 4-8" fill="none" stroke="#1971c2" stroke-width="2.5" stroke-linecap="round"/>' +
         '<circle cx="3" cy="19" r="2" fill="#333"/><circle cx="21" cy="5" r="2" fill="#333"/></svg>';
-
-      panelEl = L.DomUtil.create("div", "trk-panel", box);
-      panelEl.hidden = true;
-      var head = L.DomUtil.create("div", "trk-head", panelEl);
-      head.innerHTML = '<span class="trk-title">GPX-Tracks</span>';
-
-      var input = document.createElement("input");
-      input.type = "file";
-      input.multiple = true;
-      // Viele Android-Dateiauswahlen kennen keinen GPX-Typ; daher großzügig
-      input.accept = ".gpx,application/gpx+xml,application/xml,text/xml,application/octet-stream";
-      input.hidden = true;
-      panelEl.appendChild(input);
-
-      var importBtn = L.DomUtil.create("button", "trk-import", panelEl);
-      importBtn.type = "button";
-      importBtn.textContent = "GPX importieren …";
-      importBtn.addEventListener("click", function () { input.click(); });
-      input.addEventListener("change", function () {
-        importFiles(input.files).then(function () { input.value = ""; });
-      });
-
-      listEl = L.DomUtil.create("div", "trk-list", panelEl);
-      listEl.addEventListener("change", onListAction);
-      listEl.addEventListener("click", onListAction);
-
-      var note = L.DomUtil.create("p", "trk-note", panelEl);
-      note.textContent = "Tracks werden nur auf diesem Gerät gespeichert.";
-
       L.DomEvent.on(btn, "click", function (e) {
         L.DomEvent.preventDefault(e);
-        panelEl.hidden = !panelEl.hidden;
+        openPage();
       });
       L.DomEvent.disableClickPropagation(box);
-      L.DomEvent.disableScrollPropagation(box);
-      map.on("click", function () { panelEl.hidden = true; });
-      renderList();
       return box;
     }
   });
   if (G.addToToolbar) {
-    G.addToToolbar(new TracksControl(), function () { if (panelEl) panelEl.hidden = true; });
+    G.addToToolbar(new TracksControl());
   } else {
     new TracksControl().addTo(map);
   }
+  G.openTracksPage = openPage;
 
   // ---------- Beim Start gespeicherte Tracks laden ----------
 

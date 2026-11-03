@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "14";
+  var APP_VERSION = "15";
   var STORAGE_KEY = "goahead.view.v1";
 
   // ---------- kleine Helfer ----------
@@ -1161,6 +1161,12 @@
     });
   }
 
+  var mapClickHandler = null;
+  function setMapClickHandler(fn) {
+    mapClickHandler = fn || null;
+    if (fn) closeInfoPanel();
+  }
+
   // Einzelnes Antippen abfragen, Doppeltipp (Zoom) dagegen nicht
   var clickTimer = null;
   map.on("click", function (e) {
@@ -1169,7 +1175,11 @@
       closeMenu();
       return;
     }
-    clickTimer = setTimeout(function () { queryFeatureInfo(e.latlng); }, 300);
+    clickTimer = setTimeout(function () {
+      // Ein Modul (z. B. die Routenplanung) kann Kartentipps übernehmen
+      if (mapClickHandler) mapClickHandler(e);
+      else queryFeatureInfo(e.latlng);
+    }, 300);
   });
   map.on("dblclick zoomstart", function () { clearTimeout(clickTimer); });
 
@@ -1322,7 +1332,11 @@
     escapeHtml: escapeHtml,
     stopFollowing: stopFollowing,
     addToToolbar: addToToolbar,
-    closeMenu: closeMenu
+    closeMenu: closeMenu,
+    openMenu: openMenu,
+    setMapClickHandler: setMapClickHandler,
+    closeInfoPanel: function () { infoRequest++; closeInfoPanel(); },
+    getPosition: function () { return lastPos; }
   };
 
   // ---------- Service Worker (App-Hülle offline verfügbar) ----------

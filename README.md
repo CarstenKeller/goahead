@@ -9,7 +9,24 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
 - Gesten: mit einem Finger verschieben, mit zwei Fingern zoomen, doppelt tippen zum Vergrößern. Die +/−-Knöpfe
   lassen sich in den Einstellungen einblenden (Standard: aus).
 - **Menü** (☰ oben rechts): Eine Leiste mit den Funktionsknöpfen fährt von rechts ein: Kartenwahl,
-  Größe der Wegemarkierungen, GPX-Tracks, Einstellungen. Ein Tipp auf die Karte schließt das Menü.
+  Größe der Wegemarkierungen, Tracks, Route planen, Einstellungen. Ein Tipp auf die Karte schließt das Menü.
+- **Route planen** (Knopf mit Routen-Symbol im Menü), Modul `planner.js`:
+  - Im Planungsmodus bleibt im Menü nur die Kartenwahl. Unten erscheint das Planungsfeld.
+  - Suche: Adresse (Nominatim/OpenStreetMap) oder Koordinaten: Dezimalgrad (`51.758, 9.030`, auch mit
+    Dezimalkomma oder vertauscht) oder UTM Zone 32 wie in TIM-online (`32U 494000 5735000` oder `494000 5735000`).
+    Koordinaten setzen direkt einen Vorschlagspunkt.
+  - Tipp auf die Karte setzt einen Vorschlagspunkt (orange, verschiebbar). Die Strecke vom letzten bestätigten Punkt
+    erscheint orange gestrichelt. „Punkt übernehmen“ rastet ihn ein, er wird zum Ausgangspunkt für den nächsten.
+  - „📍 Hier“ nimmt die eigene GPS-Position als Vorschlagspunkt.
+  - Tipp auf einen Routenpunkt → „Punkt löschen“; Vorgänger und Nachfolger werden neu verbunden.
+  - „Rundtour“ verbindet den letzten Punkt mit dem Startpunkt (wieder ausschaltbar).
+  - Routing-Profil: *Wandern* (BRouter, Profil `hiking-mountain`, Rückfall OSRM), *Fußweg* (OSRM der FOSSGIS,
+    Rückfall BRouter) oder *Luftlinie*. Findet kein Dienst einen Weg, wird die Luftlinie genommen und gestrichelt gezeigt.
+  - Anzeige: Punkte, Länge, Anstieg (nur bei BRouter), Zahl der Luftlinien-Abschnitte.
+  - Die laufende Planung wird lokal gespeichert und ist nach einem Neustart wieder da. „Neu“ verwirft sie.
+    Speichern als „Geplant“ ist noch offen.
+- **Tracks** (Knopf mit Linien-Symbol im Menü): eigene Seite mit den Reitern *GPX*, *Geplant*, *Erwandert*.
+  *Geplant* und *Erwandert* sind noch Platzhalter.
 - **Einstellungen:** Zoom-Knöpfe ein/aus (wird gespeichert), App-Version, Link zur Diagnose.
 - Positions-Knopf (unten rechts): Die Karte folgt der Position (Knopf blau). Im Folgemodus wird um die eigene
   Position gezoomt. Verschieben der Karte oder Zoomen auf einen GPX-Track beendet das Folgen, ein Tipp auf den
@@ -46,7 +63,7 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     Dadurch wird es etwas unschärfer. Möglicherweise blendet der Server dann Inhalte aus, die er nur bei
     feineren Maßstäben zeigt.
   - OSM (Waymarked Trails): nur 100/200/400 %. Es werden Kacheln einer gröberen Zoomstufe vergrößert angezeigt.
-- **GPX-Tracks** (Knopf mit Linien-Symbol oben rechts):
+- **GPX-Tracks** (Reiter *GPX* auf der Seite *Tracks*):
   - Eine oder mehrere GPX-Dateien importieren. Gelesen werden Tracks, Routen und Wegpunkte.
   - Gespeichert wird die Original-Datei lokal im Browser (IndexedDB), sie ist auch nach einem Neustart
     wieder da. Je Track: ein-/ausblenden (Zustand wird gespeichert), hinzoomen, GPX herunterladen, löschen.
@@ -63,6 +80,14 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
 - Die App lässt sich zum Startbildschirm hinzufügen. Die App-Hülle funktioniert dann auch offline, die Kartenkacheln **noch nicht**.
 
 ## Kartendienste und Lizenz
+
+Routing und Suche (ohne API-Schlüssel; die Dienste sind kostenlos, aber nur für maßvolle Nutzung gedacht):
+
+| Zweck | Dienst | Geprüft |
+|---|---|---|
+| Routing Wandern | BRouter `https://brouter.de/brouter` (`lonlats`, `profile=hiking-mountain`, `format=geojson`) | Parameter, Antwortformat und CORS im Quelltext github.com/abrensch/brouter |
+| Routing Fußweg | OSRM der FOSSGIS `https://routing.openstreetmap.de/routed-foot/route/v1/driving/…` | so von openstreetmap.org verwendet (Quelltext openstreetmap-website) |
+| Adresssuche | Nominatim `https://nominatim.openstreetmap.org/search` | Standard-API; nur auf Knopfdruck, max. 1 Anfrage/s |
 
 | Karte | Dienst | Lizenz |
 |---|---|---|
@@ -103,7 +128,8 @@ Einmalig nötig: unter *Settings → Pages → Build and deployment → Source* 
 ## Dateien
 
 - `index.html`, `styles.css`, `app.js`: die App
-- `tracks.js`: GPX-Import, lokale Speicherung, Track-Liste
+- `tracks.js`: Seite *Tracks*, GPX-Import, lokale Speicherung, Track-Liste
+- `planner.js`: Route planen (Routing, Suche, Planungsfeld)
 - `config.js`: Kartendienste, Startansicht, Zoomstufe
 - `sw.js`, `manifest.webmanifest`, `icons/`: PWA (installierbar, App-Hülle offline)
 - `vendor/leaflet/`: Leaflet 1.9.4 (BSD-2-Clause), lokal eingebunden

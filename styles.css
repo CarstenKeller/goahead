@@ -537,3 +537,245 @@ html, body {
   height: 32px;
   max-width: 72px;
 }
+
+/* ---------- Eigene Seite (z. B. Tracks) ---------- */
+.page {
+  position: absolute;
+  inset: 0;
+  z-index: 2500;
+  background: #ffffff;
+  color: #222222;
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.page[hidden] {
+  display: none;
+}
+.page-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px 6px 4px;
+  flex: none;
+}
+.page-head h1 {
+  font-size: 20px;
+  margin: 0;
+}
+.page-back {
+  width: 48px;
+  height: 48px;
+  border: none;
+  background: transparent;
+  color: #333333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.page-tabs {
+  display: flex;
+  border-bottom: 1px solid #dddddd;
+  flex: none;
+}
+.page-tabs button {
+  flex: 1;
+  padding: 12px 6px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  font-size: 16px;
+  color: #555555;
+  cursor: pointer;
+}
+.page-tabs button.active {
+  color: #2e6b30;
+  border-bottom-color: #2e6b30;
+  font-weight: 600;
+}
+.page-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  padding: 8px 16px 16px;
+  font-size: 15px;
+}
+
+/* ---------- Route planen ---------- */
+.mode-plan .toolbar > :not(.leaflet-control-layers) {
+  display: none;
+}
+#plan-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1400;
+  background: #ffffff;
+  color: #222222;
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+  padding: 8px 12px calc(10px + env(safe-area-inset-bottom));
+  font-size: 15px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+#plan-panel[hidden] {
+  display: none;
+}
+.mode-plan .map-btn {
+  bottom: calc(var(--plan-h, 220px) + 12px);
+}
+.mode-plan .leaflet-bottom {
+  bottom: var(--plan-h, 220px);
+}
+.plan-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.plan-title {
+  font-weight: 600;
+  font-size: 16px;
+}
+.plan-exit, .plan-new {
+  padding: 8px 12px;
+  border: 1px solid #bbbbbb;
+  border-radius: 6px;
+  background: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+}
+.plan-search {
+  display: flex;
+  gap: 6px;
+}
+.plan-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 10px;
+  font-size: 16px;   /* verhindert Auto-Zoom auf iOS */
+  border: 1px solid #bbbbbb;
+  border-radius: 6px;
+}
+.plan-search button {
+  width: 44px;
+  border: 1px solid #bbbbbb;
+  border-radius: 6px;
+  background: #f4f4f4;
+  color: #333333;
+  cursor: pointer;
+}
+.plan-results {
+  margin-top: 4px;
+}
+.plan-result {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 6px;
+  border: none;
+  border-bottom: 1px solid #eeeeee;
+  background: transparent;
+  font-size: 14px;
+  cursor: pointer;
+}
+.plan-hint, .plan-credit {
+  margin: 4px 0;
+  font-size: 13px;
+  color: #666666;
+}
+.plan-credit {
+  font-size: 11px;
+}
+.plan-status {
+  margin: 8px 0;
+  font-size: 14px;
+  color: #333333;
+  min-height: 2.6em;
+}
+.plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.plan-actions button {
+  padding: 10px 12px;
+  font-size: 15px;
+  border-radius: 6px;
+  border: 1px solid #bbbbbb;
+  background: #ffffff;
+  cursor: pointer;
+}
+.plan-confirm {
+  flex: 1 1 100%;
+  background: #2f9e44 !important;
+  border-color: #2f9e44 !important;
+  color: #ffffff;
+  font-weight: 600;
+}
+.plan-confirm:disabled {
+  background: #b2d8bb !important;
+  border-color: #b2d8bb !important;
+}
+.plan-round.on {
+  background: #c2255c !important;
+  border-color: #c2255c !important;
+  color: #ffffff;
+}
+.plan-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #444444;
+}
+.plan-profile {
+  font-size: 13px;
+  padding: 4px;
+  max-width: 50%;
+}
+.plan-pt {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font: 700 12px/1 system-ui, sans-serif;
+}
+.plan-pt-start { background: #2f9e44; }
+.plan-pt-mid { background: #c2255c; }
+.plan-pt-last { background: #c2255c; outline: 3px solid rgba(194, 37, 92, 0.35); }
+.plan-pt-cand { background: #f08c00; font-size: 16px; }
+.plan-pt-loading { animation: tap-pulse 0.9s ease-in-out infinite; }
+.plan-pop button {
+  margin-top: 6px;
+  padding: 8px 12px;
+  font-size: 15px;
+  border: 1px solid #b00020;
+  border-radius: 6px;
+  background: #fff5f5;
+  color: #b00020;
+  cursor: pointer;
+}
+.plan-control {
+  background: #ffffff;
+}
+.toolbar .plan-control a.plan-toggle {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
