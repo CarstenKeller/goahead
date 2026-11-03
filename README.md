@@ -101,6 +101,12 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   km, ↑/↓, Gehzeit und Profil. „⋯“ öffnet das Menü der Tour, „✕“ schließt und entfernt die Linie.
 - **Listen *Geplant* und *Erwandert*:** oben Anzahl und Gesamt-km der angezeigten Touren, Filter nach Jahr
   und Namenssuche (Lupe).
+- **Erwandert → Liste prüfen** (Knopf mit Haken): findet vermutlich *doppelte* Touren (gleicher Tag, Start auf
+  ~100 m, Länge auf 200 m) und vermutlich *geplante* Touren, die beim Import unter „Erwandert“ gelandet sind
+  (keine Zeitstempel, oder Zeiten ohne Pausen und ohne festen Aufnahmetakt – typisch für berechnete Zeiten einer
+  Planung). Die Treffer werden erst angezeigt (mit Begründung), dann auf Wunsch gelöscht bzw. nach „Geplant“
+  verschoben. Die Erkennung „geplant“ ist eine Heuristik, an echten komoot-Daten nicht geprüft. Einzelne Touren
+  lassen sich auch über ihr Menü nach „Geplant“ verschieben. Eigene GoAhead-Aufnahmen gelten nie als geplant.
 - **Untere Leisten ziehen:** Planungsfeld und Unterwegs-Feld lassen sich am Griff oben größer oder kleiner ziehen
   (Höhe wird gespeichert). Alle unteren Leisten legen sich über Positions-Knopf, Maßstab und Quellenangabe,
   ohne sie zu verschieben.

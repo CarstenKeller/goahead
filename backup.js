@@ -507,5 +507,11 @@
     });
   }
 
-  G.backup = { save: save, restore: restore, importFiles: importFiles, parse: parse, unzip: unzip };
+  // Erwanderte Tour als geplante Route (z. B. falsch einsortierte komoot-Planung)
+  function walkToRoute(w) {
+    return toRoute({ name: w.name, lines: w.segments, length: w.distance, key: w.importKey || ("walk|" + w.id),
+      fileName: w.importedFrom || "", metaTime: null, t0: Date.parse(w.startedAt) || null });
+  }
+
+  G.backup = { save: save, restore: restore, importFiles: importFiles, parse: parse, unzip: unzip, walkToRoute: walkToRoute };
 })();

@@ -1288,6 +1288,7 @@ button {
   background: var(--glass-strong);
   color: var(--c-text);
 }
+.page .list-check.on,
 .page .list-find.on {
   background: var(--c-accent-soft);
   color: var(--c-accent);
@@ -1313,4 +1314,20 @@ button {
 .rec-toggle svg {
   width: 26px;
   height: 26px;
+}
+
+/* Listenprüfung: Hinweiszeile mit Aktion */
+.list-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 6px 6px 6px 12px;
+  border-radius: var(--r-sm);
+  background: var(--c-accent-soft);
+  font-size: 14px;
+  font-weight: 600;
+}
+.list-note > span {
+  flex: 1;
 }

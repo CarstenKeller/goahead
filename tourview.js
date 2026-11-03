@@ -97,7 +97,10 @@
 
   var filters = {};   // kind -> {year, q, search}
 
-  function km(m) { return (m / 1000).toFixed(1).replace(".", ","); }
+  function km(m) {
+    var k = m / 1000;
+    return k >= 100 ? Math.round(k).toLocaleString("de-DE") : k.toFixed(1).replace(".", ",");
+  }
 
   function head(kind, items, opts) {
     var f = filters[kind] || (filters[kind] = { year: "", q: "", search: false });
@@ -119,6 +122,7 @@
           '<option value="">Alle Jahre</option>' +
           ys.map(function (y) { return '<option value="' + y + '"' + (f.year === y ? " selected" : "") + ">" + y + "</option>"; }).join("") +
         "</select>" +
+        (opts.tools || "") +
         '<button type="button" class="icon-btn list-find' + (f.search || f.q ? " on" : "") + '" title="Nach Namen suchen" aria-label="Nach Namen suchen">' + G.icon("search") + "</button>" +
       "</div>" +
       (f.search || f.q ? '<input type="search" class="list-q" placeholder="Name …" value="' + esc(f.q) + '">' : "");

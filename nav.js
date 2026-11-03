@@ -765,13 +765,24 @@
       box.innerHTML = '<p class="trk-empty">Noch keine erwanderten Touren.</p>';
       return;
     }
-    var hd = G.listTools ? G.listTools.head("walks", walks, {
+    var base = check && check.mode ? walks.filter(function (w) { return check[check.mode][w.id]; }) : walks;
+    var hd = G.listTools ? G.listTools.head("walks", base, {
       yearOf: function (w) { return new Date(w.startedAt).getFullYear(); },
       metersOf: function (w) { return w.distance; },
-      nameOf: function (w) { return w.name; }
-    }) : { html: "", items: walks };
-    box.innerHTML = hd.html + hd.items.map(function (w) {
+      nameOf: function (w) { return w.name; },
+      tools: '<button type="button" class="icon-btn list-check' + (check && check.mode ? " on" : "") +
+        '" title="Liste prüfen (Doppelte, vermutlich geplante)" aria-label="Liste prüfen">' + G.icon("check") + "</button>"
+    }) : { html: "", items: base };
+    var note = "";
+    if (check && check.mode) {
+      var n = Object.keys(check[check.mode]).length;
+      note = '<div class="list-note"><span>' + (check.mode === "dups" ? n + " vermutlich doppelt" : n + " vermutlich geplant") + "</span>" +
+        '<button type="button" class="list-check-act">' + (check.mode === "dups" ? "Doppelte löschen" : "Nach „Geplant“ verschieben") + "</button>" +
+        '<button type="button" class="icon-btn list-check-off" title="Prüfung beenden" aria-label="Prüfung beenden">' + G.icon("close") + "</button></div>";
+    }
+    box.innerHTML = hd.html + note + hd.items.map(function (w) {
       var info = [km(w.distance), duration(w.movingMs)];
+      if (check && check.mode === "planned" && check.why[w.id]) info.push(check.why[w.id]);
       if (w.ascent) info.push("↑ ca. " + Math.round(w.ascent) + " m");
       info.push(new Date(w.startedAt).toLocaleDateString("de-DE"));
       return '<div class="trk-item trk-tap" role="button" tabindex="0" data-id="' + esc(w.id) + '">' +
@@ -781,6 +792,103 @@
         '</div><span class="trk-more" aria-hidden="true">›</span></div>';
     }).join("");
     if (G.listTools) G.listTools.wire(box, "walks", renderWalks);
+    var cb = box.querySelector(".list-check");
+    if (cb) cb.addEventListener("click", function (e) { e.stopPropagation(); runCheck(); });
+    var off = box.querySelector(".list-check-off");
+    if (off) off.addEventListener("click", function (e) { e.stopPropagation(); check = null; renderWalks(); });
+    var act = box.querySelector(".list-check-act");
+    if (act) act.addEventListener("click", function (e) { e.stopPropagation(); applyCheck(); });
+  }
+
+  // ---------- Liste prüfen: Doppelte und vermutlich geplante Touren ----------
+  //
+  // Doppelt: gleicher Tag, gleicher Start (auf ~100 m) und gleiche Länge (auf 200 m). Behalten wird die erste.
+  // Vermutlich geplant (Heuristik, nicht sicher – daher erst anzeigen, dann auf Wunsch verschieben):
+  //   - keine Zeitstempel, oder
+  //   - keine Pausen (Anteil der Zeit unter 0,3 m/s < 1 %) UND kein gleichmäßiger Aufnahmetakt (häufigster
+  //     Abstand zwischen zwei Punkten < 30 % aller Abstände). Aufzeichnungen haben meist einen festen Takt
+  //     und Stillstände; berechnete Zeiten einer Planung (z. B. aus komoot) nicht. Annahme, an echten Daten ungeprüft.
+  var check = null;   // {dups: {id:1}, planned: {id:1}, why: {id: Text}, mode: "dups"|"planned"}
+
+  function walkStats(w) {
+    var total = 0, stop = 0, n = 0, timed = 0, pts = 0;
+    var dts = {};
+    w.segments.forEach(function (s) {
+      for (var i = 0; i < s.length; i++) {
+        pts++;
+        if (s[i][3] != null) timed++;
+        if (!i || s[i][3] == null || s[i - 1][3] == null) continue;
+        var dt = (s[i][3] - s[i - 1][3]) / 1000;
+        if (dt <= 0 || dt > 600) continue;
+        var d = L.latLng(s[i - 1][0], s[i - 1][1]).distanceTo(L.latLng(s[i][0], s[i][1]));
+        total += dt;
+        if (d / dt < 0.3) stop += dt;
+        var k = Math.round(dt);
+        dts[k] = (dts[k] || 0) + 1;
+        n++;
+      }
+    });
+    var mode = 0;
+    Object.keys(dts).forEach(function (k) { if (dts[k] > mode) mode = dts[k]; });
+    return { timedShare: pts ? timed / pts : 0, n: n, stopShare: total ? stop / total : 0, takt: n ? mode / n : 0 };
+  }
+
+  function runCheck() {
+    var seen = {};
+    var dups = {}, planned = {}, why = {};
+    walks.slice().sort(function (a, b) { return a.id < b.id ? -1 : 1; }).forEach(function (w) {
+      var p = w.segments[0] && w.segments[0][0];
+      if (p) {
+        var key = String(w.startedAt).slice(0, 10) + "|" + Math.round((w.distance || 0) / 200) + "|" + p[0].toFixed(3) + "," + p[1].toFixed(3);
+        if (seen[key]) dups[w.id] = 1; else seen[key] = 1;
+      }
+      if (w.free || !w.importKey) return;   // eigene Aufzeichnungen aus GoAhead sind sicher erwandert
+      var st = walkStats(w);
+      if (st.timedShare < 0.5) { planned[w.id] = 1; why[w.id] = "ohne Zeitstempel"; }
+      else if (st.n >= 20 && st.stopShare < 0.01 && st.takt < 0.3) {
+        planned[w.id] = 1;
+        why[w.id] = "Pausen " + Math.round(st.stopShare * 100) + " %, Takt " + Math.round(st.takt * 100) + " %";
+      }
+    });
+    var nd = Object.keys(dups).length, np = Object.keys(planned).length;
+    var kmOf = function (set) { return walks.filter(function (w) { return set[w.id]; }).reduce(function (s, w) { return s + (w.distance || 0); }, 0) / 1000; };
+    var acts = [];
+    if (nd) acts.push({ label: "Doppelte zeigen (" + nd + ", " + num(kmOf(dups), 0) + " km)", primary: true, onClick: function () { check = { dups: dups, planned: planned, why: why, mode: "dups" }; renderWalks(); } });
+    if (np) acts.push({ label: "Vermutlich geplante zeigen (" + np + ", " + num(kmOf(planned), 0) + " km)", primary: !nd, onClick: function () { check = { dups: dups, planned: planned, why: why, mode: "planned" }; renderWalks(); } });
+    G.actionSheet("Liste prüfen", walks.length + " Touren: " + nd + " vermutlich doppelt, " + np + " vermutlich geplant (Zeiten ohne Pausen und ohne festen Aufnahmetakt)." +
+      (nd || np ? " Erst ansehen, dann entscheiden." : ""), acts);
+  }
+
+  function applyCheck() {
+    if (!check || !check.mode) return;
+    var ids = Object.keys(check[check.mode]);
+    if (check.mode === "dups") {
+      G.actionSheet(ids.length + " doppelte Touren löschen?", "Die jeweils erste bleibt erhalten.", [
+        { label: "Löschen", danger: true, onClick: function () {
+          Promise.all(ids.map(function (id) { return G.db.del("walks", id); })).then(function () {
+            check = null;
+            loadWalks();
+            G.showStatus(ids.length + " doppelte Touren gelöscht.", 4000);
+          }).catch(function (err) { G.showStatus("Löschen fehlgeschlagen: " + err.message, 6000); });
+        } }
+      ]);
+    } else {
+      G.actionSheet(ids.length + " Touren nach „Geplant“ verschieben?", "Sie werden zu geplanten Routen (Wegpunkte etwa alle 1 km) und unter „Erwandert“ entfernt.", [
+        { label: "Verschieben", primary: true, onClick: function () { moveToPlanned(walks.filter(function (w) { return check.planned[w.id]; })); } }
+      ]);
+    }
+  }
+
+  function moveToPlanned(list) {
+    if (!G.backup || !G.backup.walkToRoute) return;
+    var recs = list.map(function (w) { return G.backup.walkToRoute(w); });
+    G.db.putMany("routes", recs).then(function () {
+      return Promise.all(list.map(function (w) { return G.db.del("walks", w.id); }));
+    }).then(function () {
+      check = null;
+      window.dispatchEvent(new Event("goahead:data"));
+      G.showStatus(list.length + " Touren nach „Geplant“ verschoben.", 4000);
+    }).catch(function (err) { G.showStatus("Verschieben fehlgeschlagen: " + err.message, 6000); });
   }
 
   function findWalk(id) {
@@ -897,6 +1005,11 @@
       { label: "⬇ GPX exportieren", onClick: function () {
         var fn = G.planner ? G.planner.fileNameFor(w.name) : "tour.gpx";
         G.downloadFile(fn, walkToGpx(w), "application/gpx+xml");
+      } },
+      { label: "⇄ Nach „Geplant“ verschieben", onClick: function () {
+        G.actionSheet("„" + w.name + "“ nach „Geplant“ verschieben?", "Sie wird zur geplanten Route und unter „Erwandert“ entfernt.", [
+          { label: "Verschieben", primary: true, onClick: function () { if (G.tourView) G.tourView.close(); moveToPlanned([w]); } }
+        ]);
       } },
       { label: "🗑 Löschen", danger: true, onClick: function () {
         G.actionSheet("„" + w.name + "“ löschen?", "Die Aufzeichnung wird vom Gerät gelöscht.", [
