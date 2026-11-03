@@ -70,8 +70,10 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   ohne sie zu verschieben.
 - **Oberfläche:** leicht transparente „Glas“-Flächen mit Unschärfe, einheitlich über Design-Variablen in `styles.css`.
   Browser ohne Unschärfe-Unterstützung bekommen automatisch weniger durchsichtige Flächen.
-- **Einstellungen:** Zoom-Knöpfe ein/aus, Gehgeschwindigkeit (Ebene, Steigung, Gefälle in km/h, Schwelle in %),
-  App-Version, Link zur Diagnose. Alles wird gespeichert.
+- **Einstellungen** (Zahnrad im Menü): ziehbare untere Leiste mit scrollbarem Inhalt – Zoom-Knöpfe ein/aus,
+  Gehgeschwindigkeit (Ebene, Steigung, Gefälle in km/h, Schwelle in %), App-Version, Link zur Diagnose.
+  Alles wird gespeichert.
+- **Untere Leisten** lassen sich bis auf ihre Kopfzeile zusammenschieben; der Positions-Knopf sitzt immer darüber.
 - Positions-Knopf (unten rechts): Die Karte folgt der Position (Knopf blau). Im Folgemodus wird um die eigene
   Position gezoomt. Verschieben der Karte oder Zoomen auf einen GPX-Track beendet das Folgen, ein Tipp auf den
   Knopf zentriert wieder.

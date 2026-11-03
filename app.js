@@ -5,7 +5,31 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "22";
+  var APP_VERSION = "23";
+
+  // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
+  var ICONS = {
+    save: '<path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><path d="M8 20v-6h8v6"/>',
+    close: '<path d="M6 6l12 12M18 6L6 18"/>',
+    undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+    redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>',
+    roundtrip: '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/>',
+    search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/>',
+    hiking: '<path d="M3 20l6-10 4 6 2-3 6 7z"/>',
+    road: '<path d="M8 3L5 21M16 3l3 18M12 4v3M12 11v3M12 18v2"/>',
+    pause: '<path d="M8 5v14M16 5v14"/>',
+    play: '<path d="M7 4l13 8-13 8z" fill="currentColor"/>',
+    stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>',
+    locate: '<circle cx="12" cy="12" r="3.5" fill="currentColor"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    chart: '<path d="M3 20h18"/><path d="M4 16l5-6 4 3 7-8"/>',
+    share: '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/>'
+  };
+  function icon(name) {
+    return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || "") + "</svg>";
+  }
+
   var STORAGE_KEY = "goahead.view.v1";
 
   // ---------- kleine Helfer ----------
@@ -326,6 +350,67 @@
   }
   applyZoomButtons();
 
+  // Einstellungen als untere Leiste (ziehbar, Inhalt scrollt) – Knopf in der Menüleiste öffnet sie
+  var settingsSheet = document.createElement("section");
+  settingsSheet.id = "settings-panel";
+  settingsSheet.className = "sheet";
+  settingsSheet.hidden = true;
+  settingsSheet.setAttribute("aria-label", "Einstellungen");
+  (function buildSettingsSheet() {
+    function numRow(key, label, unit, min, max, step) {
+      return '<label class="settings-num"><span>' + label + '</span><input type="number" inputmode="decimal" data-num="' + key +
+        '" min="' + min + '" max="' + max + '" step="' + step + '"><span class="settings-unit">' + unit + "</span></label>";
+    }
+    settingsSheet.innerHTML =
+      '<div class="settings-head sheet-handle">' +
+        '<span class="sheet-grip" aria-hidden="true"></span>' +
+        '<span class="sheet-titles"><span class="settings-title">Einstellungen</span></span>' +
+        '<span class="sheet-head-btns"><button type="button" class="icon-btn settings-close" title="Schließen" aria-label="Schließen">' +
+          icon("close") + "</button></span>" +
+      "</div>" +
+      '<div class="sheet-body">' +
+        '<label class="settings-row"><input type="checkbox" data-setting="zoomButtons"> Zoom-Knöpfe (+/−) anzeigen</label>' +
+        '<div class="settings-sub">Gehgeschwindigkeit (für die Dauer)</div>' +
+        numRow("speedFlat", "Ebene", "km/h", 0.5, 10, 0.1) +
+        numRow("speedUp", "Steigung", "km/h", 0.5, 10, 0.1) +
+        numRow("speedDown", "Gefälle", "km/h", 0.5, 10, 0.1) +
+        numRow("slopePercent", "Steigung/Gefälle ab", "%", 1, 30, 1) +
+        '<p class="settings-note">App-Version ' + APP_VERSION + ' · <a href="?diagnose">Diagnose</a></p>' +
+      "</div>";
+    document.body.appendChild(settingsSheet);
+    L.DomEvent.disableClickPropagation(settingsSheet);
+    L.DomEvent.disableScrollPropagation(settingsSheet);
+    settingsSheet.querySelectorAll("[data-num]").forEach(function (inp) {
+      var key = inp.getAttribute("data-num");
+      inp.value = String(settings[key]);
+      inp.addEventListener("change", function () {
+        var v = parseFloat(String(inp.value).replace(",", "."));
+        var min = parseFloat(inp.min);
+        var max = parseFloat(inp.max);
+        if (isNaN(v)) v = SETTING_DEFAULTS[key];
+        v = Math.min(max, Math.max(min, v));
+        inp.value = String(v);
+        settings[key] = v;
+        saveSettings();
+        settingsListeners.forEach(function (fn) { try { fn(settings); } catch (e) { console.warn(e); } });
+      });
+    });
+    var cb = settingsSheet.querySelector('[data-setting="zoomButtons"]');
+    cb.checked = settings.zoomButtons;
+    cb.addEventListener("change", function () {
+      settings.zoomButtons = cb.checked;
+      saveSettings();
+      applyZoomButtons();
+    });
+    settingsSheet.querySelector(".settings-close").addEventListener("click", function () { settingsSheet.hidden = true; });
+    makeResizable(settingsSheet, settingsSheet.querySelector(".settings-head"), "goahead.settingsHeight.v1");
+  })();
+
+  function openSettings() {
+    closeMenu();
+    settingsSheet.hidden = false;
+  }
+
   var SettingsControl = L.Control.extend({
     onAdd: function () {
       var box = L.DomUtil.create("div", "leaflet-bar settings-control");
@@ -336,53 +421,15 @@
       btn.setAttribute("aria-label", "Einstellungen");
       btn.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">' +
         '<path fill="#444" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>';
-      var panel = L.DomUtil.create("div", "settings-panel", box);
-      panel.hidden = true;
-      function numRow(key, label, unit, min, max, step) {
-        return '<label class="settings-num"><span>' + label + '</span><input type="number" inputmode="decimal" data-num="' + key +
-          '" min="' + min + '" max="' + max + '" step="' + step + '"><span class="settings-unit">' + unit + "</span></label>";
-      }
-      panel.innerHTML = '<div class="settings-title">Einstellungen</div>' +
-        '<label class="settings-row"><input type="checkbox" data-setting="zoomButtons"> Zoom-Knöpfe (+/−) anzeigen</label>' +
-        '<div class="settings-sub">Gehgeschwindigkeit (für die Dauer)</div>' +
-        numRow("speedFlat", "Ebene", "km/h", 0.5, 10, 0.1) +
-        numRow("speedUp", "Steigung", "km/h", 0.5, 10, 0.1) +
-        numRow("speedDown", "Gefälle", "km/h", 0.5, 10, 0.1) +
-        numRow("slopePercent", "Steigung/Gefälle ab", "%", 1, 30, 1) +
-        '<p class="settings-note">App-Version ' + APP_VERSION + ' · <a href="?diagnose">Diagnose</a></p>';
-      panel.querySelectorAll("[data-num]").forEach(function (inp) {
-        var key = inp.getAttribute("data-num");
-        inp.value = String(settings[key]);
-        inp.addEventListener("change", function () {
-          var v = parseFloat(String(inp.value).replace(",", "."));
-          var min = parseFloat(inp.min);
-          var max = parseFloat(inp.max);
-          if (isNaN(v)) v = SETTING_DEFAULTS[key];
-          v = Math.min(max, Math.max(min, v));
-          inp.value = String(v);
-          settings[key] = v;
-          saveSettings();
-          settingsListeners.forEach(function (fn) { try { fn(settings); } catch (e) { console.warn(e); } });
-        });
-      });
-      var cb = panel.querySelector('[data-setting="zoomButtons"]');
-      cb.checked = settings.zoomButtons;
-      cb.addEventListener("change", function () {
-        settings.zoomButtons = cb.checked;
-        saveSettings();
-        applyZoomButtons();
-      });
       L.DomEvent.on(btn, "click", function (e) {
         L.DomEvent.preventDefault(e);
-        panel.hidden = !panel.hidden;
+        openSettings();
       });
-      this._panel = panel;
+      L.DomEvent.disableClickPropagation(box);
       return box;
     }
   });
-  var settingsControl = addToToolbar(new SettingsControl(), function () {
-    if (settingsControl._panel) settingsControl._panel.hidden = true;
-  });
+  addToToolbar(new SettingsControl());
   applySymbolScale(symbolScale);
 
   map.on("baselayerchange", function (e) {
@@ -1426,9 +1473,13 @@
   // Untere Leiste in der Höhe ziehbar machen (Griff = handle; Knöpfe darin bleiben bedienbar).
   // Die Höhe wird als Anteil der Bildschirmhöhe gespeichert. onResize(px) nach jeder Änderung.
   function makeResizable(panel, handle, storageKey, onResize) {
-    var minH = 64;
+    // Mindesthöhe = --sheet-min (Kopfzeile bleibt ganz sichtbar; Positions-Knopf sitzt darüber)
+    function minH() {
+      var v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sheet-min")) || 72;
+      return Math.max(v, handle.offsetHeight || 0);
+    }
     function apply(px) {
-      var h = Math.round(Math.max(minH, Math.min(window.innerHeight * 0.88, px)));
+      var h = Math.round(Math.max(minH(), Math.min(window.innerHeight * 0.88, px)));
       panel.style.height = h + "px";
       panel.style.maxHeight = "none";
       if (onResize) onResize(h);
@@ -1462,29 +1513,6 @@
     handle.addEventListener("pointercancel", end);
   }
 
-  // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil) ----------
-  var ICONS = {
-    save: '<path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><path d="M8 20v-6h8v6"/>',
-    close: '<path d="M6 6l12 12M18 6L6 18"/>',
-    undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
-    redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>',
-    roundtrip: '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/>',
-    search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/>',
-    hiking: '<path d="M3 20l6-10 4 6 2-3 6 7z"/>',
-    road: '<path d="M8 3L5 21M16 3l3 18M12 4v3M12 11v3M12 18v2"/>',
-    pause: '<path d="M8 5v14M16 5v14"/>',
-    play: '<path d="M7 4l13 8-13 8z" fill="currentColor"/>',
-    stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>',
-    locate: '<circle cx="12" cy="12" r="3.5" fill="currentColor"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/>',
-    plus: '<path d="M12 5v14M5 12h14"/>',
-    chart: '<path d="M3 20h18"/><path d="M4 16l5-6 4 3 7-8"/>',
-    share: '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/>'
-  };
-  function icon(name) {
-    return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" ' +
-      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || "") + "</svg>";
-  }
-
   // ---------- Tooltips per langem Druck (Touch zeigt title-Texte sonst nicht an) ----------
   (function () {
     var tip = document.createElement("div");
@@ -1499,11 +1527,12 @@
       clearTimeout(timer);
       tip.hidden = true;
     }
+    var shownAt = 0;
     document.addEventListener("pointerdown", function (e) {
+      shown = false;   // neue Berührung: eine alte Sperre darf nie den nächsten Tipp verschlucken
       if (e.pointerType !== "touch") return;
       var el = e.target.closest("button[title], a[title]");
       if (!el) return;
-      shown = false;
       startX = e.clientX;
       startY = e.clientY;
       clearTimeout(timer);
@@ -1518,6 +1547,7 @@
         tip.style.left = x + "px";
         tip.style.top = y + "px";
         shown = true;
+        shownAt = Date.now();
         setTimeout(hide, 1800);
       }, 450);
     }, true);
@@ -1528,11 +1558,12 @@
     document.addEventListener("pointercancel", hide, true);
     // nach angezeigtem Tooltip den Knopf nicht auslösen
     document.addEventListener("click", function (e) {
-      if (shown) {
-        shown = false;
+      // nur den Klick verschlucken, der direkt zum langen Druck gehört
+      if (shown && Date.now() - shownAt < 4000) {
         e.preventDefault();
         e.stopPropagation();
       }
+      shown = false;
     }, true);
     document.addEventListener("contextmenu", function (e) {
       if (e.target.closest("button[title], a[title]")) e.preventDefault();

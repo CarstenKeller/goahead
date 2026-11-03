@@ -28,13 +28,22 @@ Platz wie möglich:
   (z. B. Vorschlagspunkt erneut antippen = übernehmen; Strecke antippen = Zwischenpunkt; Doppeltipp = Modus wechseln).
   Keinen Knopf für etwas, das auf der Karte direkt geht.
 - Selten gebrauchte Eingaben (z. B. Suche) erst auf Knopfdruck einblenden.
+- **Einstellungen und ähnliche Formulare** sind ebenfalls eine ziehbare `.sheet` mit scrollendem Inhalt –
+  keine Klappfelder in der Menüleiste, die über den Bildschirmrand hinausragen.
+- Globale Ereignis-Abfangungen (z. B. Klick nach Tooltip verschlucken) dürfen nie einen späteren,
+  unabhängigen Tipp blockieren: Zustand bei jeder neuen Berührung zurücksetzen.
 - Das `hidden`-Attribut blendet immer aus (globale Regel `[hidden] { display: none !important }`) –
   nicht mit eigenen `display`-Regeln dagegen arbeiten.
 
-1. **Untere Leisten verschieben nichts.** Alle unteren Leisten (Infofenster, Planen, Unterwegs und
-   künftige) verwenden die Klasse `.sheet` und liegen *über* der Karte und ihren Bedienelementen.
-   Positions-Knopf, Maßstab und Quellenangabe bleiben, wo sie sind – auch beim Ziehen der Leiste.
-   Keine CSS-Regeln, die `.map-btn` oder `.leaflet-bottom` abhängig von einer Leiste verschieben.
+1. **Untere Leisten verschieben nichts.** Alle unteren Leisten (Infofenster, Planen, Unterwegs,
+   Einstellungen und künftige) verwenden die Klasse `.sheet` und liegen *über* der Karte und ihren
+   Bedienelementen. Positions-Knopf, Maßstab und Quellenangabe bleiben, wo sie sind – auch beim Ziehen
+   der Leiste. Keine CSS-Regeln, die `.map-btn` oder `.leaflet-bottom` abhängig von einer Leiste verschieben.
+   **Mindesthöhe und Positions-Knopf:** Jede Leiste lässt sich bis auf ihre Kopfzeile zusammenschieben,
+   nie niedriger: `--sheet-min` (72 px) = Höhe der Kopfzeile (`.sheet-handle` ist genau so hoch).
+   Der Positions-Knopf sitzt fest *oberhalb* dieser Mindesthöhe (`bottom: --sheet-min + 12 px`) und ist
+   bei zusammengeschobener Leiste immer ganz sichtbar. Kopfzeilen-Inhalte dürfen nicht höher als
+   `--sheet-min` werden.
 2. **Leisten-Aufbau:** `<section class="sheet">` → Kopf `.sheet-handle` mit `.sheet-grip`,
    `.sheet-titles` (Titel + Kennzahlen) und `.sheet-head-btns` → Inhalt `.sheet-body` (scrollt).
    Ziehbar machen mit `GOAHEAD.makeResizable(panel, kopf, speicherSchlüssel)`.
@@ -67,6 +76,8 @@ Platz wie möglich:
 - Versionsnummer an **drei Stellen** erhöhen: `?v=` an allen Skript-/CSS-Einbindungen in `index.html`,
   Cache-Name in `sw.js` (`goahead-shell-vN`), `APP_VERSION` in `app.js`.
 - Neue Dateien in `index.html` **und** in die `SHELL`-Liste von `sw.js` aufnehmen.
+- In `app.js` Tabellen/Variablen, die beim Aufbau gebraucht werden (z. B. `ICONS`), vor ihrer ersten
+  Verwendung definieren – Funktionsdeklarationen werden „hochgezogen“, `var`-Werte nicht.
 - README (Funktionsliste, Dateien, Dienste) mitpflegen.
 
 ## Lokaler Speicher (IndexedDB)

@@ -52,6 +52,7 @@
   --shadow: 0 8px 28px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.1);
   --shadow-up: 0 -6px 24px rgba(0, 0, 0, 0.14);
   --ctrl: 52px;                 /* Größe der runden Kartenknöpfe */
+  --sheet-min: 72px;            /* Mindesthöhe jeder unteren Leiste (= Kopfzeile); Positions-Knopf sitzt darüber */
 
   /* Ebenen */
   --z-map-ctrl: 1000;           /* Positions-Knopf, Status, Leaflet-Bedienelemente */
@@ -59,6 +60,7 @@
   --z-menu: 1200;
   --z-sheet: 1400;              /* Planen, Unterwegs */
   --z-info: 1500;               /* Infofenster (liegt über Planen/Unterwegs) */
+  --z-settings: 1600;           /* Einstellungen */
   --z-page: 2500;               /* Vollbildseiten */
   --z-dialog: 3000;
 
@@ -240,7 +242,8 @@ button {
 .map-btn {
   position: absolute;
   right: calc(12px + env(safe-area-inset-right));
-  bottom: calc(40px + env(safe-area-inset-bottom));
+  /* immer über einer ganz zusammengeschobenen Leiste (--sheet-min), damit er ganz sichtbar bleibt */
+  bottom: calc(var(--sheet-min) + 12px + env(safe-area-inset-bottom));
   z-index: var(--z-map-ctrl);
   width: 56px;
   height: 56px;
@@ -471,6 +474,9 @@ button {
 .sheet-handle {
   position: relative;
   flex: none;
+  box-sizing: border-box;
+  min-height: var(--sheet-min);
+  max-height: var(--sheet-min);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1085,4 +1091,12 @@ button {
   background: none;
   border: none;
   color: var(--c-blue);
+}
+
+/* Einstellungen als untere Leiste */
+#settings-panel {
+  z-index: var(--z-settings);
+}
+#settings-panel .sheet-body {
+  padding-bottom: 20px;
 }
