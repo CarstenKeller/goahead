@@ -41,10 +41,12 @@ Gebaut wird im GitHub-Actions-Lauf `.github/workflows/pages.yml` (Job `android`;
 Die signierte APK liegt danach unter **https://carstenkeller.github.io/goahead/app/goahead.apk**.
 Installation: Link auf dem Handy öffnen, Installation aus dieser Quelle erlauben.
 
-Signatur: `goahead-keystore.p12.enc` ist der mit AES-256 (openssl, PBKDF2) verschlüsselte Schlüssel.
+Signatur: `goahead-keystore.jks.enc` ist der mit AES-256 (openssl, PBKDF2) verschlüsselte Schlüssel
+(JKS, RSA 2048, SHA256withRSA, Alias `goahead`, Schlüssel- = Speicherpasswort).
 Das Passwort steht nur im Repository-Secret `GOAHEAD_KEYSTORE_PASSWORD`
 (*Settings → Secrets and variables → Actions → New repository secret*). Ohne Secret entsteht nur ein
-Probe-Build, keine APK. Der Schlüssel muss gleich bleiben, sonst lassen sich Updates nicht über die
-installierte App installieren.
+Probe-Build, keine APK. Der Schlüssel darf sich nach der ersten Installation **nie mehr ändern** (ebenso die
+`applicationId` `de.goahead.app`) – sonst scheitern Updates („App nicht installiert“), und nach dem nötigen
+Deinstallieren sind die Daten der App weg.
 
 Versionen: Android Gradle Plugin 8.5.2, Gradle 8.7, Kotlin 1.9.24, compileSdk/targetSdk 34, minSdk 29 (Android 10).

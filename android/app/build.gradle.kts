@@ -24,6 +24,7 @@ android {
         if (keystoreFile != null && keystorePassword != null) {
             create("release") {
                 storeFile = file(keystoreFile)
+                storeType = "JKS"   // JKS, RSA 2048, SHA256withRSA – so wie es bei einer früheren App verlässlich funktioniert hat
                 storePassword = keystorePassword
                 keyAlias = "goahead"
                 keyPassword = keystorePassword

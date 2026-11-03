@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   # Android-App (WebView + Aufzeichnung im Hintergrund), siehe android/README.md.
-  # Signiert wird mit dem verschlüsselten Schlüssel android/goahead-keystore.p12.enc; das Passwort
+  # Signiert wird mit dem verschlüsselten Schlüssel android/goahead-keystore.jks.enc; das Passwort
   # steht im Repository-Secret GOAHEAD_KEYSTORE_PASSWORD. Ohne Secret: nur Probe-Build, keine APK auf der Seite.
   android:
     runs-on: ubuntu-latest
@@ -42,12 +42,12 @@ jobs:
           set -e
           mkdir -p /tmp/apk
           if [ -n "$GOAHEAD_KEYSTORE_PASSWORD" ]; then
-            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in goahead-keystore.p12.enc \
-              -out /tmp/goahead.p12 -pass env:GOAHEAD_KEYSTORE_PASSWORD
-            export GOAHEAD_KEYSTORE_FILE=/tmp/goahead.p12
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in goahead-keystore.jks.enc \
+              -out /tmp/goahead.jks -pass env:GOAHEAD_KEYSTORE_PASSWORD
+            export GOAHEAD_KEYSTORE_FILE=/tmp/goahead.jks
             gradle --no-daemon assembleRelease
             cp app/build/outputs/apk/release/app-release.apk /tmp/apk/goahead.apk
-            rm -f /tmp/goahead.p12
+            rm -f /tmp/goahead.jks
           else
             echo "::warning::Secret GOAHEAD_KEYSTORE_PASSWORD fehlt – nur Probe-Build (Debug), keine APK auf der Seite."
             unset GOAHEAD_KEYSTORE_PASSWORD
