@@ -8,8 +8,8 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
 - Beim Start wird die GPS-Position gesucht und die Karte auf sie zentriert (Zoomstufe 16).
 - Gesten: mit einem Finger verschieben, mit zwei Fingern zoomen, doppelt tippen zum Vergrößern. Die +/−-Knöpfe
   lassen sich in den Einstellungen einblenden (Standard: aus).
-- **Menü** (☰ oben rechts): Eine Leiste mit den Funktionsknöpfen fährt von rechts ein: Kartenwahl,
-  Größe der Wegemarkierungen, Tracks, Route planen, Einstellungen. Ein Tipp auf die Karte schließt das Menü.
+- **Menü** (☰ oben rechts): Eine Leiste mit den Funktionsknöpfen fährt von rechts ein: Karten,
+  Tracks, Route planen, Aufnahme, Einstellungen. Ein Tipp auf die Karte schließt das Menü.
 - **Route planen** (Knopf mit Routen-Symbol im Menü), Modul `planner.js`:
   - Im Planungsmodus bleibt im Menü nur die Kartenwahl. Unten erscheint ein kompaktes Feld: Kopfzeile mit Name,
     Kennzahlen (Punkte, Länge, Anstieg; Vorschlag in Orange), *Speichern* und *Beenden*; darunter Symbolknöpfe
