@@ -981,12 +981,12 @@
         '<span class="plan-sum"></span>' +
       "</span>" +
       '<span class="sheet-head-btns">' +
-        iconBtn("plan-save", "save", "Speichern") +
         iconBtn("plan-exit", "close", "Planung beenden") +
       "</span>" +
     "</div>" +
     '<div class="sheet-body">' +
       '<div class="icon-row">' +
+        iconBtn("plan-save", "save", "Speichern") +
         iconBtn("plan-undo", "undo", "Rückgängig") +
         iconBtn("plan-redo", "redo", "Wiederholen") +
         '<button type="button" class="icon-btn plan-start" title="Zum Startpunkt" aria-label="Zum Startpunkt"><span class="icon-letter">S</span></button>' +

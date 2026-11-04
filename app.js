@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "30";
+  var APP_VERSION = "31";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {
@@ -34,10 +34,13 @@
     more: '<circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/>',
     trash: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/>',
     check: '<path d="M4 6h10M4 12h7M4 18h6"/><path d="M14 16l3 3 5-6"/>',
-    walk: '<circle cx="13" cy="4" r="2"/><path d="M11 8l-2 6 3 2 1 6"/><path d="M11 8l4 3 3 1"/><path d="M9 14l-3 7"/>',
-    run: '<circle cx="15" cy="4" r="2"/><path d="M5 11l4-3 5 1-2 5 4 3-1 5"/><path d="M14 9l3 3 4-1"/><path d="M12 14l-5 2-3 5"/>',
-    bike: '<circle cx="6" cy="16" r="4"/><circle cx="18" cy="16" r="4"/><path d="M6 16l4-7h6l2 7"/><path d="M10 9l3 7h-7"/><path d="M15 6h3"/>',
-    car: '<path d="M3 15l2-6h14l2 6v4H3z"/><circle cx="7.5" cy="19" r="1.5"/><circle cx="16.5" cy="19" r="1.5"/><path d="M3 15h18"/>',
+    // Art der Tour: Tabler Icons (MIT, github.com/tabler/tabler-icons) – trekking, run, bike, car
+    walk: '<path d="M11 4a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M7 21l2 -4"/><path d="M13 21v-4l-3 -3l1 -6l3 4l3 2"/>' +
+      '<path d="M10 14l-1.827 -1.218a2 2 0 0 1 -.831 -2.15l.28 -1.117a2 2 0 0 1 1.939 -1.515h1.439l4 1l3 -2"/><path d="M17 12v9"/><path d="M16 20h2"/>',
+    run: '<path d="M11.007 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M4 17l5 1l.75 -1.5"/><path d="M15 21v-4l-4 -3l1 -6"/><path d="M7 12v-3l5 -1l3 3l3 1"/>',
+    bike: '<path d="M2 18a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/><path d="M16 18a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/><path d="M12 19v-4l-3 -3l5 -4l2 3h3"/><path d="M13.007 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/>',
+    car: '<path d="M5 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M15 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5"/>',
+    layers: '<path d="M12 4l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 16l8 4 8-4"/>',
     scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.5 7.5L20 18M8.5 16.5L20 6"/>',
     warn: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>'
   };
@@ -263,8 +266,80 @@
     return control;
   }
 
-  var layersControl = L.control.layers(baseEntries, overlayEntries, { collapsed: true });
-  addToToolbar(layersControl, function () { layersControl.collapse(); });
+  // Kartenwahl: Leaflets Ebenen-Steuerung bleibt die Logik (Ereignisse baselayerchange/overlayadd …), ist aber
+  // unsichtbar; bedient wird sie über die ziehbare Leiste „Karten“ (Knopf im Menü).
+  var layersControl = L.control.layers(baseEntries, overlayEntries, { collapsed: true }).addTo(map);
+  layersControl.getContainer().hidden = true;
+
+  var mapsSheet = document.createElement("section");
+  mapsSheet.id = "maps-panel";
+  mapsSheet.className = "sheet";
+  mapsSheet.hidden = true;
+  mapsSheet.setAttribute("aria-label", "Karten");
+  mapsSheet.innerHTML =
+    '<div class="maps-head sheet-handle">' +
+      '<span class="sheet-grip" aria-hidden="true"></span>' +
+      '<span class="sheet-titles"><span class="settings-title">Karten</span></span>' +
+      '<span class="sheet-head-btns"><button type="button" class="icon-btn maps-close" title="Schließen" aria-label="Schließen">' +
+        icon("close") + "</button></span>" +
+    "</div>" +
+    '<div class="sheet-body maps-body"></div>';
+  document.body.appendChild(mapsSheet);
+  L.DomEvent.disableClickPropagation(mapsSheet);
+  L.DomEvent.disableScrollPropagation(mapsSheet);
+  makeResizable(mapsSheet, mapsSheet.querySelector(".maps-head"), "goahead.mapsHeight.v1");
+  mapsSheet.querySelector(".maps-close").addEventListener("click", function () { mapsSheet.hidden = true; });
+
+  // Eingaben der (unsichtbaren) Leaflet-Steuerung zur Ebene finden
+  function controlInput(layer) {
+    var id = L.stamp(layer);
+    var inputs = layersControl.getContainer().querySelectorAll("input");
+    for (var i = 0; i < inputs.length; i++) if (inputs[i].layerId === id) return inputs[i];
+    return null;
+  }
+  function renderMaps() {
+    var body = mapsSheet.querySelector(".maps-body");
+    var html = "";
+    var subOv = false;
+    layersControl._layers.forEach(function (o, i) {
+      if (o.overlay && !subOv) { html += '<div class="settings-sub">Ebenen</div>'; subOv = true; }
+      var on = map.hasLayer(o.layer);
+      html += '<label class="settings-row"><input type="' + (o.overlay ? "checkbox" : "radio") + '" name="maps-base" data-i="' + i + '"' +
+        (on ? " checked" : "") + "> " + escapeHtml(o.name) + "</label>";
+    });
+    body.innerHTML = '<div class="settings-sub">Hintergrund</div>' + html;
+  }
+  mapsSheet.querySelector(".maps-body").addEventListener("change", function (e) {
+    var i = e.target.getAttribute("data-i");
+    if (i == null) return;
+    var o = layersControl._layers[+i];
+    var inp = controlInput(o.layer);
+    if (inp && inp.checked !== e.target.checked) inp.click();
+    else if (inp && !o.overlay && !map.hasLayer(o.layer)) inp.click();
+    renderMaps();
+  });
+  map.on("baselayerchange overlayadd overlayremove", function () { if (!mapsSheet.hidden) renderMaps(); });
+  function openMaps() {
+    closeMenu();
+    renderMaps();
+    mapsSheet.hidden = false;
+  }
+
+  var MapsControl = L.Control.extend({
+    onAdd: function () {
+      var box = L.DomUtil.create("div", "leaflet-bar maps-control");
+      var btn = L.DomUtil.create("a", "maps-toggle", box);
+      btn.href = "#";
+      btn.setAttribute("role", "button");
+      btn.title = "Karten";
+      btn.setAttribute("aria-label", "Karten");
+      btn.innerHTML = icon("layers");
+      L.DomEvent.on(btn, "click", function (e) { L.DomEvent.preventDefault(e); openMaps(); });
+      L.DomEvent.disableClickPropagation(box);
+      return box;
+    }
+  });
+  addToToolbar(new MapsControl());
 
   // ---------- Größe der Wegemarkierungen ----------
 
@@ -284,68 +359,6 @@
     });
   }
 
-  var SizeControl = L.Control.extend({
-    options: { position: "topright" },
-    onAdd: function () {
-      var box = L.DomUtil.create("div", "leaflet-bar size-control");
-      var btn = L.DomUtil.create("a", "size-toggle", box);
-      btn.href = "#";
-      btn.setAttribute("role", "button");
-      btn.title = "Größe der Wegemarkierungen";
-      btn.setAttribute("aria-label", "Größe der Wegemarkierungen");
-      btn.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">' +
-        '<rect x="3" y="7" width="18" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>' +
-        '<path d="M7 12h10" stroke="#c0282d" stroke-width="3" stroke-linecap="round"/></svg>';
-
-      var panel = L.DomUtil.create("div", "size-panel", box);
-      panel.hidden = true;
-      var label = L.DomUtil.create("label", "", panel);
-      label.textContent = "Wegemarkierungen";
-      var row = L.DomUtil.create("div", "size-row", panel);
-      var input = L.DomUtil.create("input", "", row);
-      input.type = "range";
-      input.min = "1";
-      input.max = "3";
-      input.step = "0.25";
-      input.value = String(symbolScale);
-      input.setAttribute("aria-label", "Größe der Wegemarkierungen");
-      var out = L.DomUtil.create("output", "", row);
-      var note = L.DomUtil.create("div", "size-note", panel);
-
-      function render() {
-        var f = parseFloat(input.value);
-        out.textContent = Math.round(f * 100) + " %";
-        note.textContent = "OSM-Ebene: " + (xyzScaleStep(f) * 100) + " % (nur 100/200/400 % möglich)";
-      }
-      render();
-
-      var timer = null;
-      input.addEventListener("input", function () {
-        render();
-        clearTimeout(timer);
-        timer = setTimeout(function () {
-          var f = parseFloat(input.value);
-          applySymbolScale(f);
-          try { window.localStorage.setItem(SCALE_KEY, String(f)); } catch (e) { /* egal */ }
-        }, 250);
-      });
-
-      L.DomEvent.on(btn, "click", function (e) {
-        L.DomEvent.preventDefault(e);
-        panel.hidden = !panel.hidden;
-      });
-      L.DomEvent.disableClickPropagation(box);
-      L.DomEvent.disableScrollPropagation(box);
-      // Panel schließen, wenn auf die Karte getippt wird
-      map.on("click", function () { panel.hidden = true; });
-      return box;
-    }
-  });
-  var sizeControl = addToToolbar(new SizeControl(), function () {
-    var pnl = sizeControl.getContainer().querySelector(".size-panel");
-    if (pnl) pnl.hidden = true;
-  });
-
   // ---------- Einstellungen ----------
 
   var SETTINGS_KEY = "goahead.settings.v1";
@@ -363,7 +376,9 @@
     walkMaxKmh: 7,
     runMaxKmh: 11,
     bikeMaxKmh: 32,
-    autoEndKmh: 80       // Unterwegs: ab dieser Spitzengeschwindigkeit (über 20 s) Fahrt erkannt → Tour beenden
+    autoEndKmh: 80,      // Unterwegs: ab dieser Spitzengeschwindigkeit (über 20 s) Fahrt erkannt → Tour beenden
+    reversePct: 1,       // Unterwegs: Richtung umdrehen, wenn so viel % der Strecke entgegen der Richtung gegangen (0 = aus)
+    listCheck: false     // Erwandert: Knopf „Liste prüfen“ anzeigen
   };
   var settings = JSON.parse(JSON.stringify(SETTING_DEFAULTS));
   try {
@@ -419,11 +434,16 @@
         numRow("offlineKm", "Karten offline um die Route", "km", 0.2, 5, 0.1) +
         numRow("turnWarnM", "Vibration vor Abbiegung", "m", 5, 200, 5) +
         numRow("autoEndKmh", "Automatisch beenden ab", "km/h", 30, 250, 5) +
+        numRow("reversePct", "Richtung umdrehen nach", "% der Strecke", 0, 20, 0.5) +
         '<div class="settings-sub">Art der Tour (Ø in Bewegung)</div>' +
         numRow("walkMaxKmh", "Wandern bis", "km/h", 2, 15, 0.5) +
         numRow("runMaxKmh", "Laufen bis", "km/h", 4, 30, 0.5) +
         numRow("bikeMaxKmh", "Rad bis", "km/h", 8, 80, 1) +
+        '<div class="settings-sub">Karte</div>' +
+        '<label class="settings-num"><span>Wegemarkierungen</span><input type="range" class="settings-scale" min="1" max="3" step="0.25" aria-label="Größe der Wegemarkierungen">' +
+          '<output class="settings-unit settings-scale-out"></output></label>' +
         '<div class="settings-sub">Daten</div>' +
+        '<label class="settings-row"><input type="checkbox" data-setting="listCheck"> Listenprüfung (Erwandert)</label>' +
         '<div class="settings-act"><span>Sicherung</span><span class="icon-row">' +
           '<button type="button" class="icon-btn settings-backup" title="Sichern (alle Touren, Routen, Tracks, Einstellungen)" aria-label="Sichern">' + icon("download") + "</button>" +
           '<button type="button" class="icon-btn settings-restore" title="Wiederherstellen" aria-label="Wiederherstellen">' + icon("upload") + "</button>" +
@@ -462,12 +482,30 @@
         settingsListeners.forEach(function (fn) { try { fn(settings); } catch (e) { console.warn(e); } });
       });
     });
-    var cb = settingsSheet.querySelector('[data-setting="zoomButtons"]');
-    cb.checked = settings.zoomButtons;
-    cb.addEventListener("change", function () {
-      settings.zoomButtons = cb.checked;
-      saveSettings();
-      applyZoomButtons();
+    settingsSheet.querySelectorAll("[data-setting]").forEach(function (cb) {
+      var key = cb.getAttribute("data-setting");
+      cb.checked = !!settings[key];
+      cb.addEventListener("change", function () {
+        settings[key] = cb.checked;
+        saveSettings();
+        if (key === "zoomButtons") applyZoomButtons();
+        settingsListeners.forEach(function (fn) { try { fn(settings); } catch (e) { console.warn(e); } });
+      });
+    });
+    // Größe der Wegemarkierungen (früher eigener Knopf im Menü)
+    var sc = settingsSheet.querySelector(".settings-scale");
+    var so = settingsSheet.querySelector(".settings-scale-out");
+    sc.value = String(symbolScale);
+    so.textContent = Math.round(symbolScale * 100) + " %";
+    var scTimer = null;
+    sc.addEventListener("input", function () {
+      var f = parseFloat(sc.value);
+      so.textContent = Math.round(f * 100) + " %";
+      clearTimeout(scTimer);
+      scTimer = setTimeout(function () {
+        applySymbolScale(f);
+        try { window.localStorage.setItem(SCALE_KEY, String(f)); } catch (e) { /* egal */ }
+      }, 250);
     });
     settingsSheet.querySelector(".settings-close").addEventListener("click", function () { settingsSheet.hidden = true; });
     settingsSheet.querySelector(".settings-backup").addEventListener("click", function () {

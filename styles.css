@@ -322,8 +322,8 @@ button {
   order: 99;        /* Einstellungen immer zuletzt */
 }
 /* Im Planungs- und Unterwegs-Modus bleibt nur die Kartenwahl */
-.mode-plan .toolbar > :not(.leaflet-control-layers),
-.mode-nav .toolbar > :not(.leaflet-control-layers) {
+.mode-plan .toolbar > :not(.maps-control),
+.mode-nav .toolbar > :not(.maps-control) {
   display: none;
 }
 
@@ -1367,4 +1367,28 @@ button {
 .trim-info {
   font-size: 14px;
   margin: 4px 0 8px;
+}
+
+/* Kartenwahl als Leiste */
+#maps-panel {
+  z-index: var(--z-settings);
+}
+.maps-toggle {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-text) !important;
+}
+.maps-toggle svg {
+  width: 26px;
+  height: 26px;
+}
+.settings-scale {
+  flex: 1;
+}
+/* Listenkopf: Filter und Lupe in einer Zeile */
+.list-kind,
+.list-year {
+  flex: 1 1 0;
+  min-width: 0;
 }

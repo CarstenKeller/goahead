@@ -62,7 +62,10 @@ Platz wie möglich:
 5. **Dialoge:** nie `window.prompt`/`alert` (werden teils unterdrückt). Stattdessen
    `GOAHEAD.askText(...)` und `GOAHEAD.actionSheet(...)`. `window.confirm` nur, wo bereits verwendet.
 6. **Menü:** Funktionen kommen als Knopf in die Leiste per `GOAHEAD.addToToolbar(control)`.
-   Modi (Planen, Unterwegs) blenden über eine Body-Klasse (`mode-…`) alles außer der Kartenwahl aus.
+   Modi (Planen, Unterwegs) blenden über eine Body-Klasse (`mode-…`) alles außer der Kartenwahl (`.maps-control`) aus.
+   Auswahlen und Einstellungen öffnen eine `.sheet` (z. B. Kartenwahl), keine Klappfelder im Menü. Die Leaflet-Ebenensteuerung
+   ist unsichtbar und bleibt nur die Logik dahinter (Ereignisse `baselayerchange`/`overlayadd`).
+   Symbole: einfache eigene SVG-Pfade oder Tabler Icons (MIT) in `ICONS` – Herkunft im Kommentar nennen.
 7. **Kartentipps** übernimmt ein Modul nur über `GOAHEAD.setMapClickHandler(fn)` (und gibt sie mit `null` zurück).
 8. **Sichtbares Feedback:** Netzabfragen mit Zeitlimit; Fehler als Meldung (`GOAHEAD.showStatus`),
    nie still hängen bleiben. Leere Ergebnisse nicht mit Meldungen „belohnen“, wenn der Nutzer

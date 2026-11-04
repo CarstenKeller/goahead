@@ -101,16 +101,22 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   km, ↑/↓, Gehzeit und Profil. „⋯“ öffnet das Menü der Tour, „✕“ schließt und entfernt die Linie.
 - **Listen *Geplant* und *Erwandert*:** oben Anzahl und Gesamt-km der angezeigten Touren, Filter nach Jahr
   und Namenssuche (Lupe).
-- **Erwandert → Liste prüfen** (Knopf mit Haken): findet vermutlich *doppelte* Touren (gleicher Tag, Start auf
+- **Erwandert → Liste prüfen** (Knopf mit Haken; erst nach Einschalten unter *Einstellungen → Daten → Listenprüfung*): findet vermutlich *doppelte* Touren (gleicher Tag, Start auf
   ~100 m, Länge auf 200 m) und vermutlich *geplante* Touren, die beim Import unter „Erwandert“ gelandet sind
   (keine Zeitstempel, oder Zeiten ohne Pausen und ohne festen Aufnahmetakt – typisch für berechnete Zeiten einer
   Planung). Die Treffer werden erst angezeigt (mit Begründung), dann auf Wunsch gelöscht bzw. nach „Geplant“
   verschoben. Die Erkennung „geplant“ ist eine Heuristik, an echten komoot-Daten nicht geprüft. Einzelne Touren
   lassen sich auch über ihr Menü nach „Geplant“ verschieben. Eigene GoAhead-Aufnahmen gelten nie als geplant.
   Weitere Gruppen: *mit Fahrt am Ende* (siehe unten; „Alle kürzen“) und *Fahrzeug* (Ø schneller als „Rad bis“).
-- **Art der Tour** aus der Ø-Geschwindigkeit in Bewegung: Wandern bis 7, Laufen bis 11, Rad bis 32 km/h, darüber
+- **Art der Tour** (Symbole: Tabler Icons, MIT-Lizenz, github.com/tabler/tabler-icons) aus der Ø-Geschwindigkeit in Bewegung: Wandern bis 7, Laufen bis 11, Rad bis 32 km/h, darüber
   Fahrzeug (Grenzen nach Erfahrung des Nutzers, in den Einstellungen änderbar). Kleines Symbol vor dem Namen,
   „Ø … km/h“ in der Zeile, Filter „Alle Arten / Wandern / Laufen / Rad / Fahrzeug“.
+- **Richtung automatisch umdrehen** (Einstellung „Richtung umdrehen nach … % der Strecke“, Standard 1 %, 0 = aus):
+  Geht man zu Beginn einer Tour entlang der Route rückwärts – netto mehr als der eingestellte Anteil der Länge,
+  mindestens 50 m –, dreht GoAhead die Tour um: Reihenfolge der Punkte, Abschnitte, Start, Abbiegungen, Profil und
+  Kennzahlen; kurze Vibration und Meldung. Bei Rundtouren wird P0 → P1 … Pm → P0 zu P0 → Pm … P1 → P0. Ist man
+  genauso weit vorwärts gegangen, gilt die Richtung als bestätigt und es wird nicht mehr geprüft. Gedreht wird nur
+  die laufende Tour; die gespeicherte Planung bleibt unverändert.
 - **Fahrt erkannt → automatisch beenden** (Einstellung „Automatisch beenden ab“, Standard 80 km/h): Liegt die
   Geschwindigkeit über mindestens drei 20-Sekunden-Fenster (Luftlinie, damit einzelne GPS-Ausreißer nicht zählen)
   über der Grenze, wird die Tour bis zu der Stelle gekürzt, an der man zuletzt höchstens Lauftempo hatte, und
@@ -137,7 +143,8 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
 - Positions-Knopf (unten rechts): Die Karte folgt der Position (Knopf blau). Im Folgemodus wird um die eigene
   Position gezoomt. Verschieben der Karte oder Zoomen auf einen GPX-Track beendet das Folgen, ein Tipp auf den
   Knopf zentriert wieder.
-- Kartenwahl (im Menü): **Wanderkarte**, **Luftbild** (beide automatisch nach Gebiet) oder OpenStreetMap.
+- Kartenwahl (Knopf „Karten“ im Menü, ziehbare Leiste): **Wanderkarte**, **Luftbild** (beide automatisch nach
+  Gebiet) oder OpenStreetMap; darunter die Ebenen (Wanderwege NRW/OSM) zum Ein- und Ausblenden.
   - Die beiden automatischen Karten sind Mosaike (`mosaic.js`): An jeder Stelle erscheint die genaueste Karte,
     die dort gilt, an Landes- und Staatsgrenzen zugeschnitten (Grenzen in `regions.js`, Natural Earth, gemeinfrei,
     vereinfacht auf etwa 150 m – an Grenzen kann daher auf einigen 100 m die nächstallgemeinere Karte zu sehen sein).
@@ -174,7 +181,7 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   über Positions-Knopf und Quellenangabe.
   Tippen ins Leere schließt es. Durch Ziehen am Kopf wird es größer oder kleiner; ganz nach unten gezogen
   schließt es. Die Höhe wird gespeichert. Jede Abfrage hat ein Zeitlimit (10–12 s).
-- **Größe der Wegemarkierungen** (Knopf unter der Kartenwahl): Regler von 100 bis 300 %, wird gespeichert.
+- **Größe der Wegemarkierungen** (*Einstellungen → Karte*): Regler von 100 bis 300 %, wird gespeichert.
   - TFIS (WMS): stufenlos. Für dieselbe Fläche wird ein kleineres Bild angefordert und vergrößert angezeigt.
     Dadurch wird es etwas unschärfer. Möglicherweise blendet der Server dann Inhalte aus, die er nur bei
     feineren Maßstäben zeigt.

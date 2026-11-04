@@ -245,6 +245,65 @@
     return w.route || { segments: [{ latlngs: w.planLine || [] }], closing: null, roundtrip: false, points: [] };
   }
 
+  // ---------- Richtung automatisch umdrehen ----------
+  //
+  // Zu Beginn der Tour: Geht man entlang der Route rückwärts (netto mehr als „Richtung umdrehen nach“ % der
+  // Streckenlänge, mindestens 50 m), wird die Tour umgedreht – Punkte, Abschnitte, Abbiegungen, Profil.
+  // Hat man vorwärts genauso viel geschafft, gilt die Richtung als bestätigt und es wird nicht mehr geprüft.
+  // Sprünge der Position auf der Route (z. B. Start = Ziel bei Rundtouren) zählen nicht.
+  var revPrev = null;   // letzte Position entlang der Route (m)
+  function checkReverse(moved) {
+    if (!walk || walk.free || walk.dirChecked || !stats || !progress || progress.off > OFF_ROUTE_M) return;
+    var pct = setting("reversePct", 1);
+    if (!pct) return;
+    var thr = Math.max(50, stats.dist * pct / 100);
+    if (revPrev != null) {
+      var delta = progress.d - revPrev;
+      if (Math.abs(delta) <= moved * 1.5 + 30) walk.revNet = (walk.revNet || 0) + delta;
+    }
+    revPrev = progress.d;
+    if ((walk.revNet || 0) >= thr) { walk.dirChecked = true; saveWalk(); return; }
+    if ((walk.revNet || 0) <= -thr) reverseTour();
+  }
+
+  function reversedRoute(r) {
+    function rev(seg) {
+      var c = {};
+      Object.keys(seg).forEach(function (k) { c[k] = seg[k]; });
+      c.latlngs = seg.latlngs.slice().reverse();
+      return c;
+    }
+    var pts = (r.points || []).slice();
+    var segs = (r.segments || []).slice();
+    if (r.roundtrip && r.closing && pts.length > 1) {
+      // P0 → P1 … Pm → P0  wird zu  P0 → Pm … P1 → P0
+      return { points: [pts[0]].concat(pts.slice(1).reverse()),
+        segments: [rev(r.closing)].concat(segs.slice(1).reverse().map(rev)),
+        closing: segs.length ? rev(segs[0]) : null, roundtrip: true };
+    }
+    return { points: pts.reverse(), segments: segs.reverse().map(rev), closing: null, roundtrip: false };
+  }
+
+  function reverseTour() {
+    walk.route = reversedRoute(routeOf(walk));
+    walk.planLine = G.planner.routeLine(walk.route);
+    walk.reversed = !walk.reversed;
+    walk.dirChecked = true;
+    walk.turnsDone = {};
+    revPrev = null;
+    computeRouteData();
+    var here = G.getPosition && G.getPosition();
+    progress = here ? locateOnRoute(here.lat, here.lng) : null;
+    lastProfileKey = "";
+    sentTurnsKey = null;
+    drawPlan();
+    sendTurns();
+    saveWalk();
+    renderPanel();
+    if (navigator.vibrate && !NATIVE) navigator.vibrate([100, 80, 100, 80, 100]);
+    G.showStatus("↻ Richtung umgedreht – die Tour läuft jetzt andersherum.", 6000);
+  }
+
   function computeRouteData() {
     stats = G.planner && walk && !walk.free ? G.planner.routeStats(routeOf(walk)) : null;
     turns = stats ? findTurns(stats.profile.pts) : [];
@@ -366,6 +425,12 @@
     setTimeout(checkAutoEnd, 0);
     walk.lastFix = Date.now();
     var q = pts[pts.length - 1];
+    var prevQ = null;
+    pts.forEach(function (pq) {
+      progress = locateOnRoute(pq[0], pq[1]) || progress;
+      checkReverse(prevQ ? L.latLng(prevQ[0], prevQ[1]).distanceTo(L.latLng(pq[0], pq[1])) : 0);
+      prevQ = pq;
+    });
     progress = locateOnRoute(q[0], q[1]) || progress;
     checkTurns();   // markiert Abbiegungen, die der Dienst inzwischen gemeldet hat (vibriert hier nicht)
     saveWalk();
@@ -434,6 +499,7 @@
     // Position auf der Route und Geschwindigkeit (auch in der Pause, für die Anzeige)
     if (c0.accuracy <= MAX_ACCURACY) {
       progress = locateOnRoute(c0.latitude, c0.longitude) || progress;
+      var lastR = recent.length ? recent[recent.length - 1].ll : null;
       var now = pos.timestamp || Date.now();
       recent.push({ t: now, ll: L.latLng(c0.latitude, c0.longitude) });
       while (recent.length > 2 && now - recent[0].t > 30000) recent.shift();
@@ -446,6 +512,7 @@
         speedNow = dt > 3 ? dist / dt : speedNow;
       }
       checkTurns();
+      if (!walk.paused) checkReverse(lastR ? lastR.distanceTo(L.latLng(c0.latitude, c0.longitude)) : 0);
     }
     if (walk.paused) { renderPanel(); return; }
     var c = pos.coords;
@@ -686,6 +753,7 @@
     drawWalk();
     computeRouteData();
     progress = null;
+    revPrev = null;
     lastProfileKey = "";
     clearInterval(ticker);
     var tick = 0;
@@ -905,8 +973,8 @@
       nameOf: function (w) { return w.name; },
       kindOf: kindOf,
       kinds: KINDS,
-      tools: '<button type="button" class="icon-btn list-check' + (check && check.mode ? " on" : "") +
-        '" title="Liste prüfen (Doppelte, vermutlich geplante)" aria-label="Liste prüfen">' + G.icon("check") + "</button>"
+      tools: G.getSettings().listCheck ? '<button type="button" class="icon-btn list-check' + (check && check.mode ? " on" : "") +
+        '" title="Liste prüfen (Doppelte, vermutlich geplante)" aria-label="Liste prüfen">' + G.icon("check") + "</button>" : ""
     }) : { html: "", items: base };
     var note = "";
     if (check && check.mode) {
@@ -1320,6 +1388,10 @@
 
   loadWalks();
   window.addEventListener("goahead:data", loadWalks);
+  G.onSettingsChange(function (st) {
+    if (!st.listCheck && check) check = null;
+    renderWalks();
+  });
 
   var RecordControl = L.Control.extend({
     onAdd: function () {
