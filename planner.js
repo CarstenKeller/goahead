@@ -66,7 +66,8 @@
       savedId: null,   // gespeicherte Route, die gerade bearbeitet wird
       name: "",
       createdAt: null,
-      dirty: false     // Änderungen seit dem letzten Speichern
+      dirty: false,    // Änderungen seit dem letzten Speichern
+      loop: null       // automatisch berechnete Rundtour: {km, dir} (für „andere Variante“)
     };
   }
 
@@ -96,7 +97,7 @@
   // ---------- Rückgängig / Wiederholen ----------
 
   function snapshot() {
-    return JSON.stringify({ points: plan.points, segments: plan.segments, roundtrip: plan.roundtrip, closing: plan.closing });
+    return JSON.stringify({ points: plan.points, segments: plan.segments, roundtrip: plan.roundtrip, closing: plan.closing, loop: plan.loop || null });
   }
 
   // vor jeder Änderung aufrufen
@@ -118,6 +119,7 @@
     plan.segments = s.segments;
     plan.roundtrip = s.roundtrip;
     plan.closing = s.closing;
+    plan.loop = s.loop || null;
     candidate = null;
     selected = null;
     armed = false;
@@ -377,6 +379,11 @@
   }
 
   function onMapTap(latlng) {
+    if (loopArmed) {                    // Rundtour: dieser Tipp ist der Startpunkt
+      var la = loopArmed;
+      computeLoop(latlng, la.km, la.dir);
+      return;
+    }
     if (fresh && !candidate) {          // vorläufiger Zwischenpunkt: Tipp woanders nimmt ihn weg
       discardFresh();
       return;
@@ -687,6 +694,140 @@
     plan.closing = next;
     if (next.pending) replaceWhenRouted(next, a, b);
     savePlan();
+  }
+
+  // ---------- Rundtour nach Länge (BRouter) ----------
+  //
+  // BRouter berechnet mit engineMode=4 und nur einem Punkt eine Runde (geprüft im Quelltext abrensch/brouter,
+  // RoutingEngine.doRoundTrip/buildPointsFromCircle und RoutingParamCollector, sowie per Actions-Lauf
+  // „BRouter-Rundtour prüfen“ gegen brouter.de: CORS *, Antwort wie beim normalen Routing).
+  // roundTripDistance ist NICHT die Länge, sondern der Radius des Kreises, auf dem BRouter Wegpunkte setzt.
+  // Gemessen war die Länge das 5,4- bis 8,9-Fache des Radius – daher bis zu LOOP_TRIES Versuche mit
+  // angepasstem Radius; genommen wird die Runde, die der Wunschlänge am nächsten kommt.
+  // Immer BRouter (auch wenn OSRM eingestellt ist – OSRM kennt keine Rundtour).
+  var LOOP_KEY = "goahead.loopKm.v1";
+  var LOOP_TRIES = 4;
+  var LOOP_TOL = 0.06;      // ±6 % gilt als getroffen
+  var loopArmed = null;     // km, wenn auf den Startpunkt gewartet wird
+  var loopBusy = false;
+
+  function loopRequest(start, radius, dir) {
+    var url = BROUTER_URL + "?lonlats=" + start.lng.toFixed(6) + "," + start.lat.toFixed(6) +
+      "&profile=hiking-mountain&alternativeidx=0&format=geojson&engineMode=4" +
+      "&roundTripDistance=" + Math.round(radius) + "&roundTripStartDirection=" + Math.round(dir);
+    return fetchJson(url, 30000).then(function (gj) {
+      var f = gj && gj.features && gj.features[0];
+      if (!f || !f.geometry || !f.geometry.coordinates || f.geometry.coordinates.length < 3) throw new Error("keine Runde gefunden");
+      var latlngs = f.geometry.coordinates.map(function (c) {
+        return c.length > 2 && c[2] != null ? [round6(c[1]), round6(c[0]), Math.round(c[2] * 10) / 10] : [round6(c[1]), round6(c[0])];
+      });
+      var dist = parseFloat((f.properties || {})["track-length"]);
+      return { latlngs: latlngs, distance: isNaN(dist) ? lengthOf(latlngs) : dist };
+    });
+  }
+
+  function computeLoop(start, km, dir) {
+    if (loopBusy) return;
+    loopBusy = true;
+    loopArmed = null;
+    var target = km * 1000;
+    var radius = target / 6.5;
+    var best = null;
+    function attempt(i) {
+      G.showStatus("Rundtour " + String(km).replace(".", ",") + " km wird berechnet … (" + (i + 1) + "/" + LOOP_TRIES + ")");
+      return loopRequest(start, radius, dir).then(function (res) {
+        if (!best || Math.abs(res.distance - target) < Math.abs(best.distance - target)) best = res;
+        if (Math.abs(res.distance - target) / target <= LOOP_TOL || i + 1 >= LOOP_TRIES) return best;
+        radius = Math.max(200, radius * Math.min(3, Math.max(0.33, target / res.distance)));
+        return attempt(i + 1);
+      }, function (err) {
+        if (best) return best;
+        throw err;
+      });
+    }
+    attempt(0).then(function (res) {
+      loopBusy = false;
+      applyLoop(res, km, dir);
+      G.showStatus("Rundtour: " + (res.distance / 1000).toFixed(1).replace(".", ",") + " km (gewünscht " + String(km).replace(".", ",") + " km).", 5000);
+    }).catch(function (err) {
+      loopBusy = false;
+      G.showStatus("Rundtour nicht berechnet: " + (err.message || err) + ". Netz prüfen oder anderen Startpunkt wählen.", 8000);
+    });
+  }
+
+  // Runde → Planung: Wegpunkte etwa alle 1–3 km, Abschnitte dazwischen, letzter Abschnitt = Rückweg zum Start
+  function applyLoop(res, km, dir) {
+    var ll = res.latlngs;
+    var total = lengthOf(ll);
+    var scale = total ? res.distance / total : 1;
+    var spacing = Math.min(3000, Math.max(1000, res.distance / 6)) / scale;
+    var cuts = [0];
+    var acc = 0;
+    for (var i = 1; i < ll.length - 1; i++) {
+      acc += L.latLng(ll[i - 1][0], ll[i - 1][1]).distanceTo(L.latLng(ll[i][0], ll[i][1]));
+      if (acc >= spacing) { cuts.push(i); acc = 0; }
+    }
+    if (cuts.length < 3) cuts = [0, Math.floor(ll.length / 3), Math.floor(2 * ll.length / 3)];
+    function part(a, b) {
+      var pl = ll.slice(a, b + 1);
+      return { latlngs: pl, distance: lengthOf(pl) * scale, ascent: null, source: "BRouter", mode: "route" };
+    }
+    pushHistory();
+    var keepName = plan.savedId ? plan.name : "";
+    var savedId = plan.savedId, createdAt = plan.createdAt;
+    plan = newPlanState();
+    plan.savedId = savedId;
+    plan.createdAt = createdAt;
+    plan.name = keepName || ("Rundtour " + (res.distance / 1000).toFixed(1).replace(".", ",") + " km");
+    plan.points = cuts.map(function (c) { return { lat: ll[c][0], lng: ll[c][1] }; });
+    for (var k = 1; k < cuts.length; k++) plan.segments.push(part(cuts[k - 1], cuts[k]));
+    plan.roundtrip = true;
+    var last = plan.points[plan.points.length - 1];
+    plan.closing = part(cuts[cuts.length - 1], ll.length - 1);
+    plan.closing.key = closingKey(last, plan.points[0]);
+    plan.loop = { km: km, dir: dir };
+    plan.dirty = true;
+    candidate = null;
+    selected = null;
+    armed = false;
+    fresh = null;
+    savePlan();
+    render();
+    fitPlan();
+  }
+
+  function askLoopKm(then) {
+    var last = "10";
+    try { last = window.localStorage.getItem(LOOP_KEY) || last; } catch (e) { /* Standard */ }
+    G.askText("Rundtour – Länge in km", last, function (v) {
+      var km = parseFloat(String(v).replace(",", "."));
+      if (!(km >= 1 && km <= 200)) { G.showStatus("Bitte eine Länge zwischen 1 und 200 km angeben.", 5000); return; }
+      try { window.localStorage.setItem(LOOP_KEY, String(km)); } catch (e) { /* egal */ }
+      then(km);
+    }, "Weiter");
+  }
+
+  // Knopf „Rundtour“: ohne Route → Länge abfragen, dann Startpunkt (oder vorhandenen ersten Punkt) nehmen;
+  // bei berechneter Runde → Varianten; bei eigener Planung mit mehreren Punkten → wie bisher schließen/öffnen
+  function onRoundButton() {
+    if (loopBusy) return;
+    if (plan.loop) {
+      var lp = plan.loop;
+      var start = plan.points[0];
+      G.actionSheet("Rundtour " + String(lp.km).replace(".", ",") + " km", "", [
+        { label: "↻ Andere Variante", primary: true, onClick: function () { computeLoop(start, lp.km, (lp.dir + 72) % 360); } },
+        { label: "Länge ändern", onClick: function () { askLoopKm(function (km) { computeLoop(start, km, lp.dir); }); } },
+        { label: "Als eigene Planung weiter (Rückweg öffnen)", onClick: function () { plan.loop = null; toggleRoundtrip(); } }
+      ]);
+      return;
+    }
+    if (plan.points.length >= 2) { toggleRoundtrip(); return; }
+    askLoopKm(function (km) {
+      var dir = Math.floor(Math.random() * 360);
+      if (plan.points.length === 1) { computeLoop(plan.points[0], km, dir); return; }
+      loopArmed = { km: km, dir: dir };
+      G.showStatus("Rundtour " + String(km).replace(".", ",") + " km – Startpunkt auf der Karte antippen.");
+    });
   }
 
   function toggleRoundtrip() {
@@ -1050,7 +1191,7 @@
 
   el.undo.addEventListener("click", undo);
   el.redo.addEventListener("click", redo);
-  el.round.addEventListener("click", toggleRoundtrip);
+  el.round.addEventListener("click", onRoundButton);
 
   el.start.addEventListener("click", function () {
     if (plan.points.length) goTo(plan.points[0]);
@@ -1585,6 +1726,7 @@
   }
 
   function stop() {
+    loopArmed = null;
     if (!active) return;
     active = false;
     candidate = null;

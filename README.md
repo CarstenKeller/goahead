@@ -12,8 +12,8 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   Tracks, Route planen, Aufnahme, Einstellungen. Ein Tipp auf die Karte schließt das Menü.
 - **Route planen** (Knopf mit Routen-Symbol im Menü), Modul `planner.js`:
   - Im Planungsmodus bleibt im Menü nur die Kartenwahl. Unten erscheint ein kompaktes Feld: Kopfzeile mit Name,
-    Kennzahlen (Punkte, Länge, Anstieg; Vorschlag in Orange), *Speichern* und *Beenden*; darunter Symbolknöpfe
-    *Rückgängig*, *Wiederholen*, *S* (zum Startpunkt), *Rundtour* und *Suche*. Das Routing wird in den
+    Kennzahlen (Punkte, Länge, Anstieg; Vorschlag in Orange) und *Beenden*; darunter Symbolknöpfe
+    *Speichern*, *Rückgängig*, *Wiederholen*, *S* (zum Startpunkt), *Rundtour* und *Suche*. Das Routing wird in den
     Einstellungen gewählt; bei BRouter erscheint das Höhenprofil automatisch. Langer Druck auf einen Knopf zeigt seine Beschreibung.
   - **Auf der Karte:**
     - Tipp auf die Karte: Vorschlagspunkt mit vorgeschlagener Strecke (orange, gestrichelt).
@@ -26,6 +26,15 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
       (Karte, Strecke, anderer Punkt) gilt als Versehen und nimmt ihn wieder weg – ohne Spur im Rückgängig-Verlauf.
       Doppeltipp wechselt zwischen *Weg* (Routing) und *direkt* (gerade Linie, gestrichelt, mit ihrer Länge
       in der Gesamtstrecke). Gilt auch für den Rückweg einer Rundtour.
+  - **Rundtour nach Länge:** *Rundtour* bei leerer Planung (oder nur einem Punkt) fragt nach der Länge in km;
+    danach Startpunkt auf der Karte antippen (ein vorhandener Punkt dient als Start). BRouter berechnet eine Runde
+    (`engineMode=4`, geprüft im Quelltext abrensch/brouter und per Workflow „BRouter-Rundtour prüfen“ gegen
+    brouter.de). `roundTripDistance` ist dort der Radius des Kreises, auf dem BRouter Wegpunkte setzt; die Länge
+    war im Test das 5,4- bis 8,9-Fache. GoAhead passt den Radius deshalb an (bis zu 4 Anfragen, Ziel ±6 %) und
+    nimmt die Runde, die der Wunschlänge am nächsten kommt. Ergebnis: normale Planung mit Wegpunkten alle 1–3 km
+    (verschieben, löschen, einfügen wie gewohnt), Rückweg als Rundtour-Abschnitt. Erneut *Rundtour*: *Andere
+    Variante* (andere Richtung), *Länge ändern*, *Als eigene Planung weiter*. Immer BRouter, auch wenn OSRM
+    eingestellt ist (OSRM kennt keine Rundtour). Mit Punkten ≥ 2 schließt/öffnet *Rundtour* wie bisher den Rückweg.
   - *Rückgängig/Wiederholen*: bis zu 20 Schritte (während der Sitzung).
   - Für alle vorläufigen (orangen) Punkte gilt: antippen = übernehmen, ziehen = verschieben, Tipp woanders = wegnehmen.
   - **Höhen und Dauer:** Kopfzeile zeigt Punkte, Länge, ↑/↓ Höhenmeter und ≈ Gehzeit. Bei BRouter-Routing erscheint
