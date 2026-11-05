@@ -17,6 +17,8 @@ bildschirmfüllend zeigt und **auch bei ausgeschaltetem Bildschirm aufzeichnet**
   `EXTRA_OUTPUT`). Danach geht eine verkleinerte, nach EXIF gedrehte Kopie (max. 1600 px) an die Web-App
   (`window.GOAHEAD_PHOTO_RESULT`). Abbruch löscht den leeren Galerie-Eintrag. Ohne Kamera-Berechtigung
   (die App fordert keine an – `ACTION_IMAGE_CAPTURE` braucht sie nicht, solange sie im Manifest fehlt).
+- `shareText` (Text über das Teilen-Menü, für „Für Begleitung teilen“/„Stand teilen“). Ältere App-Versionen
+  ohne diese Methode: Die Web-App kopiert den Text dann in die Zwischenablage.
 - `TrackStore.kt`: hängt jeden Punkt sofort an `track.jsonl` im App-Speicher an. Die Web-App holt die
   Punkte beim Einschalten des Bildschirms und alle 3 s (solange sichtbar) ab. Beim Beenden der Tour wird die Datei geleert.
 

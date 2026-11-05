@@ -375,6 +375,21 @@ class MainActivity : Activity() {
             }
         }
 
+        /** Text (z. B. GoAhead-Link für die Begleitung) über das Teilen-Menü von Android weitergeben. */
+        @JavascriptInterface fun shareText(subject: String, text: String): Boolean {
+            return try {
+                val send = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_SUBJECT, subject)
+                    putExtra(Intent.EXTRA_TEXT, text)
+                }
+                runOnUiThread { startActivity(Intent.createChooser(send, "Teilen")) }
+                true
+            } catch (e: Exception) {
+                false
+            }
+        }
+
         /** Datei über das Teilen-Menü von Android weitergeben (echte .gpx-Datei, z. B. an WhatsApp). */
         @JavascriptInterface fun shareFile(name: String, mime: String, text: String, subject: String, message: String): Boolean {
             return try {

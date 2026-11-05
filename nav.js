@@ -181,6 +181,7 @@
 
   function requestWakeLock() {
     if (NATIVE) return;   // App: Aufzeichnung läuft auch bei ausgeschaltetem Bildschirm
+    if (walk && walk.companion) return;   // Begleiten: nichts aufzuzeichnen
     if (!("wakeLock" in navigator)) { wakeLockOk = false; renderPanel(); return; }
     navigator.wakeLock.request("screen").then(function (lock) {
       wakeLock = lock;
@@ -253,7 +254,7 @@
   // Sprünge der Position auf der Route (z. B. Start = Ziel bei Rundtouren) zählen nicht.
   var revPrev = null;   // letzte Position entlang der Route (m)
   function checkReverse(moved) {
-    if (!walk || walk.free || walk.dirChecked || !stats || !progress || progress.off > OFF_ROUTE_M) return;
+    if (!walk || walk.free || walk.companion || walk.dirChecked || !stats || !progress || progress.off > OFF_ROUTE_M) return;
     var pct = setting("reversePct", 1);
     if (!pct) return;
     var thr = Math.max(50, stats.dist * pct / 100);
@@ -400,7 +401,7 @@
   // Nur noch nicht gemeldete (turnsDone) und noch nicht passierte – sonst vibrierte es doppelt.
   var sentTurnsKey = null;
   function sendTurns() {
-    if (!NATIVE || !walk) return;
+    if (!NATIVE || !walk || walk.companion) return;
     var warn = (G.getSettings().turnWarnM || 20);
     var from = progress && progress.off <= OFF_ROUTE_M ? progress.d : -Infinity;
     var done = walk.turnsDone || {};
@@ -415,7 +416,7 @@
 
   // App: neue Punkte vom Aufzeichnungsdienst übernehmen
   function pullNative() {
-    if (!NATIVE || !walk) return 0;
+    if (!NATIVE || !walk || walk.companion) return 0;
     var raw = NATIVE.call("getPoints", walk.nativeIdx || 0);
     var pts;
     try { pts = JSON.parse(raw || "[]"); } catch (e) { return 0; }
@@ -455,7 +456,7 @@
   // Fahrt erkannt (Spitze über „Automatisch beenden ab“): bis zum Einstieg kürzen und Tour speichern
   var autoEnding = false;
   function checkAutoEnd() {
-    if (!walk || walk.paused || autoEnding) return;
+    if (!walk || walk.paused || walk.companion || autoEnding) return;
     var det = detectDrive(walk.segments);
     if (!det) return;
     autoEnding = true;
@@ -515,6 +516,7 @@
       if (!walk.paused) checkReverse(lastR ? lastR.distanceTo(L.latLng(c0.latitude, c0.longitude)) : 0);
     }
     if (walk.paused) { renderPanel(); return; }
+    if (walk.companion) { walk.lastFix = Date.now(); renderPanel(); return; }   // Begleiten: nur anzeigen
     var c = pos.coords;
     walk.lastFix = Date.now();
     walk.weak = c.accuracy > MAX_ACCURACY;
@@ -552,6 +554,8 @@
     '<div class="sheet-body">' +
     '<div class="icon-row nav-extra">' +
       '<button type="button" class="icon-btn nav-start" title="Zum Startpunkt" aria-label="Zum Startpunkt"><span class="icon-letter">S</span></button>' +
+      '<button type="button" class="icon-btn nav-share" title="Stand teilen (für Begleitung)" aria-label="Stand teilen">' + G.icon("share") + "</button>" +
+      '<button type="button" class="icon-btn nav-paste" title="Stand der Aufzeichnung einfügen" aria-label="Stand einfügen">' + G.icon("paste") + "</button>" +
     "</div>" +
     '<div class="nav-stats">' +
       '<div><span class="nav-val nav-dist">0,00</span><span class="nav-lbl">km gewandert</span></div>' +
@@ -588,7 +592,8 @@
     profBox: panel.querySelector(".nav-profile-box"),
     profSvg: panel.querySelector(".nav-pf"),
     state: panel.querySelector(".nav-state"),
-    pause: panel.querySelector(".nav-pause")
+    pause: panel.querySelector(".nav-pause"),
+    end: panel.querySelector(".nav-end")
   };
 
   el.pause.addEventListener("click", function () {
@@ -622,12 +627,22 @@
     }
   });
   panel.querySelector(".nav-end").addEventListener("click", askEnd);
+  panel.querySelector(".nav-share").addEventListener("click", function () { if (walk && G.share) G.share.stand(standOf()); });
+  panel.querySelector(".nav-paste").addEventListener("click", function () { if (G.share) G.share.paste(); });
 
   function renderPanel() {
     if (!walk) return;
     // freie Aufnahme: Felder, die nur mit Route Sinn ergeben, ausblenden
     [el.rest, el.left, el.eta, el.plan].forEach(function (v) { v.parentNode.hidden = !!walk.free; });
     el.title.textContent = walk.routeName;
+    var comp = walk.companion;
+    el.pause.hidden = !!comp;
+    photoBtn.hidden = !!comp || !G.photos;
+    panel.querySelector(".nav-share").hidden = !!comp || !G.share;
+    panel.querySelector(".nav-paste").hidden = !comp || !G.share;
+    el.end.title = comp ? "Begleiten beenden" : "Tour beenden";
+    el.end.setAttribute("aria-label", el.end.title);
+    if (comp) walk.distance = companionDistance();
     var moving = movingTime(walk);
     el.dist.textContent = num(walk.distance / 1000, 2);
     el.time.textContent = duration(moving);
@@ -659,7 +674,15 @@
     // knapper Zustand, EINE Zeile (Kopfhöhe = --sheet-min): nur das Wichtigste, in dieser Rangfolge
     var st;
     var cls = "is-rec";
-    if (walk.paused) { st = walk.interrupted ? "Pause (neu geladen)" : "Pause"; cls = "is-pause"; }
+    if (comp) {
+      // Begleiten: Stand-Zeit, sonst wie unterwegs (Abbiegung, neben der Route)
+      if (turnFlash && Date.now() < turnFlash.until) { st = turnFlash.text; cls = "is-warn"; }
+      else if (progress && progress.off > OFF_ROUTE_M) { st = "⚠ " + Math.round(progress.off) + " m neben der Route"; cls = "is-warn"; }
+      else if (!walk.lastFix) st = "Begleiten · warte auf GPS";
+      else st = "Begleiten" + (comp.at ? " · Stand " + hhmm(comp.at) : "");
+      cls = cls === "is-warn" ? cls : "is-pause";
+    }
+    else if (walk.paused) { st = walk.interrupted ? "Pause (neu geladen)" : "Pause"; cls = "is-pause"; }
     else if (turnFlash && Date.now() < turnFlash.until) { st = turnFlash.text; cls = "is-warn"; }
     else if (progress && progress.off > OFF_ROUTE_M) { st = "⚠ " + Math.round(progress.off) + " m neben der Route"; cls = "is-warn"; }
     else if (!walk.lastFix) { st = "● Aufnahme · warte auf GPS"; }
@@ -672,6 +695,7 @@
   }
 
   function num(v, digits) { return v.toFixed(digits).replace(".", ","); }
+  function hhmm(t) { var d = new Date(t); return d.getHours() + ":" + (d.getMinutes() < 10 ? "0" : "") + d.getMinutes(); }
 
   // Höhenprofil mit eigener Position (nur wenn die Route Höhen hat)
   var lastProfileKey = "";
@@ -759,10 +783,10 @@
     var tick = 0;
     ticker = setInterval(function () {
       if (!walk) return;
-      if (NATIVE && !document.hidden && ++tick % 3 === 0 && !walk.paused) pullNative();
+      if (NATIVE && !walk.companion && !document.hidden && ++tick % 3 === 0 && !walk.paused) pullNative();
       if (!walk.paused) renderPanel();
     }, 1000);
-    if (NATIVE) {
+    if (NATIVE && !walk.companion) {
       sentTurnsKey = null;
       nativeBattery = NATIVE.batteryOptimized();
       pullNative();
@@ -805,6 +829,97 @@
     // dann auf die eigene Position und ihr folgen
     setTimeout(function () { G.follow(); }, 600);
     requestWakeLock();
+  }
+
+  // ---------- Begleiten: Tour eines anderen Geräts mitverfolgen (ohne eigene Aufzeichnung) ----------
+  //
+  // km gewandert = geteilter Stand (falls vorhanden) + Strecke entlang der Route seit der Stelle des Stands;
+  // ohne Stand: Strecke entlang der Route vom Start bis zur eigenen Position.
+  function companionDistance() {
+    var c = walk.companion;
+    var d = progress ? progress.dRoute : (c.dRoute || 0);
+    if (c.dist == null) return Math.max(0, d);
+    return c.dist + Math.max(0, d - (c.dRoute || 0));
+  }
+
+  function startCompanion(rec, stand) {
+    if (active && walk && !walk.companion) {
+      G.showStatus("Es läuft bereits eine eigene Tour. Bitte zuerst beenden.", 5000);
+      enter();
+      return;
+    }
+    var line = G.planner ? G.planner.routeLine(rec) : [];
+    walk = {
+      id: "c" + Date.now().toString(36),
+      companion: { dist: null, dRoute: 0, at: null },
+      routeId: rec.id,
+      routeName: rec.name,
+      planLine: line,
+      route: { segments: rec.segments || [], closing: rec.closing || null, roundtrip: !!rec.roundtrip, points: rec.points || [] },
+      planLength: (rec.stats && rec.stats.length) || lineLength(line),
+      planHours: G.planner && G.planner.routeStats ? G.planner.routeStats(rec).hours : null,
+      startedAt: Date.now(),
+      paused: false,
+      pausedAt: null,
+      pausedTotal: 0,
+      segments: [[]],
+      distance: 0,
+      lastFix: null
+    };
+    if (stand) applyStandData(stand);
+    saveWalk();
+    enter();
+    setTimeout(function () { G.follow(); }, 600);
+  }
+
+  // geteilter Stand: {route, name, startedAt, dist, moving, elapsed, dRoute, at, track}
+  function applyStandData(st) {
+    walk.companion = { dist: st.dist, dRoute: st.dRoute || 0, at: st.at };
+    walk.startedAt = st.startedAt || walk.startedAt;
+    // Pausen des Aufzeichnenden bis zum Stand übernehmen (danach zählt die Zeit als unterwegs)
+    walk.pausedTotal = Math.max(0, (st.at - walk.startedAt) - (st.moving || 0));
+    walk.segments = st.track && st.track.length ? st.track : [[]];
+    if (st.route) {
+      walk.route = st.route;
+      walk.planLine = G.planner.routeLine(st.route);
+      walk.reversed = !!st.reversed;
+    }
+  }
+
+  function applyStand(st, rec) {
+    if (!active || !walk || !walk.companion || (rec && walk.routeId !== rec.id)) {
+      startCompanion(rec, st);
+      G.showStatus("Begleiten mit Stand von " + hhmm(st.at) + ".", 4000);
+      return;
+    }
+    applyStandData(st);
+    computeRouteData();
+    progress = null;
+    lastProfileKey = "";
+    drawPlan();
+    drawWalk();
+    saveWalk();
+    var here = G.getPosition && G.getPosition();
+    if (here) progress = locateOnRoute(here.lat, here.lng);
+    renderPanel();
+    G.showStatus("Stand von " + hhmm(st.at) + " übernommen.", 4000);
+  }
+
+  // eigenen Stand für die Begleitung zusammenstellen
+  function standOf() {
+    if (NATIVE) pullNative();
+    return {
+      name: walk.routeName,
+      routeId: walk.routeId,
+      route: walk.free ? null : routeOf(walk),
+      reversed: !!walk.reversed,
+      startedAt: walk.startedAt,
+      at: Date.now(),
+      dist: walk.distance,
+      moving: movingTime(walk),
+      dRoute: progress && progress.off <= OFF_ROUTE_M ? progress.dRoute : null,
+      track: walk.segments.filter(function (sg) { return sg.length > 1; })
+    };
   }
 
   // Aufnahme ohne geplante Route (spontane Tour)
@@ -866,6 +981,10 @@
 
   function askEnd() {
     if (!walk) return;
+    if (walk.companion) {
+      G.actionSheet("Begleiten beenden?", walk.routeName, [{ label: "Beenden", danger: true, onClick: leave }]);
+      return;
+    }
     if (!walk.paused) pause();
     var pts = walk.segments.reduce(function (n, s) { return n + s.length; }, 0);
     G.actionSheet("Tour beenden?", km(walk.distance) + " · " + duration(movingTime(walk)) + " · " + pts + " Punkte", [
@@ -930,7 +1049,7 @@
   }
 
   function leave() {
-    if (NATIVE) NATIVE.call("stopRecording");   // erst nach dem Speichern bzw. Verwerfen: löscht die Punkte im Dienst
+    if (NATIVE && walk && !walk.companion) NATIVE.call("stopRecording");   // erst nach dem Speichern bzw. Verwerfen: löscht die Punkte im Dienst
     active = false;
     walk = null;
     stats = null;
@@ -1369,12 +1488,12 @@
     var saved = JSON.parse(window.localStorage.getItem(WALK_KEY) || "null");
     if (saved && Array.isArray(saved.segments)) {
       walk = saved;
-      var nState = NATIVE ? NATIVE.call("recordingState") : null;
+      var nState = NATIVE && !walk.companion ? NATIVE.call("recordingState") : null;
       if (nState === "rec" && walk.paused) NATIVE.call("pauseRecording");   // Zustand der Seite gilt
       if (!walk.paused && nState === "rec") {
         // App: Der Dienst hat weiter aufgezeichnet – nichts verloren, einfach fortsetzen
         walk.interrupted = false;
-      } else if (!walk.paused) {
+      } else if (!walk.paused && !walk.companion) {
         // Seite wurde während der Aufzeichnung neu geladen: pausiert fortsetzen
         // Pause ab der letzten Sicherung, damit die Zeit ohne Aufzeichnung nicht mitzählt
         walk.paused = true;
@@ -1416,6 +1535,8 @@
   G.nav = {
     start: start,
     startFree: startFree,
+    startCompanion: startCompanion,
+    applyStand: applyStand,
     isActive: function () { return active; },
     getWalk: function () { return walk; },
     getTurns: function () { return turns; },

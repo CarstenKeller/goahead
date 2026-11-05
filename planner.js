@@ -1466,6 +1466,8 @@
       : { label: "👁 Ansehen", onClick: function () { viewRoute(rec); } });
     actions.push({ label: "✎ Verändern", onClick: function () { editRoute(rec); } });
     actions.push({ label: "⧉ Kopieren und neu planen", onClick: function () { copyRoute(rec); } });
+    if (G.nav && G.nav.startCompanion) actions.push({ label: "👥 Begleiten (ohne Aufzeichnung)", onClick: function () { G.nav.startCompanion(rec); } });
+    if (G.share) actions.push({ label: "↗ Für Begleitung teilen (GoAhead-Link)", onClick: function () { G.share.tour(rec); } });
     actions.push({ label: "↗ Teilen (z. B. WhatsApp)", onClick: function () { shareRoute(rec); } });
     actions.push({ label: "⬇ GPX exportieren", onClick: function () { exportRouteGpx(rec); } });
     actions.push({ label: "🗑 Löschen", danger: true, onClick: function () { deleteRoute(rec); } });

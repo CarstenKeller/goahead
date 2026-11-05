@@ -1311,6 +1311,16 @@ button {
   color: var(--c-text);
 }
 /* Menü-Knopf „Aufnahme“ */
+.paste-toggle {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-text) !important;
+}
+.paste-toggle svg {
+  width: 26px;
+  height: 26px;
+}
 .rec-toggle {
   color: var(--c-danger) !important;
   display: flex !important;

@@ -60,6 +60,18 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     und nur den Text zu teilen.
 - **Aufnahme ohne Route** (roter Aufnahme-Knopf im Menü): spontane Tour aufzeichnen wie unterwegs, nur ohne
   Routenbezug (keine Restzeit/Abbiegungen). Beim Beenden fragt die App nach dem Namen.
+- **Begleiten** (Modul `share.js`, ohne Server): Wer mitwandert, aber nicht aufzeichnet (z. B. iPhone mit der Web-App),
+  sieht Karte, Route, eigene Position, km gewandert/verbleibend, Restzeit, Ankunft und Höhenprofil.
+  - *Geplant → „Für Begleitung teilen“* schickt einen Text mit GoAhead-Link (Route vereinfacht auf 5 m, gepackt).
+  - Empfang: Link antippen, oder – in der Web-App auf dem Home-Bildschirm des iPhones, die einen eigenen Speicher
+    hat (Kenntnisstand, ungeprüft) – Nachricht kopieren und im Menü bzw. beim Begleiten „Einfügen“ tippen. Die Tour
+    landet unter *Geplant*, dann „Begleiten“ (auch über das Menü einer geplanten Tour).
+  - *Unterwegs → „Stand teilen“* (Knopf neben „S“) schickt den aktuellen Stand: Route (auch umgedreht), Start, km,
+    Zeit in Bewegung und die gelaufene Spur. Beim Begleiten „Einfügen“ übernimmt ihn; danach zählt GoAhead die Strecke
+    entlang der Route seit der Stelle des Stands dazu. Ohne Stand ist „km gewandert“ die Strecke entlang der Route.
+  - Begleiten zeichnet nicht auf, hält den Bildschirm nicht an und speichert beim Beenden nichts.
+  - Daten: JSON, deflate (`CompressionStream`, Safari ab 16.4), base64url im Link-Teil `#g=`; Linien als
+    Polyline-Zeichenkette (Google-Verfahren, Höhe als dritter Wert).
 - **Fotos unterwegs** (Kamera-Knopf in der Kopfzeile von *Unterwegs*), Modul `photos.js`: Das Foto wird an der
   aktuellen Position der Tour zugeordnet und als Kamera-Marker auf der Karte gezeigt; Antippen zeigt das Bild
   (dort auch löschen). In der **Android-App** speichert die Kamera das Bild in voller Größe in der Galerie,
@@ -297,6 +309,7 @@ Einmalig nötig: unter *Settings → Pages → Build and deployment → Source* 
 - `nav.js`: Unterwegs-Modus, Aufzeichnung, Abbiegungen, Liste *Erwandert*
 - `tourview.js`: Leiste mit Tour-Details, Listenkopf (Anzahl, km, Jahr, Suche)
 - `photos.js`: Fotos unterwegs (Kamera, Speicher, Marker, Anzeige)
+- `share.js`: Tour und Stand für die Begleitung teilen und einfügen
 - `backup.js`: Sicherung/Wiederherstellen, Sammel-Import (GPX, ZIP) nach *Geplant*/*Erwandert*
 - `android/`: Android-App (WebView + Aufzeichnung im Hintergrund), Build im Pages-Workflow
 - `config.js`: Kartendienste, Startansicht, Zoomstufe
