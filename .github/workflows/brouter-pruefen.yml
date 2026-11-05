@@ -1,0 +1,19 @@
+name: BRouter-Rundtour prüfen
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ccr-a56f7acc-f6tzvw]
+    paths:
+      - .github/scripts/probe_brouter.py
+      - .github/workflows/brouter-pruefen.yml
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 .github/scripts/probe_brouter.py
