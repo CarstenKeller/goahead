@@ -158,6 +158,11 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
    Langer Druck: CDP `Input.dispatchTouchEvent`.
 4. Commit auf Deutsch, Push auf den Entwicklungs-Branch → `pages.yml` läuft → Lauf prüfen (bei 502 im
    Deploy-Schritt einen neuen Lauf per workflow_dispatch starten, nicht „Re-run failed jobs“).
+   „Re-run“ legt ein zweites Paket `github-pages` an → Fehler „Multiple artifacts“.
+   **Neuer Entwicklungs-Branch:** in `pages.yml` (`on.push.branches`) eintragen **und** vom Nutzer in den
+   Repository-Einstellungen (Environments → `github-pages` → Deployment branches) freigeben lassen.
+   Hängt eine Veröffentlichung („deployment_queued“, dann „Deployment failed, try again later“), scheitern weitere
+   Läufe zum selben Commit offenbar ebenso (Vermutung, Kennung = Commit) – dann mit einem neuen Commit veröffentlichen.
 
 ## 10. Offen, ungeprüft, bekannte Grenzen
 
