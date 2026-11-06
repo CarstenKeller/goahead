@@ -1585,6 +1585,12 @@ a[role="button"] {
 .mk-pin.sel .mk-stack {
   outline: 3px solid var(--c-mk-sel);
 }
+/* Größe der Wegzeichen im Marker: --mk-s (marks.js, nach Einstellung „Wegemarkierungen“) */
+.mk-pin .mk-sign {
+  width: var(--mk-s, 28px);
+  height: var(--mk-s, 28px);
+  font-size: calc(var(--mk-s, 28px) * 0.55);
+}
 .mk-tail {
   width: 0;
   height: 0;

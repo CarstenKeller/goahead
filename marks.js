@@ -164,24 +164,31 @@
   var selId = null;          // ausgewählte Position
   var pick = null;           // {photoId|null}: Wegzeichen für die ausgewählte Position wählen
 
+  function scale() { return (G.symbolScale && G.symbolScale()) || 1; }
+
   function markerIcon(layer, p) {
     var sel = current === layer && p.id === selId;
     if (map.getZoom() < DETAIL_ZOOM && !sel) {
       var worst = "ok";
       p.signs.forEach(function (s) { if (s.state === "missing") worst = "missing"; else if (s.state === "renew" && worst !== "missing") worst = "renew"; });
       if (!p.signs.length) worst = "none";
-      return L.divIcon({ className: "", html: '<div class="mk-dot mk-' + worst + '"></div>', iconSize: [14, 14], iconAnchor: [7, 7] });
+      var d = Math.round(14 * scale());
+      return L.divIcon({ className: "", html: '<div class="mk-dot mk-' + worst + '" style="width:' + d + "px;height:" + d + 'px"></div>',
+        iconSize: [d, d], iconAnchor: [d / 2, d / 2] });
     }
     // Beim Filtern nur die passenden Wegzeichen zeigen; die ausgewählte Position zeigt alle (zum Bearbeiten)
     var list = p.signs;
     if (current === layer && filterActive() && !sel) list = list.filter(signMatches);
     if (!list.length) list = [null];
-    var html = '<div class="mk-pin' + (sel ? " sel" : "") + '"><div class="mk-stack">' + list.map(function (s) {
+    // Größe wie die Wegemarkierungen der Kartenebenen (Einstellungen → Karte → Wegemarkierungen)
+    var sz = Math.round(28 * scale());
+    var html = '<div class="mk-pin' + (sel ? " sel" : "") + '" style="--mk-s:' + sz + 'px"><div class="mk-stack">' + list.map(function (s) {
       if (!s) return '<span class="mk-sign mk-none">?</span>';
       return '<span class="mk-sign mk-' + s.state + '"><img alt="" src="' + esc(symUrl(symOf(layer, s.sym))) + '"></span>';
     }).join("") + '</div><span class="mk-tail"></span></div>';
-    var h = list.length * 30 + 6 + 8;
-    return L.divIcon({ className: "", html: html, iconSize: [36, h], iconAnchor: [18, h] });
+    // Stapel: Wegzeichen mit 2 px Abstand, 2 px Rand, darunter 8 px Spitze
+    var w = sz + 4, h = list.length * (sz + 2) - 2 + 4 + 8;
+    return L.divIcon({ className: "", html: html, iconSize: [w, h], iconAnchor: [w / 2, h] });
   }
 
   function renderMarkers(layer) {
@@ -242,6 +249,9 @@
       save(layer);
       renderPage();
     }
+  });
+  if (G.onSymbolScale) G.onSymbolScale(function () {
+    layers.forEach(function (l) { if (groups[l.id] && map.hasLayer(groups[l.id])) renderMarkers(l); });
   });
   map.on("zoomend", function () {
     layers.forEach(function (l) { if (groups[l.id] && map.hasLayer(groups[l.id])) renderMarkers(l); });
@@ -862,7 +872,7 @@
       ctx.strokeStyle = ink;
       ctx.strokeRect(mx + 0.5, my + 0.5, mw - 1, mh - 1);
       // Positionen: passende Wegzeichen untereinander, Spitze am Ort
-      var s = Math.round(5.5 * PX_MM), gap = 3, pad = 3;
+      var s = Math.round(5.5 * PX_MM * Math.min(2, scale())), gap = 3, pad = 3;   // wie auf der Karte vergrößert (höchstens doppelt)
       ctx.save();
       ctx.beginPath();
       ctx.rect(mx, my, mw, mh);

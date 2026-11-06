@@ -115,7 +115,8 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     (*gut*, *erneuern*, *fehlt*); die ausgewählte Position lässt sich auf der Karte verschieben (GPS ist im Wald oft
     einige Meter ungenau).
   - **Karte:** an jeder Position die Wegzeichen untereinander, Rahmen nach Zustand (grün, orange, rot gestrichelt);
-    unter Zoomstufe 14 nur farbige Punkte. Die Ebenen stehen auch in der Kartenwahl.
+    unter Zoomstufe 14 nur farbige Punkte. Die Ebenen stehen auch in der Kartenwahl. Die Größe folgt der Einstellung
+    *Karte → Wegemarkierungen* (100–300 %, im PDF höchstens doppelt).
   - **Filter** nach Wegzeichen und Zustand mit Anzahl der Positionen und Wegzeichen; auf der Karte erscheinen dann nur
     die passenden Wegzeichen (nicht passende werden ausgeblendet). Je hinterlegtem Wegzeichen die Anzahl nach Zustand.
   - **Zählung:** „Wegzeichen“ = vorhandene (gut + erneuern), fehlende werden getrennt gezählt („… · 2 fehlen“).

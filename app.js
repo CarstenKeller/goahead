@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "56";
+  var APP_VERSION = "57";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {
@@ -361,6 +361,7 @@
     if (storedScale >= 1 && storedScale <= 3) symbolScale = storedScale;
   } catch (e) { /* ohne Speicher */ }
 
+  var symbolScaleListeners = [];   // z. B. marks.js: Wegzeichen der eigenen Ebenen
   function applySymbolScale(f) {
     symbolScale = f;
     (cfg.overlays || []).forEach(function (def) {
@@ -368,6 +369,7 @@
       if (def.type === "wms") layer.setSymbolScale(f);
       else setXyzSymbolScale(layer, f);
     });
+    symbolScaleListeners.forEach(function (fn) { try { fn(f); } catch (e) { console.warn(e); } });
   }
 
   // ---------- Einstellungen ----------
@@ -1933,6 +1935,9 @@
     onSettingsChange: function (fn) { settingsListeners.push(fn); },
     shareGpx: shareGpx,
     icon: icon,
+    // Größe der Wegemarkierungen (Einstellungen → Karte), Faktor 1–3
+    symbolScale: function () { return symbolScale; },
+    onSymbolScale: function (fn) { symbolScaleListeners.push(fn); },
     directionArrows: directionArrows,
     version: APP_VERSION,
     i18n: I18N,
