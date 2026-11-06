@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "36";
+  var APP_VERSION = "37";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {
@@ -381,7 +381,8 @@
     reversePct: 1,       // Unterwegs: Richtung umdrehen, wenn so viel % der Strecke entgegen der Richtung gegangen (0 = aus)
     listCheck: false,    // Erwandert: Knopf „Liste prüfen“ anzeigen
     loopPrefer: "longer", // Rundtour nach Länge: passt die Länge nicht, die nächstlängere ("longer") oder -kürzere ("shorter")
-    loopOverlapPct: 0    // Rundtour: erlaubter Anteil doppelt gegangener Strecke in %
+    loopOverlapPct: 0,   // Rundtour: erlaubter Anteil doppelt gegangener Strecke in %
+    loopWarnPct: 20      // Rundtour: Warnung, wenn die Länge um mehr als … % von der Vorgabe abweicht
   };
   var settings = JSON.parse(JSON.stringify(SETTING_DEFAULTS));
   try {
@@ -434,6 +435,7 @@
           selectRow("routing", "Routing", [["brouter", "BRouter (Wandern, mit Höhen)"], ["osrm", "OSRM (Fußweg)"]]) +
           selectRow("loopPrefer", "Rundtour, wenn die Länge nicht passt", [["longer", "nächstlängere"], ["shorter", "nächstkürzere"]]) +
           numRow("loopOverlapPct", "Rundtour: doppelte Wege erlaubt bis", "%", 0, 30, 1) +
+          numRow("loopWarnPct", "Rundtour: Warnung ab Längenabweichung", "%", 1, 100, 1) +
           '<div class="settings-mini">Gehgeschwindigkeit (für die Dauer)</div>' +
           numRow("speedFlat", "Ebene", "km/h", 0.5, 10, 0.1) +
           numRow("speedUp", "Steigung", "km/h", 0.5, 10, 0.1) +

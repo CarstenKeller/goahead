@@ -30,20 +30,22 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     danach Startpunkt auf der Karte antippen (ein vorhandener Punkt dient als Start). BRouter berechnet eine Runde
     (`engineMode=4`, geprüft im Quelltext abrensch/brouter und per Workflow „BRouter-Rundtour prüfen“ gegen
     brouter.de). `roundTripDistance` ist dort der Radius des Kreises, auf dem BRouter Wegpunkte setzt; die Länge
-    war im Test das 5,4- bis 8,9-Fache. BRouter vermeidet doppelte Wege nicht sicher (z. B. Stichwege zu seinen
-    Wegpunkten). GoAhead schneidet Stichwege heraus (Abschnitte, die auf demselben Weg hin und zurück führen:
-    Hin- und Rückweg spiegelbildlich höchstens 20 m auseinander), fragt 6 Richtungen ab – ohne saubere Runde
-    6 weitere – (Radius aus dem gemessenen Verhältnis), misst je Runde den
-    Anteil doppelt gegangener Strecke (Linie alle 10 m abgetastet; doppelt = ein anderer Teil der Runde näher als
-    15 m) und bessert die beste Richtung bis zu 2-mal in der Länge nach. Gewählt wird eine Runde ohne doppelte Wege
-    (Einstellung *Planen → Rundtour: doppelte Wege erlaubt bis … %*, Standard 0 %), die der Wunschlänge am
-    nächsten kommt (±6 %). Findet sich keine Runde innerhalb der Toleranz, fragt GoAhead („Andere Richtungen
-    versuchen“ oder „Trotzdem übernehmen“) statt eine Runde mit doppelten Wegen still zu übernehmen; passt keine, die nächstlängere – oder, nach
-    Einstellung *Planen → Rundtour, wenn die Länge nicht passt*, die nächstkürzere. Gibt es keine saubere Runde,
-    zeigt die Frage den Anteil doppelter Strecke. Ergebnis: normale Planung mit Wegpunkten alle 1–3 km
-    (verschieben, löschen, einfügen wie gewohnt), Rückweg als Rundtour-Abschnitt. Erneut *Rundtour*: *Andere
-    Variante* (andere Richtungen), *Länge ändern*, *Als eigene Planung weiter*. Immer BRouter, auch wenn OSRM
-    eingestellt ist (OSRM kennt keine Rundtour). Mit Punkten ≥ 2 schließt/öffnet *Rundtour* wie bisher den Rückweg.
+    war im Test das 5,4- bis 8,9-Fache.
+    - BRouter vermeidet doppelte Wege nicht sicher. GoAhead schneidet daher Stichwege heraus (auf demselben Weg hin
+      und zurück: Hin- und Rückweg spiegelbildlich höchstens 20 m auseinander) und misst je Runde den Anteil doppelt
+      gegangener Strecke (alle 10 m abgetastet; doppelt = ein anderer Teil der Runde näher als 15 m).
+    - Ein „Stiel“ am Start (Anfang und Ende auf demselben Weg, z. B. Start in einer Sackgasse) wird akzeptiert,
+      wenn keine Richtung ohne ihn auskommt.
+    - Suche ohne Rückfrage: 6 Richtungen; ohne passende Runde 6 weitere, danach größere Radien (×1,6, ×2,5), bis
+      eine Runde innerhalb der Toleranz *Planen → Rundtour: doppelte Wege erlaubt bis … %* (Standard 0 %) gefunden
+      ist; dann bis zu 3 Nachbesserungen der Länge.
+    - Auswahl: Länge ±6 % → am nächsten; sonst die nächstlängere (Standard) bzw. nächstkürzere (Einstellung
+      *Rundtour, wenn die Länge nicht passt*). Weicht die Länge um mehr als *Rundtour: Warnung ab
+      Längenabweichung* (Standard 20 %) ab, zeigt die Meldung „⚠ +… % Länge“.
+    - Ergebnis: normale Planung mit Wegpunkten alle 1–3 km (verschieben, löschen, einfügen wie gewohnt), Rückweg als
+      Rundtour-Abschnitt. Erneut *Rundtour*: *Andere Variante* (andere Richtungen), *Länge ändern*, *Als eigene
+      Planung weiter*. Immer BRouter, auch wenn OSRM eingestellt ist (OSRM kennt keine Rundtour). Mit Punkten ≥ 2
+      schließt/öffnet *Rundtour* wie bisher den Rückweg.
   - *Rückgängig/Wiederholen*: bis zu 20 Schritte (während der Sitzung).
   - Für alle vorläufigen (orangen) Punkte gilt: antippen = übernehmen, ziehen = verschieben, Tipp woanders = wegnehmen.
   - **Höhen und Dauer:** Kopfzeile zeigt Punkte, Länge, ↑/↓ Höhenmeter und ≈ Gehzeit. Bei BRouter-Routing erscheint
