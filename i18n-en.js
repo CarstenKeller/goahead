@@ -550,5 +550,11 @@ window.GOAHEAD_I18N_EN = {
   "{0} fehlen": "{0} missing",
   "{0} zugeordnet": "{0} assigned",
   "{0} Fotos": "{0} photos",
-  "„{0}“ ist an dieser Stelle schon erfasst.": "“{0}” is already recorded at this spot."
+  "„{0}“ ist an dieser Stelle schon erfasst.": "“{0}” is already recorded at this spot.",
+  "Drucken": "Print",
+  "Drucken oder als PDF speichern": "Print or save as PDF",
+  "Druckansicht schließen": "Close print preview",
+  "Keine Positionen zum Drucken.": "No positions to print.",
+  "Zum Drucken bitte die neue Version der Android-App installieren.": "To print, please install the new version of the Android app.",
+  "Drucken: Rand um die Positionen": "Print: margin around the positions"
 };

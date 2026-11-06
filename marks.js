@@ -165,8 +165,8 @@
   var pick = null;           // {photoId|null}: Wegzeichen für die ausgewählte Position wählen
 
   function markerIcon(layer, p) {
-    var sel = current === layer && p.id === selId;
-    if (map.getZoom() < DETAIL_ZOOM && !sel) {
+    var sel = current === layer && p.id === selId && !printing;
+    if (map.getZoom() < DETAIL_ZOOM && !sel && !printing) {
       var worst = "ok";
       p.signs.forEach(function (s) { if (s.state === "missing") worst = "missing"; else if (s.state === "renew" && worst !== "missing") worst = "renew"; });
       if (!p.signs.length) worst = "none";
@@ -189,11 +189,12 @@
     if (!g) return;
     g.clearLayers();
     layer.points.forEach(function (p) {
-      if (current === layer && !pointMatches(p) && p.id !== selId) return;
-      var sel = current === layer && p.id === selId;
+      if (current === layer && !pointMatches(p) && (p.id !== selId || printing)) return;
+      var sel = current === layer && p.id === selId && !printing;
       var m = L.marker([p.lat, p.lng], { icon: markerIcon(layer, p), keyboard: false, draggable: sel, zIndexOffset: sel ? 900 : 400 });
       m.on("click", function (e) {
         L.DomEvent.stopPropagation(e);
+        if (printing) return;
         openLayer(layer.id, { select: p.id });
       });
       if (sel) {
@@ -311,6 +312,7 @@
       '<span class="sheet-titles"><span class="mk-title" data-noi18n></span><span class="mk-sub"></span></span>' +
       '<span class="sheet-head-btns">' +
         '<button type="button" class="icon-btn mk-photo" title="Markierung fotografieren" aria-label="Markierung fotografieren">' + G.icon("camera") + "</button>" +
+        '<button type="button" class="icon-btn mk-print" title="Drucken" aria-label="Drucken">' + G.icon("print") + "</button>" +
         '<button type="button" class="icon-btn mk-nophoto" title="Wegzeichen ohne Foto erfassen" aria-label="Wegzeichen ohne Foto erfassen">' + G.icon("plus") + "</button>" +
         '<button type="button" class="icon-btn mk-close" title="Schließen" aria-label="Schließen">' + G.icon("close") + "</button>" +
       "</span>" +
@@ -486,6 +488,7 @@
   }
 
   panel.querySelector(".mk-close").addEventListener("click", closeLayer);
+  panel.querySelector(".mk-print").addEventListener("click", function () { openPrint(); });
 
   panel.querySelector(".mk-photo").addEventListener("click", function () {
     if (!current || !G.photos) return;
@@ -647,6 +650,130 @@
       ]);
     }
   });
+
+  // ---------- Drucken: Ebene mit den gefilterten Positionen auf A4 (Druckdialog → „Als PDF speichern“) ----------
+  // Ausschnitt: alle gefilterten Positionen + Rand (Einstellung „Drucken: Rand um die Positionen“, Standard 100 m).
+  // Die Karte selbst (#map) wird dafür in ein A4-großes Blatt verschoben, das am Bildschirm verkleinert als
+  // Vorschau erscheint; gedruckt wird über @media print. Android-App: window.print() wirkt in der WebView nicht,
+  // daher die App-Methode printPage(titel, quer) (Android-Druckdienst, ab App-Version mit dieser Methode).
+  var A4 = { w: 734, h: 1063 };          // A4 abzüglich 8 mm Rand, in CSS-Pixeln (96 dpi)
+  var PRINT_HEAD = 64, PRINT_FOOT = 92;  // Kopf (Titel, Filter, Anzahl) und Fuß (Legende) des Blatts
+  var printing = null;                   // {layer, view, landscape, parent, next}
+
+  var printSheet = document.createElement("div");
+  printSheet.id = "mk-print-sheet";
+  printSheet.hidden = true;
+  printSheet.innerHTML = '<div class="mk-print-head"></div><div class="mk-print-map"></div><div class="mk-print-foot"></div>';
+  document.body.appendChild(printSheet);
+  var printBar = document.createElement("div");
+  printBar.id = "mk-print-bar";
+  printBar.hidden = true;
+  printBar.innerHTML =
+    '<button type="button" class="icon-btn mk-print-go" title="Drucken oder als PDF speichern" aria-label="Drucken oder als PDF speichern">' + G.icon("print") + "</button>" +
+    '<button type="button" class="icon-btn mk-print-close" title="Druckansicht schließen" aria-label="Druckansicht schließen">' + G.icon("close") + "</button>";
+  document.body.appendChild(printBar);
+  var pageStyle = document.createElement("style");
+  document.head.appendChild(pageStyle);
+
+  function printBounds(layer) {
+    var pts = layer.points.filter(pointMatches);
+    if (!pts.length) return null;
+    var s = 90, n = -90, w = 180, e = -180;
+    pts.forEach(function (p) { s = Math.min(s, p.lat); n = Math.max(n, p.lat); w = Math.min(w, p.lng); e = Math.max(e, p.lng); });
+    var m = (G.getSettings && G.getSettings().printMarginM) || 0;
+    var dLat = m / 111320, dLng = m / (111320 * Math.cos((s + n) / 2 * Math.PI / 180));
+    return L.latLngBounds([s - dLat, w - dLng], [n + dLat, e + dLng]);
+  }
+
+  function scalePrintSheet() {
+    if (!printing) return;
+    var W = printing.landscape ? A4.h : A4.w, H = printing.landscape ? A4.w : A4.h;
+    var avail = { w: window.innerWidth - 16, h: window.innerHeight - 76 };
+    var k = Math.min(1, avail.w / W, avail.h / H);
+    printSheet.style.width = W + "px";
+    printSheet.style.height = H + "px";
+    printSheet.style.transform = "scale(" + k + ")";
+    printSheet.style.left = Math.round((window.innerWidth - W * k) / 2) + "px";
+  }
+
+  function printLegend(layer) {
+    var used = {};
+    layer.points.forEach(function (p) { p.signs.forEach(function (s) { if (signMatches(s)) used[s.sym] = (used[s.sym] || 0) + 1; }); });
+    var html = layer.symbols.filter(function (sym) { return used[sym.id]; }).map(function (sym) {
+      return '<span class="mk-print-leg"><span class="mk-sign mk-ok"><img alt="" src="' + esc(symUrl(sym)) + '"></span>' +
+        '<span data-noi18n>' + esc(sym.name) + "</span> <b>" + used[sym.id] + "</b></span>";
+    }).join("");
+    html += '<span class="mk-print-states">' + STATES.map(function (st) {
+      return '<span class="mk-print-leg"><span class="mk-sign mk-' + st[0] + '"></span>' + esc(T(st[1])) + "</span>";
+    }).join("") + "</span>";
+    return html;
+  }
+
+  function openPrint() {
+    var layer = current;
+    if (!layer || printing) return;
+    var b = printBounds(layer);
+    if (!b) { G.showStatus("Keine Positionen zum Drucken.", 5000); return; }
+    // Querformat, wenn der Ausschnitt breiter als hoch ist (in Metern)
+    var c = b.getCenter();
+    var wM = map.distance([c.lat, b.getWest()], [c.lat, b.getEast()]);
+    var hM = map.distance([b.getSouth(), c.lng], [b.getNorth(), c.lng]);
+    var mapEl = map.getContainer();
+    printing = { layer: layer, view: { center: map.getCenter(), zoom: map.getZoom() }, landscape: wM > hM,
+      parent: mapEl.parentNode, next: mapEl.nextSibling };
+    var W = printing.landscape ? A4.h : A4.w, H = printing.landscape ? A4.w : A4.h;
+    pageStyle.textContent = "@page { size: A4 " + (printing.landscape ? "landscape" : "portrait") + "; margin: 8mm; }";
+    var sym = filter.sym && symOf(layer, filter.sym);
+    var what = [sym ? sym.name : T("Alle Wegzeichen"), filter.state ? stateLabel(filter.state) : T("Alle Zustände")].join(" · ");
+    printSheet.querySelector(".mk-print-head").innerHTML =
+      '<div class="mk-print-title" data-noi18n>' + esc(layer.name) + "</div>" +
+      '<div class="mk-print-sub"><span data-noi18n>' + esc(what) + "</span> · " + esc(summary(layer, true)) + " · " +
+        esc(new Date().toLocaleDateString(G.i18n.locale)) + "</div>";
+    printSheet.querySelector(".mk-print-foot").innerHTML = printLegend(layer);
+    var box = printSheet.querySelector(".mk-print-map");
+    box.style.height = (H - PRINT_HEAD - PRINT_FOOT) + "px";
+    box.appendChild(mapEl);
+    document.body.classList.add("mk-print");
+    printSheet.hidden = false;
+    printBar.hidden = false;
+    scalePrintSheet();
+    ["dragging", "touchZoom", "doubleClickZoom", "scrollWheelZoom"].forEach(function (h) { if (map[h]) map[h].disable(); });
+    map.invalidateSize(false);
+    map.fitBounds(b, { padding: [0, 0], animate: false });
+    renderMarkers(layer);
+  }
+
+  function closePrint() {
+    if (!printing) return;
+    var p = printing;
+    printing = null;
+    var mapEl = map.getContainer();
+    p.parent.insertBefore(mapEl, p.next);
+    document.body.classList.remove("mk-print");
+    printSheet.hidden = true;
+    printBar.hidden = true;
+    printSheet.style.transform = "";
+    ["dragging", "touchZoom", "doubleClickZoom", "scrollWheelZoom"].forEach(function (h) { if (map[h]) map[h].enable(); });
+    map.invalidateSize(false);
+    map.setView(p.view.center, p.view.zoom, { animate: false });
+    renderMarkers(p.layer);
+  }
+
+  function doPrint() {
+    if (!printing) return;
+    if (G.native) {
+      var r = G.native.call("printPage", printing.layer.name, printing.landscape);
+      if (r == null) G.showStatus("Zum Drucken bitte die neue Version der Android-App installieren.", 8000);
+      return;
+    }
+    window.print();
+  }
+
+  printBar.addEventListener("click", function (e) {
+    if (e.target.closest(".mk-print-go")) doPrint();
+    else if (e.target.closest(".mk-print-close")) closePrint();
+  });
+  window.addEventListener("resize", scalePrintSheet);
 
   // ---------- Wegzeichen hinterlegen ----------
 

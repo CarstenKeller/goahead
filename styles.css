@@ -92,6 +92,9 @@
   --c-mk-sel: #1c6dd0;          /* ausgewählte Position */
   --c-mk-plate-text: #5f6b75;   /* „?“ auf dem Wegzeichen-Untergrund */
   --c-crop-dim: rgba(0, 0, 0, 0.5);   /* Zuschnitt: abgedunkelt außerhalb des Rahmens */
+  --c-print-paper: #ffffff;     /* Druckansicht: Papier (in beiden Darstellungen weiß) */
+  --c-print-ink: #1d2125;       /* Druckansicht: Schrift */
+  --c-print-back: rgba(0, 0, 0, 0.55);  /* Druckansicht: Hintergrund am Bildschirm */
 
   --info-height: 34vh;          /* Standardhöhe Infofenster (per Ziehen änderbar) */
 }
@@ -144,6 +147,9 @@
   --c-mk-sel: #74b5ff;
   --c-mk-plate-text: #5f6b75;
   --c-crop-dim: rgba(0, 0, 0, 0.6);
+  --c-print-paper: #ffffff;
+  --c-print-ink: #1d2125;
+  --c-print-back: rgba(0, 0, 0, 0.7);
 }
 
 /* Ohne Unschärfe-Unterstützung: Flächen weniger durchsichtig, damit Text lesbar bleibt */
@@ -204,6 +210,7 @@ button {
 .page,
 .dlg,
 .photo-view-bar,
+#mk-print-bar,
 #diagnose,
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
@@ -1819,4 +1826,111 @@ a[role="button"] {
 .page .mk-layer-item .trk-actions .icon-btn.on {
   background: var(--c-accent-soft);
   color: var(--c-accent);
+}
+/* ---------- Druckansicht einer Ebene (marks.js) ----------
+   Die Karte (#map) liegt dann in #mk-print-sheet (A4-Blatt in CSS-Pixeln), am Bildschirm verkleinert. */
+body.mk-print {
+  background: var(--c-print-back);
+}
+body.mk-print .sheet,
+body.mk-print .page,
+body.mk-print #toolbar,
+body.mk-print #menu-btn,
+body.mk-print #locate-btn,
+body.mk-print .leaflet-control-zoom {
+  display: none !important;
+}
+#mk-print-sheet {
+  position: fixed;
+  top: 8px;
+  z-index: var(--z-page);
+  transform-origin: 0 0;
+  background: var(--c-print-paper);
+  color: var(--c-print-ink);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow);
+}
+.mk-print-head {
+  height: 64px;
+  box-sizing: border-box;
+  padding: 6px 4px;
+  flex: none;
+}
+.mk-print-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+.mk-print-sub {
+  font-size: 12px;
+}
+.mk-print-map {
+  position: relative;
+  flex: none;
+}
+#mk-print-sheet #map {
+  position: absolute;
+  inset: 0;
+}
+.mk-print-foot {
+  height: 92px;
+  box-sizing: border-box;
+  padding: 6px 4px 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 4px 14px;
+  font-size: 11px;
+  overflow: hidden;
+  flex: none;
+}
+.mk-print-leg {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.mk-print-leg .mk-sign {
+  width: 22px;
+  height: 22px;
+}
+.mk-print-states {
+  display: inline-flex;
+  gap: 14px;
+}
+#mk-print-bar {
+  position: fixed;
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-dialog);
+  display: flex;
+  gap: 10px;
+  padding: 6px;
+  border-radius: var(--r-lg);
+  background: var(--glass-strong);
+  box-shadow: var(--shadow);
+}
+#mk-print-bar .icon-btn {
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: var(--r-md);
+  background: var(--btn-soft);
+  color: var(--c-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+@media print {
+  body.mk-print {
+    background: var(--c-print-paper);
+  }
+  body.mk-print > *:not(#mk-print-sheet) {
+    display: none !important;
+  }
+  #mk-print-sheet {
+    position: static;
+    transform: none !important;
+    box-shadow: none;
+  }
 }

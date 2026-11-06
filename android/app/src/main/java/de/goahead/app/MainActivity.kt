@@ -18,6 +18,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.PowerManager
+import android.print.PrintAttributes
+import android.print.PrintManager
 import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Base64
@@ -323,6 +325,24 @@ class MainActivity : Activity() {
             }
             latch.await(3, java.util.concurrent.TimeUnit.SECONDS)
             return ok
+        }
+
+        /**
+         * Seite drucken bzw. als PDF speichern (Android-Druckdienst; window.print() wirkt in der WebView nicht).
+         * Gedruckt wird, was die Web-App für den Druck darstellt (@media print), auf A4 hoch oder quer.
+         */
+        @JavascriptInterface fun printPage(title: String, landscape: Boolean): Boolean {
+            runOnUiThread {
+                try {
+                    val pm = getSystemService(Context.PRINT_SERVICE) as PrintManager
+                    val size = if (landscape) PrintAttributes.MediaSize.ISO_A4.asLandscape()
+                               else PrintAttributes.MediaSize.ISO_A4.asPortrait()
+                    val name = "GoAhead " + title
+                    pm.print(name, web.createPrintDocumentAdapter(name),
+                        PrintAttributes.Builder().setMediaSize(size).build())
+                } catch (e: Exception) { }
+            }
+            return true
         }
 
         /** Punkte ab Index [from]: JSON [[lat, lon, höhe|null, zeit ms, genauigkeit m], …] */

@@ -121,6 +121,11 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   - **Zählung:** „Wegzeichen“ = vorhandene (gut + erneuern), fehlende werden getrennt gezählt („… · 2 fehlen“).
   - **Seite *Ebenen*, „…“:** klappt die Wegzeichen der Ebene mit Anzahl (zugeordnet, gut, erneuern, fehlen) auf;
     Antippen öffnet die Ebene gefiltert auf dieses Wegzeichen. Dort auch Umbenennen und Löschen.
+  - **Drucken** (Drucker-Knopf in der Kopfzeile): Druckansicht auf A4 mit allen gefilterten Positionen, Kopf (Ebene,
+    Filter, Anzahl, Datum) und Legende (Wegzeichen mit Anzahl, Zustände). Ausschnitt = äußerste Positionen plus Rand
+    (*Einstellungen → Ebenen → Drucken: Rand um die Positionen*, Standard 100 m); Hoch- oder Querformat nach Form des
+    Ausschnitts. Der Druck-Knopf der Ansicht öffnet den Druckdialog (dort „Als PDF speichern“). In der Android-App
+    über die App-Methode `printPage` (Android-Druckdienst) – dafür ist die App-Version mit dieser Methode nötig.
   - Gespeichert in IndexedDB (Speicher `marklayers`, Fotos im Speicher `photos`), in der Sicherung enthalten.
   - Noch offen (Schritt 2): automatische Erkennung des Wegzeichens im Foto als Vorschlag.
 - **Fotos unterwegs** (Kamera-Knopf in der Kopfzeile von *Unterwegs*), Modul `photos.js`: Das Foto wird an der
