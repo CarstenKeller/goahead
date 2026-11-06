@@ -54,7 +54,10 @@ def main(out_path, files):
     print(f"Einträge: {len(out)}")
     for probe in ("Eggeweg", "E1"):
         hits = [r for r in out if r[1] == probe or r[2] == probe]
-        print(f"  {probe}: {hits[:5]}")
+        print(f"  {probe}: {len(hits)} Einträge: {hits[:12]}")
+    # Prüfung: Unter welchen Vereinen steht der Europäische Fernwanderweg E1?
+    e1 = sorted({r[3] for r in out if "Fernwanderweg E1" in r[1] and not "Fernwanderweg E1" + "1" in r[1]})
+    print(f"  Vereine E1 (Fernwanderweg): {e1}")
     if not out:
         if os.path.exists(out_path):
             os.remove(out_path)
