@@ -31,13 +31,16 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     (`engineMode=4`, geprüft im Quelltext abrensch/brouter und per Workflow „BRouter-Rundtour prüfen“ gegen
     brouter.de). `roundTripDistance` ist dort der Radius des Kreises, auf dem BRouter Wegpunkte setzt; die Länge
     war im Test das 5,4- bis 8,9-Fache. BRouter vermeidet doppelte Wege nicht sicher (z. B. Stichwege zu seinen
-    Wegpunkten). GoAhead fragt daher 6 Richtungen ab (Radius aus dem gemessenen Verhältnis), misst je Runde den
+    Wegpunkten). GoAhead schneidet Stichwege heraus (Abschnitte, die auf demselben Weg hin und zurück führen:
+    Hin- und Rückweg spiegelbildlich höchstens 20 m auseinander), fragt 6 Richtungen ab – ohne saubere Runde
+    6 weitere – (Radius aus dem gemessenen Verhältnis), misst je Runde den
     Anteil doppelt gegangener Strecke (Linie alle 10 m abgetastet; doppelt = ein anderer Teil der Runde näher als
     15 m) und bessert die beste Richtung bis zu 2-mal in der Länge nach. Gewählt wird eine Runde ohne doppelte Wege
     (Einstellung *Planen → Rundtour: doppelte Wege erlaubt bis … %*, Standard 0 %), die der Wunschlänge am
-    nächsten kommt (±6 %); passt keine, die nächstlängere – oder, nach
+    nächsten kommt (±6 %). Findet sich keine Runde innerhalb der Toleranz, fragt GoAhead („Andere Richtungen
+    versuchen“ oder „Trotzdem übernehmen“) statt eine Runde mit doppelten Wegen still zu übernehmen; passt keine, die nächstlängere – oder, nach
     Einstellung *Planen → Rundtour, wenn die Länge nicht passt*, die nächstkürzere. Gibt es keine saubere Runde,
-    erscheint „⚠ … % doppelt“. Ergebnis: normale Planung mit Wegpunkten alle 1–3 km
+    zeigt die Frage den Anteil doppelter Strecke. Ergebnis: normale Planung mit Wegpunkten alle 1–3 km
     (verschieben, löschen, einfügen wie gewohnt), Rückweg als Rundtour-Abschnitt. Erneut *Rundtour*: *Andere
     Variante* (andere Richtungen), *Länge ändern*, *Als eigene Planung weiter*. Immer BRouter, auch wenn OSRM
     eingestellt ist (OSRM kennt keine Rundtour). Mit Punkten ≥ 2 schließt/öffnet *Rundtour* wie bisher den Rückweg.

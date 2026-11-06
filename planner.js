@@ -784,6 +784,41 @@
     return (typeof v === "number" && v >= 0 ? v : 0) / 100 + 1e-9;
   }
 
+  // Stichwege herausschneiden: Abschnitte, die auf demselben Weg hin und wieder zurück führen
+  // (Punkt j … Umkehr … Punkt i an derselben Stelle, und Hin- und Rückweg liegen spiegelbildlich
+  // höchstens 20 m auseinander). Kleine Schleifen (z. B. um einen Block) bleiben, nur Hin-und-zurück fällt weg.
+  function removeSpurs(latlngs) {
+    var ll = latlngs.slice();
+    var kx = 111320 * Math.cos(ll[0][0] * Math.PI / 180), ky = 110540;
+    function d(a, b) { var dx = (a[1] - b[1]) * kx, dy = (a[0] - b[0]) * ky; return Math.sqrt(dx * dx + dy * dy); }
+    for (var pass = 0; pass < 50; pass++) {
+      var cum = [0];
+      for (var c = 1; c < ll.length; c++) cum.push(cum[c - 1] + d(ll[c - 1], ll[c]));
+      var at = function (sAlong, from, to) {   // Punkt bei Strecke sAlong zwischen den Indizes from..to
+        var k = from;
+        while (k < to && cum[k + 1] < sAlong) k++;
+        var seg = cum[k + 1] - cum[k], t = seg ? (sAlong - cum[k]) / seg : 0;
+        return [ll[k][0] + (ll[k + 1][0] - ll[k][0]) * t, ll[k][1] + (ll[k + 1][1] - ll[k][1]) * t];
+      };
+      var cut = null;
+      for (var i = 2; i < ll.length && !cut; i++) {
+        for (var j = i - 2; j >= 0; j--) {
+          var len = cum[i] - cum[j];
+          if (len > 4000) break;
+          if (len < 20 || d(ll[i], ll[j]) > 10) continue;
+          var half = len / 2, ok = true;
+          for (var t = 0.1; t < 0.95 && ok; t += 0.1) {
+            if (d(at(cum[j] + t * half, j, i), at(cum[i] - t * half, j, i)) > 20) ok = false;
+          }
+          if (ok) { cut = [j, i]; break; }
+        }
+      }
+      if (!cut) break;
+      ll.splice(cut[0] + 1, cut[1] - cut[0]);   // Punkte zwischen j und i (inkl. i) weg; j bleibt
+    }
+    return ll;
+  }
+
   function pickLoop(cands, target, preferShorter) {
     if (!cands.length) return null;
     var clean = cands.filter(function (c) { return c.ov <= overlapOk(); });
@@ -812,6 +847,11 @@
       n++;
       G.showStatus("Rundtour " + String(km).replace(".", ",") + " km wird gesucht … (" + n + "/" + total + ")");
       return loopRequest(start, radius, d).then(function (res) {
+        // erst Stichwege entfernen, dann Länge und doppelte Wege bewerten
+        var before = lengthOf(res.latlngs);
+        res.latlngs = removeSpurs(res.latlngs);
+        var after = lengthOf(res.latlngs);
+        if (before > 0) res.distance = res.distance * after / before;
         res.dir = d;
         res.radius = radius;
         res.ov = overlapShare(res.latlngs);
@@ -825,9 +865,13 @@
       return cands.some(function (c) { return c.ov <= overlapOk() && Math.abs(c.distance - target) / target <= LOOP_TOL; });
     }
     var k = 0;
+    // ohne saubere Runde nach den ersten 6 Richtungen: 6 weitere dazwischen (30° versetzt)
+    function clean() { return cands.some(function (c) { return c.ov <= overlapOk(); }); }
     function nextDir() {
-      if (k >= LOOP_DIRS || good()) return Promise.resolve();
-      var d = (dir + k * 60) % 360;
+      if (good()) return Promise.resolve();
+      if (k >= LOOP_DIRS && (clean() || k >= 2 * LOOP_DIRS)) return Promise.resolve();
+      if (k === LOOP_DIRS) total += LOOP_DIRS;
+      var d = (dir + (k < LOOP_DIRS ? k * 60 : (k - LOOP_DIRS) * 60 + 30)) % 360;
       k++;
       return ask(d, target / factor).then(nextDir);
     }
@@ -845,10 +889,20 @@
       loopBusy = false;
       var res = pickLoop(cands, target, preferShorter);
       if (!res) throw new Error("keine Runde gefunden");
+      var kmTxt = (res.distance / 1000).toFixed(1).replace(".", ",") + " km";
+      if (res.ov > overlapOk()) {
+        // keine Runde innerhalb der Toleranz: nicht still übernehmen, sondern fragen
+        var pct = (res.ov < 0.1 ? (res.ov * 100).toFixed(1).replace(".", ",") : Math.round(res.ov * 100)) + " %";
+        if (G.hideStatus) G.hideStatus();
+        G.actionSheet("Keine Rundtour ohne doppelte Wege gefunden",
+          "Beste von " + cands.length + " Varianten: " + kmTxt + ", " + pct + " doppelt (erlaubt " + Math.round(overlapOk() * 100) + " %).", [
+            { label: "Andere Richtungen versuchen", primary: true, onClick: function () { computeLoop(start, km, (dir + 15) % 360); } },
+            { label: "Trotzdem übernehmen (" + pct + " doppelt)", onClick: function () { applyLoop(res, km, res.dir); } }
+          ]);
+        return;
+      }
       applyLoop(res, km, res.dir);
-      var msg = "Rundtour: " + (res.distance / 1000).toFixed(1).replace(".", ",") + " km (gewünscht " + String(km).replace(".", ",") + " km)";
-      if (res.ov > overlapOk()) msg += " · ⚠ " + (res.ov < 0.1 ? (res.ov * 100).toFixed(1).replace(".", ",") : Math.round(res.ov * 100)) + " % doppelt – „Andere Variante“ oder anderer Start";
-      G.showStatus(msg + ".", res.ov > overlapOk() ? 9000 : 5000);
+      G.showStatus("Rundtour: " + kmTxt + " (gewünscht " + String(km).replace(".", ",") + " km).", 5000);
     }).catch(function (err) {
       loopBusy = false;
       G.showStatus("Rundtour nicht berechnet: " + (err.message || err) + ". Netz prüfen oder anderen Startpunkt wählen.", 8000);
