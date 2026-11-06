@@ -9,7 +9,8 @@
  * Gespeichert in IndexedDB, Speicher "marklayers" (über G.db aus tracks.js):
  *   {id, name, created, visible,
  *    symbols: [{id, name, tfis|null (Signaturnummer), key|null (eigene Wegenummer des Vereins), img|null}],
- *    points:  [{id, lat, lng, time, photos: [fotoId], signs: [{id, sym, state: "ok"|"renew"|"missing", photo|null}]}]}
+ *    points:  [{id, lat, lng, time, photos: [fotoId], signs: [{id, sym, state: "ok"|"renew"|"missing", photos: [fotoId]}]}]}
+ *    (je Wegzeichen höchstens ein Eintrag pro Position; Positionen ohne Wegzeichen nur, solange ausgewählt)
  * Fotos liegen im Speicher "photos" (photos.js) mit walkId "mark:<ebenenId>:<positionsId|>" – so findet die
  * Rückmeldung der Kamera-App die Ebene auch dann, wenn die Seite zwischendurch neu geladen wurde.
  *
@@ -71,11 +72,40 @@
     });
   }
 
+  // Aufbereiten beim Laden: je Wegzeichen an einer Position nur ein Eintrag (mehrere Fotos möglich, z. B. für
+  // beide Richtungen an Vorder- und Rückseite eines Baums); ältere Einträge mit einem Foto (photo) → photos.
   function normalize(l) {
     l.symbols = l.symbols || [];
     l.points = l.points || [];
-    l.points.forEach(function (p) { p.signs = p.signs || []; p.photos = p.photos || []; });
+    l.points.forEach(function (p) {
+      p.photos = p.photos || [];
+      var bySym = {};
+      p.signs = (p.signs || []).filter(function (s) {
+        s.photos = s.photos || (s.photo ? [s.photo] : []);
+        delete s.photo;
+        var first = bySym[s.sym];
+        if (!first) { bySym[s.sym] = s; return true; }
+        s.photos.forEach(function (id) { if (first.photos.indexOf(id) < 0) first.photos.push(id); });
+        return false;
+      });
+    });
     return l;
+  }
+
+  // Positionen ohne Wegzeichen bleiben nur, solange sie ausgewählt sind (gerade erfasst); sonst werden sie mit
+  // ihren Fotos gelöscht. true, wenn etwas entfernt wurde.
+  function pruneEmpty(layer, keepId) {
+    var removed = [];
+    layer.points = layer.points.filter(function (p) {
+      if (p.signs.length || p.id === keepId) return true;
+      removed.push(p);
+      return false;
+    });
+    removed.forEach(function (p) { deletePhotos(p.photos); });
+    return removed.length > 0;
+  }
+  function tidy(layer) {
+    if (layer && pruneEmpty(layer, current === layer ? selId : null)) save(layer);
   }
 
   // ---------- Zählen und Filtern ----------
@@ -258,7 +288,10 @@
         layer.points.forEach(function (p) {
           var i = p.photos.indexOf(ph.id);
           if (i >= 0) { p.photos.splice(i, 1); changed = true; }
-          p.signs.forEach(function (s) { if (s.photo === ph.id) { s.photo = null; changed = true; } });
+          p.signs.forEach(function (s) {
+            var j = s.photos.indexOf(ph.id);
+            if (j >= 0) { s.photos.splice(j, 1); changed = true; }
+          });
         });
         if (changed) { save(layer); if (layer === current) renderSheet(); }
       });
@@ -322,7 +355,7 @@
         '<span class="mk-sign-main" data-act="sign">' +
           '<span class="mk-sign mk-' + s.state + '">' + symImg(layer, s.sym, "") + "</span>" +
           '<span class="trk-text"><span class="trk-name" data-noi18n>' + esc(sym ? sym.name : "?") + "</span>" +
-          '<span class="trk-info mk-st-' + s.state + '">' + esc(stateLabel(s.state) + (s.photo ? " · " + T("mit Foto") : "")) + "</span></span>" +
+          '<span class="trk-info mk-st-' + s.state + '">' + esc(stateLabel(s.state) + (s.photos.length > 1 ? " · " + T("{0} Fotos", s.photos.length) : s.photos.length ? " · " + T("mit Foto") : "")) + "</span></span>" +
         "</span>" +
         '<button type="button" class="icon-btn" data-act="up" title="Nach oben" aria-label="Nach oben"' + (i === 0 ? " disabled" : "") + ">" + G.icon("up") + "</button>" +
         '<button type="button" class="icon-btn" data-act="down" title="Nach unten" aria-label="Nach unten"' + (i === p.signs.length - 1 ? " disabled" : "") + ">" + G.icon("down") + "</button>" +
@@ -330,7 +363,8 @@
     }).join("");
     if (pick) {
       html += '<div class="mk-pick">' + (layer.symbols.length ? layer.symbols.map(function (sym) {
-        return '<button type="button" class="mk-pick-btn" data-pick="' + esc(sym.id) + '" title="' + esc(sym.name) + '" aria-label="' + esc(sym.name) + '" data-noi18n>' +
+        var here = p.signs.some(function (x) { return x.sym === sym.id; });
+        return '<button type="button" class="mk-pick-btn' + (here ? " on" : "") + '" data-pick="' + esc(sym.id) + '" title="' + esc(sym.name) + '" aria-label="' + esc(sym.name) + '" data-noi18n>' +
           '<img alt="" src="' + esc(symUrl(sym)) + '"><span>' + esc(sym.name) + "</span></button>";
       }).join("") : '<p class="trk-empty">Noch keine Wegzeichen hinterlegt.</p>') +
         '<button type="button" class="icon-btn mk-pick-cancel" title="Nicht zuordnen" aria-label="Nicht zuordnen">' + G.icon("close") + "</button></div>";
@@ -386,7 +420,12 @@
     var layer = byId(id);
     if (!layer) return;
     opts = opts || {};
-    if (current !== layer) { filter = { sym: "", state: "" }; selId = null; pick = null; }
+    if (current !== layer) {
+      selId = null;
+      pick = null;
+      tidy(current);   // leere Position der vorher geöffneten Ebene aufräumen
+      filter = { sym: "", state: "" };
+    }
     if (opts.filterSym !== undefined) filter = { sym: opts.filterSym, state: "" };
     var prev = current;
     current = layer;
@@ -394,6 +433,7 @@
     if (opts.select !== undefined) {
       if (selId !== opts.select) pick = null;
       selId = opts.select;
+      tidy(layer);
     }
     if (opts.pick) pick = opts.pick;
     if (!layer.visible) { layer.visible = true; save(layer); }
@@ -428,9 +468,10 @@
 
   function closeLayer() {
     var layer = current;
-    current = null;
     selId = null;
     pick = null;
+    tidy(layer);
+    current = null;
     filter = { sym: "", state: "" };
     panel.hidden = true;
     document.body.classList.remove("mode-marks");
@@ -440,6 +481,7 @@
   function select(pointId) {
     if (selId !== pointId) pick = null;
     selId = pointId;
+    tidy(current);
     renderSheet();
   }
 
@@ -495,7 +537,16 @@
     }
     var pb = e.target.closest("[data-pick]");
     if (pb && pick) {
-      p.signs.push({ id: newId(), sym: pb.getAttribute("data-pick"), state: "ok", photo: pick.photoId || null });
+      var symId = pb.getAttribute("data-pick");
+      var have = null;
+      p.signs.forEach(function (x) { if (x.sym === symId) have = x; });
+      if (have) {
+        // gleiches Wegzeichen an dieser Stelle: nur das Foto ergänzen (z. B. Markierung für die Gegenrichtung)
+        if (pick.photoId && have.photos.indexOf(pick.photoId) < 0) have.photos.push(pick.photoId);
+        else { var hs = symOf(layer, symId); G.showStatus(T("„{0}“ ist an dieser Stelle schon erfasst.", hs ? hs.name : "?"), 4000); }
+      } else {
+        p.signs.push({ id: newId(), sym: symId, state: "ok", photos: pick.photoId ? [pick.photoId] : [] });
+      }
       pick = null;
       save(layer);
       renderSheet();
@@ -521,9 +572,18 @@
       var acts = STATES.filter(function (st) { return st[0] !== s.state; }).map(function (st) {
         return { label: T("Zustand: {0}", T(st[1])), onClick: function () { s.state = st[0]; save(layer); renderSheet(); } };
       });
-      if (s.photo && photoCache[s.photo]) acts.push({ label: "Foto anzeigen", onClick: function () { G.photos.open(photoCache[s.photo]); } });
+      var shown = s.photos.filter(function (id) { return photoCache[id]; });
+      if (shown.length) acts.push({ label: "Foto anzeigen", onClick: function () { G.photos.open(photoCache[shown[0]]); } });
       acts.push({ label: "Entfernen", danger: true, onClick: function () {
+        // Wegzeichen mit seinen Fotos entfernen; ohne weitere Wegzeichen verschwindet die Position
         p.signs.splice(p.signs.indexOf(s), 1);
+        p.photos = p.photos.filter(function (id) { return s.photos.indexOf(id) < 0; });
+        deletePhotos(s.photos);
+        if (!p.signs.length && !pick) {
+          layer.points = layer.points.filter(function (q) { return q !== p; });
+          deletePhotos(p.photos);
+          selId = null;
+        }
         save(layer);
         renderSheet();
       } });
@@ -566,7 +626,15 @@
         { label: "Entfernen", danger: true, onClick: function () {
           function doRemove() {
             layer.symbols = layer.symbols.filter(function (x) { return x !== sym; });
-            layer.points.forEach(function (p) { p.signs = p.signs.filter(function (s) { return s.sym !== sym.id; }); });
+            layer.points.forEach(function (p) {
+              p.signs = p.signs.filter(function (s) {
+                if (s.sym !== sym.id) return true;
+                p.photos = p.photos.filter(function (id) { return s.photos.indexOf(id) < 0; });
+                deletePhotos(s.photos);
+                return false;
+              });
+            });
+            pruneEmpty(layer, current === layer ? selId : null);
             if (filter.sym === sym.id) filter.sym = "";
             save(layer);
             renderSheet();
@@ -1091,6 +1159,7 @@
       Object.keys(groups).forEach(dropGroup);
       layers = (all || []).map(normalize);
       layers.forEach(function (l) {
+        if (pruneEmpty(l, current && current.id === l.id ? selId : null)) save(l);
         ensureGroup(l);
         if (l.visible) setVisible(l, true);
         renderMarkers(l);

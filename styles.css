@@ -1762,6 +1762,7 @@ a[role="button"] {
 .page .mk-grid .mk-pick-btn {
   width: auto;
 }
+.sheet .mk-pick-btn.on,
 .page .mk-pick-btn.on {
   border: 2px solid var(--c-accent);
   background: var(--c-accent-soft);

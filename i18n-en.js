@@ -548,5 +548,7 @@ window.GOAHEAD_I18N_EN = {
   "Ausschnitt wählen": "Select area",
   "1 fehlt": "1 missing",
   "{0} fehlen": "{0} missing",
-  "{0} zugeordnet": "{0} assigned"
+  "{0} zugeordnet": "{0} assigned",
+  "{0} Fotos": "{0} photos",
+  "„{0}“ ist an dieser Stelle schon erfasst.": "“{0}” is already recorded at this spot."
 };

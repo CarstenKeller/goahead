@@ -5,7 +5,7 @@ GoAhead ist, wie es aufgebaut ist und welche Entscheidungen schon getroffen wurd
 Arbeitsregeln stehen in [`CLAUDE.md`](../CLAUDE.md), die Funktionsbeschreibung für Nutzer in [`README.md`](../README.md).
 Bei Widersprüchen gilt: Code > CLAUDE.md > diese Datei. Beim Ändern bitte hier mitpflegen.
 
-Stand: Version 53 (App-Version in `app.js`), November 2026.
+Stand: Version 54 (App-Version in `app.js`), November 2026.
 
 ---
 
@@ -159,6 +159,10 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
 - Version 53 (Wunsch des Nutzers): Filter blendet nicht passende Wegzeichen auf der Karte aus (vorher ausgegraut;
   die ausgewählte Position zeigt weiter alle); fehlende Wegzeichen werden getrennt gezählt – Auslegung: „Wegzeichen“ =
   gut + erneuern, „fehlen“ extra; „…“ auf der Seite *Ebenen* klappt die Wegzeichen mit Anzahl auf.
+- Version 54 (Wunsch des Nutzers): je Position jedes Wegzeichen nur einmal (Daten: `sign.photos` statt `sign.photo`,
+  Altdaten werden beim Laden zusammengeführt); zweites Foto desselben Wegzeichens = Gegenrichtung, wird ergänzt.
+  Positionen ohne Wegzeichen bleiben nur, solange sie ausgewählt sind (gerade erfasst), sonst werden sie samt Fotos
+  gelöscht (auch beim Laden – vorher blieb nach dem Entfernen aller Wegzeichen ein „?“ stehen).
 - Schritt 2 (offen): Foto mit den hinterlegten Wegzeichen vergleichen, beste Treffer zuerst anbieten; bestätigte Fotos
   als weitere Vergleichsbilder. Braucht echte Fotos von Markierungen zum Prüfen. Ob ein Vergleich auf dem Gerät
   verwitterte, schräg fotografierte Markierungen zuverlässig erkennt, ist **ungeprüft**.

@@ -109,6 +109,8 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   - **Erfassen:** Kamera in der Kopfzeile fotografiert die Markierung an der GPS-Position und legt eine Position an;
     danach das passende Wegzeichen antippen. Ist eine Position ausgewählt, ergänzt das nächste Foto dieselbe Stelle
     (mehrere Wegzeichen nacheinander). *+* erfasst ein Wegzeichen ohne Foto (z. B. wenn es fehlt).
+    Jedes Wegzeichen zählt an einer Position nur einmal; ein weiteres Foto desselben Wegzeichens (z. B. Markierung für
+    die Gegenrichtung auf der Rückseite des Baums) wird dort ergänzt. Positionen ohne Wegzeichen werden entfernt.
   - **Position antippen:** Fotos, Wegzeichen in ihrer Reihenfolge (Pfeile ändern sie), Zustand je Wegzeichen
     (*gut*, *erneuern*, *fehlt*); die ausgewählte Position lässt sich auf der Karte verschieben (GPS ist im Wald oft
     einige Meter ungenau).
