@@ -1627,9 +1627,8 @@
   function renderRoutesList() {
     var box = G.tracksPanel && G.tracksPanel("planned");
     if (!box) return;
-    var newBtn = '<button type="button" class="trk-import plan-newroute">＋ Neue Route planen</button>';
     if (!savedRoutes.length) {
-      box.innerHTML = newBtn + '<p class="trk-empty">Noch keine geplanten Routen.</p>';
+      box.innerHTML = '<p class="trk-empty">Noch keine geplanten Routen.</p>';
       return;
     }
     var hd = G.listTools ? G.listTools.head("routes", savedRoutes, {
@@ -1637,7 +1636,7 @@
       metersOf: function (r) { return (r.stats && r.stats.length) || 0; },
       nameOf: function (r) { return r.name; }
     }) : { html: "", items: savedRoutes };
-    box.innerHTML = newBtn + hd.html + hd.items.map(function (r) {
+    box.innerHTML = hd.html + hd.items.map(function (r) {
       var info = [statsText(routeStats(r))];
       info.push(T("{0} Punkte", r.points.length));
       if (r.roundtrip) info.push(T("Rundtour"));
@@ -1807,7 +1806,6 @@
     var box = G.tracksPanel && G.tracksPanel("planned");
     if (!box) return;
     box.addEventListener("click", function (e) {
-      if (e.target.closest(".plan-newroute")) { newPlan(); return; }
       var item = e.target.closest(".trk-item");
       if (!item) return;
       var rec = findRoute(item.getAttribute("data-id"));
@@ -1895,29 +1893,6 @@
     G.shareGpx(fileNameFor(rec.name), routeToGpx(rec), rec.name, rec.name + "\n" + routeDetails(rec) + "\n" + T("(GPX-Datei, erstellt mit GoAhead)"));
   }
 
-  // Neue, leere Planung beginnen (Knopf in Tracks → Geplant)
-  function newPlan() {
-    function go() {
-      var profile = plan.profile;
-      plan = newPlanState();
-      plan.profile = profile;
-      candidate = null;
-      selected = null;
-      armed = false;
-      routeVersion++;
-      resetHistory();
-      savePlan();
-      openPlanner();
-    }
-    if (plan.dirty && plan.points.length) {
-      G.actionSheet("Ungespeicherte Planung verwerfen?", plan.name || "Neue Route", [
-        { label: "Verwerfen und neu beginnen", danger: true, onClick: go }
-      ]);
-    } else {
-      go();
-    }
-  }
-
   // ---------- Modus ein/aus ----------
 
   function start() {
@@ -1995,7 +1970,6 @@
   G.planner = {
     start: start,
     stop: stop,
-    newPlan: newPlan,
     undo: undo,
     redo: redo,
     parseCoordinates: parseCoordinates,

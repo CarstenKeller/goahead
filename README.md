@@ -62,7 +62,8 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   - *Speichern* legt die Route unter *Tracks → Geplant* ab (neue Route: Name im Dialog; bearbeitete Route: wird
     überschrieben). Änderungen an einer gespeicherten Route wirken erst nach *Speichern*; ein roter Punkt hinter
     dem Namen zeigt ungespeicherte Änderungen. Der Arbeitsstand wird zusätzlich lokal gesichert.
-  - Neue Route: *Tracks → Geplant → ＋ Neue Route planen*.
+  - Neue Route: Knopf *Route planen* im Menü; eine offene Planung beendet man mit × (*Speichern und beenden*,
+    *Später weiterplanen* oder *Verwerfen*).
 - **Tracks** (Knopf mit Linien-Symbol im Menü): eigene Seite mit den Reitern *GPX*, *Geplant*, *Erwandert*.
   - *Geplant*: gespeicherte Routen mit Länge, Anstieg, Punktzahl, Datum. Antippen öffnet ein Menü:
     *▶ Los geht's* (Unterwegs-Modus), *👁 Ansehen* (nur auf der Karte zeigen; Antippen der Linie öffnet das Menü),
