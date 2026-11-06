@@ -1682,7 +1682,8 @@ a[role="button"] {
   padding-top: 6px;
   border-top: 1px solid var(--c-line);
 }
-.sheet .mk-pick-btn {
+.sheet .mk-pick-btn,
+.page .mk-pick-btn {
   width: 72px;
   padding: 6px 4px;
   display: flex;
@@ -1746,4 +1747,22 @@ a[role="button"] {
 .sheet .fi-add {
   margin-left: auto;
   background: transparent;
+}
+/* Seite „Wegzeichen wählen“: Raster aller TFIS-Wegzeichen */
+.mk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+}
+.page .mk-grid .mk-pick-btn {
+  width: auto;
+}
+.page .mk-pick-btn.on {
+  border: 2px solid var(--c-accent);
+  background: var(--c-accent-soft);
+}
+.mk-pick-head .list-kind,
+.mk-pick-head .list-year {
+  flex: 1 1 0;
+  min-width: 0;
 }

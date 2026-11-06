@@ -5,7 +5,7 @@ GoAhead ist, wie es aufgebaut ist und welche Entscheidungen schon getroffen wurd
 Arbeitsregeln stehen in [`CLAUDE.md`](../CLAUDE.md), die Funktionsbeschreibung für Nutzer in [`README.md`](../README.md).
 Bei Widersprüchen gilt: Code > CLAUDE.md > diese Datei. Beim Ändern bitte hier mitpflegen.
 
-Stand: Version 49 (App-Version in `app.js`), November 2026.
+Stand: Version 50 (App-Version in `app.js`), November 2026.
 
 ---
 
@@ -146,6 +146,10 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
   E1 = `nam` „Europäischer Fernwanderweg E1“, `snr` 100055. Lösung: Suche nach Name/Bezeichnung
   (`symbols/tfis/index.json` = Liste [snr, nam, bez, wvi, kat]); die eigene Wegenummer davor wird als `key` beim
   Wegzeichen gespeichert und angezeigt. Herkunft der Wegenummern unbekannt (vermutlich Vereinsnummerierung – ungeprüft).
+- Version 50: Seite *Wegzeichen wählen* – alle TFIS-Wegzeichen als Bildraster (je Signaturnummer eins), Filter Verein
+  (Vorgabe: Verein der schon hinterlegten TFIS-Wegzeichen) und Kategorie, Namenssuche per Lupe wie bei *Tracks*.
+  Rückmeldung über Markierung der Kachel (Statusmeldungen liegen unter Vollbildseiten). Ersetzt die Textsuche mit
+  Auswahlliste aus Version 49.
 - Schritt 2 (offen): Foto mit den hinterlegten Wegzeichen vergleichen, beste Treffer zuerst anbieten; bestätigte Fotos
   als weitere Vergleichsbilder. Braucht echte Fotos von Markierungen zum Prüfen. Ob ein Vergleich auf dem Gerät
   verwitterte, schräg fotografierte Markierungen zuverlässig erkennt, ist **ungeprüft**.

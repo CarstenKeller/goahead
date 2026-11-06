@@ -530,7 +530,7 @@
   symsEl.addEventListener("click", function (e) {
     var layer = current;
     if (!layer) return;
-    if (e.target.closest(".mk-add-tfis")) { askTfis(layer); return; }
+    if (e.target.closest(".mk-add-tfis")) { openPicker(layer); return; }
     if (e.target.closest(".mk-add-img")) { imgTarget = layer; imgInput.value = ""; imgInput.click(); return; }
     var item = e.target.closest("[data-sym]");
     var actEl = e.target.closest("[data-act]");
@@ -576,6 +576,7 @@
     layer.symbols.push(sym);
     save(layer);
     if (layer === current) renderSheet();
+    if (!pickEl.hidden && picker.layer === layer) renderPickGrid();
     renderPage();
   }
 
@@ -618,51 +619,169 @@
     return 2;
   }
 
-  // Treffer nach Signaturnummer zusammenfassen (gleiches Wegzeichen), beste zuerst
-  function searchWays(list, q) {
-    q = q.toLowerCase();
-    var groups = {};
-    list.forEach(function (r) {
-      var nam = (r[1] || "").toLowerCase(), bez = (r[2] || "").toLowerCase();
-      var score = nam === q || bez === q ? 3 : (nam.indexOf(q) >= 0 ? 2 : 0);
-      if (!score) return;
-      var g = groups[r[0]];
-      if (!g || score > g.score) groups[r[0]] = { score: score, nr: r[0], nam: r[1], bez: r[2], verein: r[3], rank: katRank(r[4]) };
-    });
-    return Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) {
-      return b.score - a.score || a.rank - b.rank || (a.nam || a.bez).localeCompare(b.nam || b.bez, G.i18n.locale);
-    }).slice(0, 12);
-  }
   function wayName(w) {
     if (w.nam && w.bez && w.nam.indexOf(w.bez) < 0) return w.bez + " " + w.nam;
-    return w.nam || w.bez;
+    return w.nam || w.bez || ("TFIS " + w.nr);
   }
 
-  // Eingabe: Name oder Bezeichnung des Weges („Eggeweg“, „E1“, „X“), davor optional die eigene Wegenummer
-  // („01-0A0-00 Eggeweg“ – wird beim Wegzeichen angezeigt), oder die Signaturnummer (nur Ziffern)
-  var OWN_KEY = /^[0-9A-Z]{2}-[0-9A-Z]{3}-[0-9A-Z]{2}$/i;
-  function askTfis(layer) {
-    G.askText("Name oder Bezeichnung des Weges", "", function (v) {
-      var text = String(v || "").trim();
-      if (!text) return;
-      if (/^\d+$/.test(text)) { addTfisTo(layer, text, ""); return; }
-      var m = /^(\S+)\s*(.*)$/.exec(text);
-      var own = OWN_KEY.test(m[1]) ? m[1].toUpperCase() : null;
-      var q = own ? m[2].trim() : text;
-      if (!q) { G.showStatus(T("Die Wegenummer {0} steht nicht in den amtlichen Daten. Bitte den Namen des Weges dazuschreiben.", own), 7000); return; }
-      loadWayIndex().then(function (list) {
-        var hits = searchWays(list, q);
-        if (!hits.length) { G.showStatus(T("Kein Weg „{0}“ gefunden.", q), 6000); return; }
-        function take(w) { addTfisTo(layer, w.nr, wayName(w), own); }
-        if (hits.length === 1) { take(hits[0]); return; }
-        G.actionSheet(T("Wege „{0}“", q), "", hits.map(function (w) {
-          return { label: wayName(w) + (w.verein ? " · " + w.verein : ""), onClick: function () { take(w); } };
-        }));
-      }).catch(function () {
-        G.showStatus("Das Wegeverzeichnis lässt sich gerade nicht laden. Bitte mit Internetverbindung noch einmal versuchen.", 7000);
+  // ---------- Seite „Wegzeichen wählen“: alle TFIS-Wegzeichen als Bilder ----------
+  // Filter nach Verein und Kategorie (Werte aus TFIS), Lupe blendet die Namenssuche ein (wie bei „Tracks“).
+  // Eine davor geschriebene eigene Wegenummer („01-0A0-00 Eggeweg“ – steht nicht in TFIS) wird beim Übernehmen
+  // mit dem Wegzeichen gespeichert. Ziffern allein finden die Signaturnummer.
+  var OWN_KEY = /^([0-9A-Z]{2}-[0-9A-Z]{3}-[0-9A-Z]{2})\s*(.*)$/i;
+  var signGroups = null;   // je Signaturnummer: {nr, nam, bez, vereine{}, kats{}, rank, text}
+  var picker = { layer: null, lastLayer: null, verein: "", kat: "", q: "", search: false };
+
+  function buildGroups(list) {
+    var by = {};
+    list.forEach(function (r) {
+      var g = by[r[0]];
+      if (!g) g = by[r[0]] = { nr: r[0], nam: "", bez: "", vereine: {}, kats: {}, rank: 9, text: "" };
+      if (!g.nam && r[1]) g.nam = r[1];
+      if (!g.bez && r[2]) g.bez = r[2];
+      if (r[3]) g.vereine[r[3]] = true;
+      if (r[4]) { g.kats[r[4]] = true; g.rank = Math.min(g.rank, katRank(r[4])); }
+      g.text += " " + (r[1] || "") + " " + (r[2] || "") + " " + r[0];
+    });
+    return Object.keys(by).map(function (k) { var g = by[k]; g.text = g.text.toLowerCase(); return g; })
+      .sort(function (a, b) {
+        return a.rank - b.rank || (a.bez || a.nam || a.nr).localeCompare(b.bez || b.nam || b.nr, "de", { numeric: true });
       });
-    }, "Suchen");
   }
+
+  var pickEl = document.createElement("section");
+  pickEl.id = "marks-pick-page";
+  pickEl.className = "page";
+  pickEl.hidden = true;
+  pickEl.setAttribute("aria-label", "Wegzeichen wählen");
+  pickEl.innerHTML =
+    '<header class="page-head">' +
+      '<button type="button" class="page-back" aria-label="Zurück">' +
+        '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+      "</button>" +
+      "<h1>Wegzeichen wählen</h1>" +
+    "</header>" +
+    '<div class="page-body"><div class="mk-pick-head"></div><div class="mk-grid"></div></div>';
+  document.body.appendChild(pickEl);
+  var pickHead = pickEl.querySelector(".mk-pick-head");
+  var pickGrid = pickEl.querySelector(".mk-grid");
+  pickEl.querySelector(".page-back").addEventListener("click", function () { pickEl.hidden = true; });
+
+  // Voreinstellung Verein: der Verein, zu dem die meisten schon hinterlegten TFIS-Wegzeichen der Ebene gehören
+  function guessVerein(layer) {
+    var count = {}, best = "", n = 0, byNr = {};
+    signGroups.forEach(function (g) { byNr[g.nr] = g; });
+    layer.symbols.forEach(function (s) {
+      var g = s.tfis && byNr[s.tfis];
+      if (!g) return;
+      Object.keys(g.vereine).forEach(function (v) {
+        count[v] = (count[v] || 0) + 1;
+        if (count[v] > n) { n = count[v]; best = v; }
+      });
+    });
+    return best;
+  }
+
+  function pickQuery() {
+    var m = OWN_KEY.exec(picker.q.trim());
+    return { own: m ? m[1].toUpperCase() : null, q: (m ? m[2] : picker.q).trim().toLowerCase() };
+  }
+
+  function renderPickHead() {
+    var vereine = {}, kats = {};
+    signGroups.forEach(function (g) {
+      Object.keys(g.vereine).forEach(function (v) { vereine[v] = true; });
+      Object.keys(g.kats).forEach(function (k) { kats[k] = true; });
+    });
+    var vOpts = '<option value="">Alle Vereine</option>' + Object.keys(vereine).sort(function (a, b) { return a.localeCompare(b, "de"); }).map(function (v) {
+      return '<option value="' + esc(v) + '"' + (picker.verein === v ? " selected" : "") + " data-noi18n>" + esc(v) + "</option>";
+    }).join("");
+    var kOpts = '<option value="">Alle Kategorien</option>' + Object.keys(kats).sort(function (a, b) { return katRank(a) - katRank(b) || a.localeCompare(b, "de"); }).map(function (k) {
+      return '<option value="' + esc(k) + '"' + (picker.kat === k ? " selected" : "") + " data-noi18n>" + esc(k) + "</option>";
+    }).join("");
+    var on = picker.search || picker.q;
+    pickHead.innerHTML = '<div class="list-head"><span class="list-sum mk-pick-sum"></span>' +
+      '<select class="list-kind mk-pv" aria-label="Verein" title="Verein">' + vOpts + "</select>" +
+      '<select class="list-year mk-pk" aria-label="Kategorie" title="Kategorie">' + kOpts + "</select>" +
+      '<button type="button" class="icon-btn list-find' + (on ? " on" : "") + '" title="Nach Namen suchen" aria-label="Nach Namen suchen">' + G.icon("search") + "</button></div>" +
+      (on ? '<input type="search" class="list-q mk-pq" placeholder="Name …" value="' + esc(picker.q) + '">' : "");
+  }
+
+  // Wegzeichen ohne Bild (fehlt im TFIS-Paket) ausblenden und nicht mitzählen
+  var pickCount = 0;
+  function showPickCount() {
+    var el = pickEl.querySelector(".mk-pick-sum");
+    if (el) el.textContent = T(pickCount === 1 ? "1 Wegzeichen" : "{0} Wegzeichen", pickCount);
+  }
+  pickGrid.addEventListener("error", function (e) {
+    var b = e.target && e.target.closest && e.target.closest(".mk-pick-btn");
+    if (!b || b.hidden) return;
+    b.hidden = true;
+    pickCount--;
+    showPickCount();
+  }, true);
+
+  function renderPickGrid() {
+    var layer = picker.layer;
+    var have = {};
+    layer.symbols.forEach(function (s) { if (s.tfis) have[s.tfis] = true; });
+    var pq = pickQuery();
+    var shown = signGroups.filter(function (g) {
+      return (!picker.verein || g.vereine[picker.verein]) && (!picker.kat || g.kats[picker.kat]) && (!pq.q || g.text.indexOf(pq.q) >= 0);
+    });
+    pickCount = shown.length;
+    showPickCount();
+    pickGrid.innerHTML = shown.length ? shown.map(function (g) {
+      var title = wayName(g) + " · " + Object.keys(g.vereine).join(", ");
+      return '<button type="button" class="mk-pick-btn' + (have[g.nr] ? " on" : "") + '" data-nr="' + esc(g.nr) + '" title="' + esc(title) +
+        '" aria-label="' + esc(title) + '" data-noi18n>' +
+        '<img alt="" loading="lazy" src="' + esc(symUrl({ tfis: g.nr })) + '">' +
+        "<span>" + esc(g.bez || g.nam || g.nr) + "</span></button>";
+    }).join("") : '<p class="trk-empty">Keine passenden Wegzeichen.</p>';
+  }
+
+  function openPicker(layer) {
+    picker.layer = layer;
+    pickEl.hidden = false;
+    pickHead.innerHTML = "";
+    pickGrid.innerHTML = "";
+    loadWayIndex().then(function (list) {
+      if (!signGroups) signGroups = buildGroups(list);
+      if (picker.lastLayer !== layer.id) { picker.verein = guessVerein(layer); picker.lastLayer = layer.id; }
+      renderPickHead();
+      renderPickGrid();
+    }).catch(function () {
+      pickGrid.innerHTML = '<p class="trk-empty">Das Wegeverzeichnis lässt sich gerade nicht laden. Bitte mit Internetverbindung noch einmal versuchen.</p>';
+    });
+  }
+
+  pickHead.addEventListener("change", function (e) {
+    if (e.target.classList.contains("mk-pv")) picker.verein = e.target.value;
+    else if (e.target.classList.contains("mk-pk")) picker.kat = e.target.value;
+    else return;
+    renderPickGrid();
+  });
+  pickHead.addEventListener("input", function (e) {
+    if (!e.target.classList.contains("mk-pq")) return;
+    picker.q = e.target.value;
+    renderPickGrid();
+  });
+  pickHead.addEventListener("click", function (e) {
+    if (!e.target.closest(".list-find")) return;
+    if (picker.search || picker.q) { picker.search = false; picker.q = ""; } else picker.search = true;
+    renderPickHead();
+    renderPickGrid();
+    var inp = pickHead.querySelector(".mk-pq");
+    if (inp) inp.focus();
+  });
+  pickGrid.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-nr]");
+    if (!b || b.classList.contains("on") || !picker.layer) return;
+    var nr = b.getAttribute("data-nr"), g = null;
+    signGroups.forEach(function (x) { if (x.nr === nr) g = x; });
+    addTfisTo(picker.layer, nr, g ? wayName(g) : "", pickQuery().own);
+  });
+
   function addTfisTo(layer, nr, name, key) {
     for (var i = 0; i < layer.symbols.length; i++) {
       if (layer.symbols[i].tfis === nr) { G.showStatus(T("Dieses Wegzeichen ist schon in „{0}“.", layer.name), 5000); return; }
