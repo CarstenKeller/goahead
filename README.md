@@ -102,7 +102,9 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     blendet die Namenssuche ein (Name, Bezeichnung oder Signaturnummer, davor optional die eigene Wegenummer des
     Vereins, z. B. „01-0A0-00 Eggeweg“ – sie steht nicht in TFIS und wird beim Wegzeichen angezeigt). Bild antippen
     übernimmt es; übernommene sind markiert. Auch direkt aus dem Infofenster (Weg antippen, *+* neben dem Wegzeichen).
-    Dazu eigene Bilder (Knopf mit Bild-Symbol). Das Wegeverzeichnis (`symbols/tfis/index.json`) erzeugt der
+    Dazu eigene Bilder (Knopf mit Bild-Symbol): Foto oder Bild wählen, Ausschnitt mit dem Finger aufziehen (danach
+    im Rahmen ziehen = verschieben, an einer Ecke = Größe ändern) – z. B. wenn die echte Markierung anders aussieht
+    als das TFIS-Bild (E1: TFIS zeigt weißes „E1“ auf Schwarz, vor Ort hängt das blaue Schild mit Sternen). Das Wegeverzeichnis (`symbols/tfis/index.json`) erzeugt der
     Pages-Workflow aus dem TFIS-GeoPackage (`.github/scripts/tfis_index.py`, Aufbau dort mit Prüfweg beschrieben).
   - **Erfassen:** Kamera in der Kopfzeile fotografiert die Markierung an der GPS-Position und legt eine Position an;
     danach das passende Wegzeichen antippen. Ist eine Position ausgewählt, ergänzt das nächste Foto dieselbe Stelle

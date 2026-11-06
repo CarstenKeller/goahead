@@ -829,22 +829,103 @@
       im.src = URL.createObjectURL(f);
     });
     load.then(function (bmp) {
-      var k = Math.min(1, SYM_PX / Math.max(bmp.width, bmp.height));
-      var c = document.createElement("canvas");
-      c.width = Math.max(1, Math.round(bmp.width * k));
-      c.height = Math.max(1, Math.round(bmp.height * k));
-      c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
-      var data = c.toDataURL("image/png");
-      G.askText("Name des Wegzeichens", "", function (v) {
-        v = (v || "").trim();
-        if (!v) { G.showStatus("Ohne Namen wurde das Wegzeichen nicht übernommen.", 5000); return; }
-        addSymbol(layer, { name: v, tfis: null, img: data });
-      }, "Übernehmen");
+      cropImage(bmp, function (r) {
+        var k = Math.min(1, SYM_PX / Math.max(r.w, r.h));
+        var c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(r.w * k));
+        c.height = Math.max(1, Math.round(r.h * k));
+        c.getContext("2d").drawImage(bmp, r.x, r.y, r.w, r.h, 0, 0, c.width, c.height);
+        var data = c.toDataURL("image/png");
+        G.askText("Name des Wegzeichens", "", function (v) {
+          v = (v || "").trim();
+          if (!v) { G.showStatus("Ohne Namen wurde das Wegzeichen nicht übernommen.", 5000); return; }
+          addSymbol(layer, { name: v, tfis: null, img: data });
+        }, "Übernehmen");
+      });
     }).catch(function (err) {
       console.warn("[GoAhead] Wegzeichen-Bild:", err);
       G.showStatus("Das Bild konnte nicht geöffnet werden.", 6000);
     });
   });
+
+  // Ausschnitt wählen: Rahmen mit dem Finger aufziehen; im Rahmen beginnen = Rahmen verschieben.
+  // onOk({x, y, w, h}) in Bildpunkten des Originals.
+  function cropImage(bmp, onOk) {
+    var back = document.createElement("div");
+    back.className = "dlg-back";
+    back.innerHTML = '<div class="dlg mk-crop" role="dialog"><div class="dlg-title">Ausschnitt wählen</div>' +
+      '<div class="mk-crop-box"><canvas></canvas><div class="mk-crop-sel"></div></div>' +
+      '<div class="dlg-buttons"><button type="button" class="dlg-cancel">Abbrechen</button><button type="button" class="dlg-ok">Weiter</button></div></div>';
+    document.body.appendChild(back);
+    var box = back.querySelector(".mk-crop-box");
+    var cv = back.querySelector("canvas");
+    var sel = back.querySelector(".mk-crop-sel");
+    var maxW = box.clientWidth || 300;
+    var maxH = Math.round(window.innerHeight * 0.55);
+    var f = Math.min(maxW / bmp.width, maxH / bmp.height, 1);
+    var W = Math.max(1, Math.round(bmp.width * f)), H = Math.max(1, Math.round(bmp.height * f));
+    cv.width = W; cv.height = H;
+    cv.style.width = W + "px"; cv.style.height = H + "px";
+    box.style.width = W + "px"; box.style.height = H + "px";
+    cv.getContext("2d").drawImage(bmp, 0, 0, W, H);
+    // Vorgabe: mittiges Quadrat über 60 % der kürzeren Seite
+    var s0 = Math.round(Math.min(W, H) * 0.6);
+    var r = { x: Math.round((W - s0) / 2), y: Math.round((H - s0) / 2), w: s0, h: s0 };
+    function draw() {
+      sel.style.left = r.x + "px"; sel.style.top = r.y + "px";
+      sel.style.width = r.w + "px"; sel.style.height = r.h + "px";
+    }
+    draw();
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+    function pos(e) {
+      var b = box.getBoundingClientRect();
+      return { x: clamp(e.clientX - b.left, 0, W), y: clamp(e.clientY - b.top, 0, H) };
+    }
+    // Erster Zug zieht immer einen neuen Rahmen auf (die Vorgabe liegt mittig, man beginnt fast immer darin).
+    // Danach: an einer Ecke = Größe ändern (gegenüberliegende Ecke bleibt), im Rahmen = verschieben, sonst neu.
+    var drag = null, fresh = true, CORNER = 28;
+    box.addEventListener("pointerdown", function (e) {
+      var p = pos(e), mode = "new", anchor = p;
+      if (!fresh) {
+        var cs = [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]];
+        for (var i = 0; i < 4; i++) {
+          if (Math.abs(p.x - cs[i][0]) < CORNER && Math.abs(p.y - cs[i][1]) < CORNER) {
+            mode = "new";
+            anchor = { x: cs[3 - i][0], y: cs[3 - i][1] };   // gegenüberliegende Ecke
+            break;
+          }
+        }
+        if (anchor === p && p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h) mode = "move";
+      }
+      drag = { start: p, anchor: anchor, mode: mode, orig: { x: r.x, y: r.y, w: r.w, h: r.h } };
+      try { box.setPointerCapture(e.pointerId); } catch (err) { /* egal */ }
+      e.preventDefault();
+    });
+    box.addEventListener("pointermove", function (e) {
+      if (!drag) return;
+      var p = pos(e);
+      if (drag.mode === "move") {
+        r.x = clamp(drag.orig.x + p.x - drag.start.x, 0, W - r.w);
+        r.y = clamp(drag.orig.y + p.y - drag.start.y, 0, H - r.h);
+      } else {
+        var a = drag.anchor;
+        var w = Math.abs(p.x - a.x), h = Math.abs(p.y - a.y);
+        if (w < 12 && h < 12) return;   // zu klein: alter Rahmen bleibt
+        r = { x: Math.min(p.x, a.x), y: Math.min(p.y, a.y), w: w, h: h };
+        fresh = false;
+      }
+      draw();
+    });
+    function end() { drag = null; }
+    box.addEventListener("pointerup", end);
+    box.addEventListener("pointercancel", end);
+    function close() { back.remove(); }
+    back.querySelector(".dlg-cancel").addEventListener("click", close);
+    back.querySelector(".dlg-ok").addEventListener("click", function () {
+      close();
+      onOk({ x: r.x / f, y: r.y / f, w: Math.max(1, r.w / f), h: Math.max(1, r.h / f) });
+    });
+  }
 
   // ---------- Seite „Ebenen“ ----------
 

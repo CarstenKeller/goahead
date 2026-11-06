@@ -545,5 +545,6 @@ window.GOAHEAD_I18N_EN = {
   "Zurück": "Back",
   "Alle Vereine": "All clubs",
   "Alle Kategorien": "All categories",
-  "Keine passenden Wegzeichen.": "No matching waymarks."
+  "Keine passenden Wegzeichen.": "No matching waymarks.",
+  "Ausschnitt wählen": "Select area"
 };

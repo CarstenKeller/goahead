@@ -91,6 +91,7 @@
   --c-mk-plate: #ffffff;        /* Untergrund der Wegzeichen (Symbole sind für Weiß gezeichnet) */
   --c-mk-sel: #1c6dd0;          /* ausgewählte Position */
   --c-mk-plate-text: #5f6b75;   /* „?“ auf dem Wegzeichen-Untergrund */
+  --c-crop-dim: rgba(0, 0, 0, 0.5);   /* Zuschnitt: abgedunkelt außerhalb des Rahmens */
 
   --info-height: 34vh;          /* Standardhöhe Infofenster (per Ziehen änderbar) */
 }
@@ -142,6 +143,7 @@
   --c-mk-plate: #ffffff;
   --c-mk-sel: #74b5ff;
   --c-mk-plate-text: #5f6b75;
+  --c-crop-dim: rgba(0, 0, 0, 0.6);
 }
 
 /* Ohne Unschärfe-Unterstützung: Flächen weniger durchsichtig, damit Text lesbar bleibt */
@@ -1765,4 +1767,23 @@ a[role="button"] {
 .mk-pick-head .list-year {
   flex: 1 1 0;
   min-width: 0;
+}
+/* Eigenes Wegzeichen-Bild zuschneiden */
+.mk-crop-box {
+  position: relative;
+  margin: 8px auto 14px;
+  max-width: 100%;
+  overflow: hidden;
+  touch-action: none;
+  border-radius: var(--r-sm);
+}
+.mk-crop-box canvas {
+  display: block;
+}
+.mk-crop-sel {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--c-mk-plate);
+  box-shadow: 0 0 0 9999px var(--c-crop-dim);
+  pointer-events: none;
 }
