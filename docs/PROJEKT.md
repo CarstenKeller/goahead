@@ -5,7 +5,7 @@ GoAhead ist, wie es aufgebaut ist und welche Entscheidungen schon getroffen wurd
 Arbeitsregeln stehen in [`CLAUDE.md`](../CLAUDE.md), die Funktionsbeschreibung für Nutzer in [`README.md`](../README.md).
 Bei Widersprüchen gilt: Code > CLAUDE.md > diese Datei. Beim Ändern bitte hier mitpflegen.
 
-Stand: Version 51 (App-Version in `app.js`), November 2026.
+Stand: Version 52 (App-Version in `app.js`), November 2026.
 
 ---
 
@@ -153,6 +153,9 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
 - Version 51: eigene Wegzeichen-Bilder zuschneiden (Rahmen aufziehen; erster Zug immer neu, danach verschieben bzw.
   Ecke ziehen). Anlass: TFIS-Bild des E1 (100055.svg, per Protokoll geprüft: weißes „E1“ auf schwarzem Rechteck)
   entspricht nicht dem Schild vor Ort (blau mit gelben Sternen). E1 steht in TFIS u. a. beim Eggegebirgsverein.
+- Version 52: Wegzeichen im Kartenmarker wurden abgeschnitten statt verkleinert – Leaflet setzt für Bilder im
+  Marker-Bereich `max-width: none !important` und `width: auto`. Lösung: feste Maße + `object-fit: contain` mit
+  stärkerem Selektor (`.leaflet-container .leaflet-marker-pane .mk-sign img`). Bei Marker-Bildern immer beachten.
 - Schritt 2 (offen): Foto mit den hinterlegten Wegzeichen vergleichen, beste Treffer zuerst anbieten; bestätigte Fotos
   als weitere Vergleichsbilder. Braucht echte Fotos von Markierungen zum Prüfen. Ob ein Vergleich auf dem Gerät
   verwitterte, schräg fotografierte Markierungen zuverlässig erkennt, ist **ungeprüft**.
