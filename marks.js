@@ -165,8 +165,8 @@
   var pick = null;           // {photoId|null}: Wegzeichen für die ausgewählte Position wählen
 
   function markerIcon(layer, p) {
-    var sel = current === layer && p.id === selId && !printing;
-    if (map.getZoom() < DETAIL_ZOOM && !sel && !printing) {
+    var sel = current === layer && p.id === selId;
+    if (map.getZoom() < DETAIL_ZOOM && !sel) {
       var worst = "ok";
       p.signs.forEach(function (s) { if (s.state === "missing") worst = "missing"; else if (s.state === "renew" && worst !== "missing") worst = "renew"; });
       if (!p.signs.length) worst = "none";
@@ -189,12 +189,11 @@
     if (!g) return;
     g.clearLayers();
     layer.points.forEach(function (p) {
-      if (current === layer && !pointMatches(p) && (p.id !== selId || printing)) return;
-      var sel = current === layer && p.id === selId && !printing;
+      if (current === layer && !pointMatches(p) && p.id !== selId) return;
+      var sel = current === layer && p.id === selId;
       var m = L.marker([p.lat, p.lng], { icon: markerIcon(layer, p), keyboard: false, draggable: sel, zIndexOffset: sel ? 900 : 400 });
       m.on("click", function (e) {
         L.DomEvent.stopPropagation(e);
-        if (printing) return;
         openLayer(layer.id, { select: p.id });
       });
       if (sel) {
@@ -312,7 +311,7 @@
       '<span class="sheet-titles"><span class="mk-title" data-noi18n></span><span class="mk-sub"></span></span>' +
       '<span class="sheet-head-btns">' +
         '<button type="button" class="icon-btn mk-photo" title="Markierung fotografieren" aria-label="Markierung fotografieren">' + G.icon("camera") + "</button>" +
-        '<button type="button" class="icon-btn mk-print" title="Drucken" aria-label="Drucken">' + G.icon("print") + "</button>" +
+        '<button type="button" class="icon-btn mk-pdf" title="PDF erstellen" aria-label="PDF erstellen">' + G.icon("pdf") + "</button>" +
         '<button type="button" class="icon-btn mk-nophoto" title="Wegzeichen ohne Foto erfassen" aria-label="Wegzeichen ohne Foto erfassen">' + G.icon("plus") + "</button>" +
         '<button type="button" class="icon-btn mk-close" title="Schließen" aria-label="Schließen">' + G.icon("close") + "</button>" +
       "</span>" +
@@ -488,7 +487,7 @@
   }
 
   panel.querySelector(".mk-close").addEventListener("click", closeLayer);
-  panel.querySelector(".mk-print").addEventListener("click", function () { openPrint(); });
+  panel.querySelector(".mk-pdf").addEventListener("click", function () { makePdf(); });
 
   panel.querySelector(".mk-photo").addEventListener("click", function () {
     if (!current || !G.photos) return;
@@ -651,29 +650,15 @@
     }
   });
 
-  // ---------- Drucken: Ebene mit den gefilterten Positionen auf A4 (Druckdialog → „Als PDF speichern“) ----------
-  // Ausschnitt: alle gefilterten Positionen + Rand (Einstellung „Drucken: Rand um die Positionen“, Standard 100 m).
-  // Die Karte selbst (#map) wird dafür in ein A4-großes Blatt verschoben, das am Bildschirm verkleinert als
-  // Vorschau erscheint; gedruckt wird über @media print. Android-App: window.print() wirkt in der WebView nicht,
-  // daher die App-Methode printPage(titel, quer) (Android-Druckdienst, ab App-Version mit dieser Methode).
-  var A4 = { w: 734, h: 1063 };          // A4 abzüglich 8 mm Rand, in CSS-Pixeln (96 dpi)
-  var PRINT_HEAD = 64, PRINT_FOOT = 92;  // Kopf (Titel, Filter, Anzahl) und Fuß (Legende) des Blatts
-  var printing = null;                   // {layer, view, landscape, parent, next}
-
-  var printSheet = document.createElement("div");
-  printSheet.id = "mk-print-sheet";
-  printSheet.hidden = true;
-  printSheet.innerHTML = '<div class="mk-print-head"></div><div class="mk-print-map"></div><div class="mk-print-foot"></div>';
-  document.body.appendChild(printSheet);
-  var printBar = document.createElement("div");
-  printBar.id = "mk-print-bar";
-  printBar.hidden = true;
-  printBar.innerHTML =
-    '<button type="button" class="icon-btn mk-print-go" title="Drucken oder als PDF speichern" aria-label="Drucken oder als PDF speichern">' + G.icon("print") + "</button>" +
-    '<button type="button" class="icon-btn mk-print-close" title="Druckansicht schließen" aria-label="Druckansicht schließen">' + G.icon("close") + "</button>";
-  document.body.appendChild(printBar);
-  var pageStyle = document.createElement("style");
-  document.head.appendChild(pageStyle);
+  // ---------- PDF der Ebene (A4): gefilterte Positionen auf der Karte, Kopf und Legende ----------
+  // GoAhead setzt die Seite selbst zusammen (Leinwand → JPEG → PDF mit einer Seite) und öffnet die Datei;
+  // drucken lässt sie sich dann aus dem PDF-Viewer. Ausschnitt: äußerste gefilterte Positionen + Rand
+  // (Einstellung „PDF: Rand um die Positionen“, Standard 100 m), Querformat, wenn breiter als hoch.
+  // Kartenkacheln werden mit CORS geladen (sonst dürfte die Leinwand nicht ausgelesen werden); Ebenen ohne
+  // CORS-Freigabe fehlen im PDF und werden gemeldet. Laut offline.js erlauben die NRW-Dienste CORS (?diagnose).
+  var PDF_DPI = 150;
+  var PX_MM = PDF_DPI / 25.4;
+  var pdfBusy = false;
 
   function printBounds(layer) {
     var pts = layer.points.filter(pointMatches);
@@ -685,95 +670,350 @@
     return L.latLngBounds([s - dLat, w - dLng], [n + dLat, e + dLng]);
   }
 
-  function scalePrintSheet() {
-    if (!printing) return;
-    var W = printing.landscape ? A4.h : A4.w, H = printing.landscape ? A4.w : A4.h;
-    var avail = { w: window.innerWidth - 16, h: window.innerHeight - 76 };
-    var k = Math.min(1, avail.w / W, avail.h / H);
-    printSheet.style.width = W + "px";
-    printSheet.style.height = H + "px";
-    printSheet.style.transform = "scale(" + k + ")";
-    printSheet.style.left = Math.round((window.innerWidth - W * k) / 2) + "px";
+  function cssVar(name, fallback) {
+    var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
   }
 
-  function printLegend(layer) {
+  function loadImg(src, cors, ms) {
+    return new Promise(function (resolve) {
+      var im = new Image();
+      if (cors) im.crossOrigin = "anonymous";
+      var t = setTimeout(function () { resolve(null); }, ms || 15000);
+      im.onload = function () { clearTimeout(t); resolve(im); };
+      im.onerror = function () { clearTimeout(t); resolve(null); };
+      im.src = src;
+    });
+  }
+
+  // Kachel-Adresse wie Leaflet sie anfordern würde (wie offline.js)
+  function tileUrlOf(layer, x, y, z) {
+    var c = L.point(x, y);
+    c.z = z;
+    var saved = layer._tileZoom;
+    layer._tileZoom = z;
+    try { return layer.getTileUrl(c); } finally { layer._tileZoom = saved; }
+  }
+
+  // nacheinander mit höchstens n gleichzeitig
+  function runLimited(jobs, n, onProgress) {
+    var i = 0, done = 0;
+    return new Promise(function (resolve) {
+      if (!jobs.length) { resolve(); return; }
+      function next() {
+        if (i >= jobs.length) return;
+        var job = jobs[i++];
+        job().then(function () {
+          done++;
+          if (onProgress) onProgress(done, jobs.length);
+          if (done === jobs.length) resolve(); else next();
+        });
+      }
+      for (var k = 0; k < Math.min(n, jobs.length); k++) next();
+    });
+  }
+
+  // Kartenbild der sichtbaren Ebenen für den Ausschnitt: origin/size in Pixeln der Zoomstufe z
+  function renderMapCanvas(origin, size, z, onProgress) {
+    var cv = document.createElement("canvas");
+    cv.width = size.x;
+    cv.height = size.y;
+    var ctx = cv.getContext("2d");
+    ctx.fillStyle = cssVar("--c-print-paper", "#ffffff");
+    ctx.fillRect(0, 0, size.x, size.y);
+    var tileLayers = [];
+    map.eachLayer(function (l) {
+      if ((l instanceof L.TileLayer || l.renderTile) && l._goaheadDef) tileLayers.push(l);
+    });
+    tileLayers.sort(function (a, b) { return (a.options.zIndex || 0) - (b.options.zIndex || 0); });
+    var missing = [];
+    // je Ebene eine Leinwand, am Ende in Reihenfolge übereinander
+    var parts = tileLayers.map(function (layer) {
+      var lc = document.createElement("canvas");
+      lc.width = size.x;
+      lc.height = size.y;
+      return { layer: layer, ctx: lc.getContext("2d"), canvas: lc, ok: 0, total: 0 };
+    });
+    var jobs = [];
+    parts.forEach(function (part) {
+      var layer = part.layer;
+      var ts = layer.getTileSize().x;
+      var x0 = Math.floor(origin.x / ts), x1 = Math.floor((origin.x + size.x - 1) / ts);
+      var y0 = Math.floor(origin.y / ts), y1 = Math.floor((origin.y + size.y - 1) / ts);
+      var bounds = layer.options.bounds ? L.latLngBounds(layer.options.bounds) : null;
+      for (var x = x0; x <= x1; x++) {
+        for (var y = y0; y <= y1; y++) {
+          (function (x, y) {
+            var dx = x * ts - origin.x, dy = y * ts - origin.y;
+            if (bounds) {
+              var tb = L.latLngBounds(map.unproject([x * ts, (y + 1) * ts], z), map.unproject([(x + 1) * ts, y * ts], z));
+              if (!bounds.intersects(tb)) return;
+            }
+            part.total++;
+            jobs.push(function () {
+              if (layer.renderTile) {
+                return layer.renderTile(x, y, z).then(function (r) {
+                  if (r.ok) { part.ok++; part.ctx.drawImage(r.canvas, dx, dy, ts, ts); }
+                  else if (!r.total) part.total--;   // Kachel ohne Quelle (z. B. außerhalb aller Gebiete)
+                });
+              }
+              return loadImg(tileUrlOf(layer, x, y, z), true).then(function (im) {
+                if (im) { part.ok++; part.ctx.drawImage(im, dx, dy, ts, ts); }
+              });
+            });
+          })(x, y);
+        }
+      }
+    });
+    return runLimited(jobs, 6, onProgress).then(function () {
+      parts.forEach(function (part) {
+        if (part.total && !part.ok) missing.push(part.layer._goaheadDef.name);
+        if (part.ok) ctx.drawImage(part.canvas, 0, 0);
+      });
+      return { canvas: cv, missing: missing };
+    });
+  }
+
+  // Bild in ein Kästchen einpassen (Seitenverhältnis behalten)
+  function drawContain(ctx, im, x, y, w, h) {
+    var iw = im.naturalWidth || im.width || 1, ih = im.naturalHeight || im.height || 1;
+    var k = Math.min(w / iw, h / ih);
+    ctx.drawImage(im, x + (w - iw * k) / 2, y + (h - ih * k) / 2, iw * k, ih * k);
+  }
+
+  function stateColor(st) {
+    return st === "missing" ? cssVar("--c-mk-missing", "#c62828") : st === "renew" ? cssVar("--c-mk-renew", "#f08c00") : cssVar("--c-mk-ok", "#2f9e44");
+  }
+
+  function signBox(ctx, im, st, x, y, s) {
+    ctx.fillStyle = cssVar("--c-mk-plate", "#ffffff");
+    ctx.fillRect(x, y, s, s);
+    if (im) {
+      if (st === "missing") ctx.globalAlpha = 0.4;
+      drawContain(ctx, im, x + 3, y + 3, s - 6, s - 6);
+      ctx.globalAlpha = 1;
+    }
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = stateColor(st);
+    if (st === "missing") ctx.setLineDash([6, 4]);
+    ctx.strokeRect(x + 1.5, y + 1.5, s - 3, s - 3);
+    ctx.setLineDash([]);
+  }
+
+  // Text umbrechen; gibt die Höhe zurück
+  function wrapText(ctx, text, x, y, maxW, lh) {
+    var words = String(text).split(" "), line = "", yy = y;
+    words.forEach(function (w) {
+      var test = line ? line + " " + w : w;
+      if (ctx.measureText(test).width > maxW && line) { ctx.fillText(line, x, yy); yy += lh; line = w; }
+      else line = test;
+    });
+    if (line) { ctx.fillText(line, x, yy); yy += lh; }
+    return yy - y;
+  }
+
+  function niceScale(maxM) {
+    var p = Math.pow(10, Math.floor(Math.log(maxM) / Math.LN10));
+    var r = maxM / p;
+    return (r >= 5 ? 5 : r >= 2 ? 2 : 1) * p;
+  }
+
+  function buildPage(layer, b, landscape, onProgress) {
+    var pw = Math.round((landscape ? 297 : 210) * PX_MM), ph = Math.round((landscape ? 210 : 297) * PX_MM);
+    var margin = Math.round(8 * PX_MM), head = Math.round(16 * PX_MM), foot = Math.round(22 * PX_MM);
+    var mw = pw - 2 * margin, mh = ph - 2 * margin - head - foot;
+    // Zoomstufe, bei der der Ausschnitt genau in die Kartenfläche passt; Kacheln eine Stufe feiner (schärfer)
+    var p0nw = map.project(b.getNorthWest(), 0), p0se = map.project(b.getSouthEast(), 0);
+    var zFit = Math.min(Math.log(mw / Math.max(1e-9, p0se.x - p0nw.x)), Math.log(mh / Math.max(1e-9, p0se.y - p0nw.y))) / Math.LN2;
+    var zt = Math.max(1, Math.min(18, Math.ceil(zFit)));
+    var k = Math.pow(2, zt - zFit);                 // Kachel-Pixel je Seiten-Pixel
+    var c = map.project(b.getCenter(), zt);
+    var size = L.point(Math.ceil(mw * k), Math.ceil(mh * k));
+    var origin = L.point(Math.round(c.x - size.x / 2), Math.round(c.y - size.y / 2));
     var used = {};
     layer.points.forEach(function (p) { p.signs.forEach(function (s) { if (signMatches(s)) used[s.sym] = (used[s.sym] || 0) + 1; }); });
-    var html = layer.symbols.filter(function (sym) { return used[sym.id]; }).map(function (sym) {
-      return '<span class="mk-print-leg"><span class="mk-sign mk-ok"><img alt="" src="' + esc(symUrl(sym)) + '"></span>' +
-        '<span data-noi18n>' + esc(sym.name) + "</span> <b>" + used[sym.id] + "</b></span>";
-    }).join("");
-    html += '<span class="mk-print-states">' + STATES.map(function (st) {
-      return '<span class="mk-print-leg"><span class="mk-sign mk-' + st[0] + '"></span>' + esc(T(st[1])) + "</span>";
-    }).join("") + "</span>";
-    return html;
+    var syms = layer.symbols.filter(function (sym) { return used[sym.id]; });
+    var symImgs = {};
+    return Promise.all(layer.symbols.map(function (sym) {
+      return loadImg(symUrl(sym), false, 10000).then(function (im) { symImgs[sym.id] = im; });
+    })).then(function () {
+      return renderMapCanvas(origin, size, zt, onProgress);
+    }).then(function (res) {
+      var page = document.createElement("canvas");
+      page.width = pw;
+      page.height = ph;
+      var ctx = page.getContext("2d");
+      var ink = cssVar("--c-print-ink", "#1d2125");
+      ctx.fillStyle = cssVar("--c-print-paper", "#ffffff");
+      ctx.fillRect(0, 0, pw, ph);
+      // Kopf
+      ctx.fillStyle = ink;
+      ctx.textBaseline = "top";
+      ctx.font = "bold " + Math.round(6 * PX_MM) + "px sans-serif";
+      ctx.fillText(layer.name, margin, margin);
+      var sym = filter.sym && symOf(layer, filter.sym);
+      var what = [sym ? sym.name : T("Alle Wegzeichen"), filter.state ? stateLabel(filter.state) : T("Alle Zustände")].join(" · ");
+      ctx.font = Math.round(3.2 * PX_MM) + "px sans-serif";
+      ctx.fillText(what + " · " + summary(layer, true) + " · " + new Date().toLocaleDateString(G.i18n.locale), margin, margin + Math.round(8.5 * PX_MM));
+      // Karte
+      var mx = margin, my = margin + head;
+      ctx.drawImage(res.canvas, mx, my, mw, mh);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = ink;
+      ctx.strokeRect(mx + 0.5, my + 0.5, mw - 1, mh - 1);
+      // Positionen: passende Wegzeichen untereinander, Spitze am Ort
+      var s = Math.round(5.5 * PX_MM), gap = 3, pad = 3;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(mx, my, mw, mh);
+      ctx.clip();
+      layer.points.forEach(function (p) {
+        var list = p.signs.filter(signMatches);
+        if (!list.length) return;
+        var pt = map.project([p.lat, p.lng], zt);
+        var px = mx + (pt.x - origin.x) / k, py = my + (pt.y - origin.y) / k;
+        var bh = list.length * (s + gap) - gap + 2 * pad, bw = s + 2 * pad, tail = 10;
+        var bx = px - bw / 2, by = py - tail - bh;
+        ctx.fillStyle = cssVar("--c-mk-plate", "#ffffff");
+        ctx.shadowColor = "rgba(0,0,0,0.35)";
+        ctx.shadowBlur = 6;
+        ctx.fillRect(bx, by, bw, bh);
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.moveTo(px - 8, by + bh);
+        ctx.lineTo(px + 8, by + bh);
+        ctx.lineTo(px, py);
+        ctx.closePath();
+        ctx.fill();
+        list.forEach(function (sg, i) { signBox(ctx, symImgs[sg.sym], sg.state, bx + pad, by + pad + i * (s + gap), s); });
+      });
+      ctx.restore();
+      // Maßstab unten links in der Karte
+      var lat = b.getCenter().lat;
+      var mPerPx = 40075016.686 * Math.cos(lat * Math.PI / 180) / (256 * Math.pow(2, zt)) * k;
+      var len = niceScale(mw * 0.2 * mPerPx), lpx = len / mPerPx;
+      var sx = mx + 16, sy = my + mh - 22;
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.fillRect(sx - 6, sy - 26, lpx + 12, 34);
+      ctx.fillStyle = ink;
+      ctx.fillRect(sx, sy, lpx, 4);
+      ctx.fillRect(sx, sy - 8, 2, 12);
+      ctx.fillRect(sx + lpx - 2, sy - 8, 2, 12);
+      ctx.font = Math.round(2.6 * PX_MM) + "px sans-serif";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(len >= 1000 ? G.i18n.dec(len / 1000) + " km" : len + " m", sx, sy - 4);
+      // Fuß: Legende und Quellenangabe
+      ctx.textBaseline = "middle";
+      var fy = my + mh + Math.round(3 * PX_MM), fx = margin, ls = Math.round(4.5 * PX_MM);
+      ctx.font = Math.round(3 * PX_MM) + "px sans-serif";
+      function legend(im, st, label) {
+        var w = ls + 8 + ctx.measureText(label).width + 28;
+        if (fx + w > pw - margin) { fx = margin; fy += ls + 8; }
+        signBox(ctx, im, st, fx, fy, ls);
+        ctx.fillStyle = ink;
+        ctx.fillText(label, fx + ls + 8, fy + ls / 2);
+        fx += w;
+      }
+      syms.forEach(function (sy2) { legend(symImgs[sy2.id], "ok", sy2.name + " (" + used[sy2.id] + ")"); });
+      STATES.forEach(function (st) { legend(null, st[0], T(st[1])); });
+      var attr = map.attributionControl ? map.attributionControl.getContainer().textContent.replace(/^\s*Leaflet\s*\|?\s*/, "") : "";
+      ctx.font = Math.round(2.3 * PX_MM) + "px sans-serif";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = cssVar("--c-muted", "#5f6b75");
+      wrapText(ctx, T("Karte: {0}", attr) + " · GoAhead", margin, ph - margin - Math.round(5 * PX_MM), pw - 2 * margin, Math.round(2.8 * PX_MM));
+      return { page: page, missing: res.missing, landscape: landscape };
+    });
   }
 
-  function openPrint() {
-    var layer = current;
-    if (!layer || printing) return;
-    var b = printBounds(layer);
-    if (!b) { G.showStatus("Keine Positionen zum Drucken.", 5000); return; }
-    // Querformat, wenn der Ausschnitt breiter als hoch ist (in Metern)
-    var c = b.getCenter();
-    var wM = map.distance([c.lat, b.getWest()], [c.lat, b.getEast()]);
-    var hM = map.distance([b.getSouth(), c.lng], [b.getNorth(), c.lng]);
-    var mapEl = map.getContainer();
-    printing = { layer: layer, view: { center: map.getCenter(), zoom: map.getZoom() }, landscape: wM > hM,
-      parent: mapEl.parentNode, next: mapEl.nextSibling };
-    var W = printing.landscape ? A4.h : A4.w, H = printing.landscape ? A4.w : A4.h;
-    pageStyle.textContent = "@page { size: A4 " + (printing.landscape ? "landscape" : "portrait") + "; margin: 8mm; }";
-    var sym = filter.sym && symOf(layer, filter.sym);
-    var what = [sym ? sym.name : T("Alle Wegzeichen"), filter.state ? stateLabel(filter.state) : T("Alle Zustände")].join(" · ");
-    printSheet.querySelector(".mk-print-head").innerHTML =
-      '<div class="mk-print-title" data-noi18n>' + esc(layer.name) + "</div>" +
-      '<div class="mk-print-sub"><span data-noi18n>' + esc(what) + "</span> · " + esc(summary(layer, true)) + " · " +
-        esc(new Date().toLocaleDateString(G.i18n.locale)) + "</div>";
-    printSheet.querySelector(".mk-print-foot").innerHTML = printLegend(layer);
-    var box = printSheet.querySelector(".mk-print-map");
-    box.style.height = (H - PRINT_HEAD - PRINT_FOOT) + "px";
-    box.appendChild(mapEl);
-    document.body.classList.add("mk-print");
-    printSheet.hidden = false;
-    printBar.hidden = false;
-    scalePrintSheet();
-    ["dragging", "touchZoom", "doubleClickZoom", "scrollWheelZoom"].forEach(function (h) { if (map[h]) map[h].disable(); });
-    map.invalidateSize(false);
-    map.fitBounds(b, { padding: [0, 0], animate: false });
-    renderMarkers(layer);
+  // Minimales PDF mit einer Seite: JPEG als Bild über die ganze Seite (A4 in pt)
+  function pdfFromJpeg(jpeg, w, h, landscape) {
+    var W = landscape ? 841.89 : 595.28, H = landscape ? 595.28 : 841.89;
+    var enc = new TextEncoder();
+    var chunks = [], offsets = [], pos = 0;
+    function add(x) { var b = typeof x === "string" ? enc.encode(x) : x; chunks.push(b); pos += b.length; }
+    function obj(n, body) { offsets[n] = pos; add(n + " 0 obj\n" + body + "\nendobj\n"); }
+    add("%PDF-1.4\n%âãÏÓ\n");
+    obj(1, "<< /Type /Catalog /Pages 2 0 R >>");
+    obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
+    obj(3, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + W + " " + H + "] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>");
+    offsets[4] = pos;
+    add("4 0 obj\n<< /Type /XObject /Subtype /Image /Width " + w + " /Height " + h +
+      " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + jpeg.length + " >>\nstream\n");
+    add(jpeg);
+    add("\nendstream\nendobj\n");
+    var content = "q " + W + " 0 0 " + H + " 0 0 cm /Im0 Do Q";
+    obj(5, "<< /Length " + content.length + " >>\nstream\n" + content + "\nendstream");
+    var xref = pos;
+    var x = "xref\n0 6\n0000000000 65535 f \n";
+    for (var i = 1; i <= 5; i++) x += ("000000000" + offsets[i]).slice(-10) + " 00000 n \n";
+    add(x + "trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF\n");
+    var out = new Uint8Array(pos), o = 0;
+    chunks.forEach(function (c) { out.set(c, o); o += c.length; });
+    return out;
   }
 
-  function closePrint() {
-    if (!printing) return;
-    var p = printing;
-    printing = null;
-    var mapEl = map.getContainer();
-    p.parent.insertBefore(mapEl, p.next);
-    document.body.classList.remove("mk-print");
-    printSheet.hidden = true;
-    printBar.hidden = true;
-    printSheet.style.transform = "";
-    ["dragging", "touchZoom", "doubleClickZoom", "scrollWheelZoom"].forEach(function (h) { if (map[h]) map[h].enable(); });
-    map.invalidateSize(false);
-    map.setView(p.view.center, p.view.zoom, { animate: false });
-    renderMarkers(p.layer);
+  function toBase64(bytes) {
+    var s = "", CH = 0x8000;
+    for (var i = 0; i < bytes.length; i += CH) s += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    return btoa(s);
   }
 
-  function doPrint() {
-    if (!printing) return;
+  function pdfName(layer) {
+    var d = new Date();
+    var ymd = d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+    return ("GoAhead " + layer.name + " " + ymd).replace(/[\\/:*?"<>|]+/g, "_").replace(/\s+/g, "_") + ".pdf";
+  }
+
+  function deliverPdf(bytes, name) {
     if (G.native) {
-      var r = G.native.call("printPage", printing.layer.name, printing.landscape);
-      if (r == null) G.showStatus("Zum Drucken bitte die neue Version der Android-App installieren.", 8000);
+      var r = G.native.call("openFile", name, "application/pdf", toBase64(bytes));
+      if (r == null) { G.showStatus("Für das PDF bitte die neue Version der Android-App installieren.", 8000); return; }
+      if (r === "opened") G.showStatus(T("PDF gespeichert unter „Downloads“: {0}", name), 5000);
+      else if (r === "saved") G.showStatus(T("PDF gespeichert unter „Downloads“: {0}. Zum Öffnen fehlt ein PDF-Programm.", name), 8000);
+      else G.showStatus("Das PDF konnte nicht gespeichert werden.", 6000);
       return;
     }
-    window.print();
+    var url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 60000);
+    G.showStatus(T("PDF erstellt: {0}", name), 5000);
   }
 
-  printBar.addEventListener("click", function (e) {
-    if (e.target.closest(".mk-print-go")) doPrint();
-    else if (e.target.closest(".mk-print-close")) closePrint();
-  });
-  window.addEventListener("resize", scalePrintSheet);
+  function makePdf() {
+    var layer = current;
+    if (!layer || pdfBusy) return;
+    var b = printBounds(layer);
+    if (!b) { G.showStatus("Keine Positionen für das PDF.", 5000); return; }
+    var c = b.getCenter();
+    var landscape = map.distance([c.lat, b.getWest()], [c.lat, b.getEast()]) > map.distance([b.getSouth(), c.lng], [b.getNorth(), c.lng]);
+    pdfBusy = true;
+    G.showStatus(T("PDF wird erstellt … {0} %", 0));
+    buildPage(layer, b, landscape, function (d, n) {
+      G.showStatus(T("PDF wird erstellt … {0} %", Math.round(d / n * 100)));
+    }).then(function (res) {
+      return new Promise(function (resolve, reject) {
+        res.page.toBlob(function (blob) { blob ? resolve({ blob: blob, res: res }) : reject(new Error("JPEG")); }, "image/jpeg", 0.88);
+      });
+    }).then(function (x) {
+      return x.blob.arrayBuffer().then(function (buf) {
+        var bytes = pdfFromJpeg(new Uint8Array(buf), x.res.page.width, x.res.page.height, x.res.landscape);
+        G.hideStatus();
+        deliverPdf(bytes, pdfName(layer));
+        if (x.res.missing.length) {
+          setTimeout(function () {
+            G.showStatus(T("Im PDF fehlt die Karte „{0}“. Bitte später noch einmal versuchen oder eine andere Karte wählen.", x.res.missing.join(", ")), 8000);
+          }, 5200);
+        }
+      });
+    }).catch(function (err) {
+      console.warn("[GoAhead] PDF:", err);
+      G.showStatus("Das PDF konnte nicht erstellt werden.", 6000);
+    }).then(function () { pdfBusy = false; });
+  }
 
   // ---------- Wegzeichen hinterlegen ----------
 

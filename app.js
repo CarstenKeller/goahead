@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "55";
+  var APP_VERSION = "56";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {
@@ -48,7 +48,7 @@
     marks: '<rect x="5" y="3" width="14" height="11" rx="1.5"/><path d="M12 14v7"/><path d="M9 6l6 5M15 6l-6 5"/>',
     up: '<path d="M6 15l6-6 6 6"/>',
     down: '<path d="M6 9l6 6 6-6"/>',
-    print: '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>',
+    pdf: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>',
     edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
     image: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/>'
   };
@@ -390,7 +390,7 @@
     autoEndKmh: 80,      // Unterwegs: ab dieser Spitzengeschwindigkeit (über 20 s) Fahrt erkannt → Tour beenden
     reversePct: 1,       // Unterwegs: Richtung umdrehen, wenn so viel % der Strecke entgegen der Richtung gegangen (0 = aus)
     listCheck: false,    // Erwandert: Knopf „Liste prüfen“ anzeigen
-    printMarginM: 100,   // Ebenen drucken: Rand um die äußersten Positionen (m)
+    printMarginM: 100,   // Ebene als PDF: Rand um die äußersten Positionen (m)
     loopPrefer: "longer", // Rundtour nach Länge: passt die Länge nicht, die nächstlängere ("longer") oder -kürzere ("shorter")
     loopOverlapPct: 0,   // Rundtour: erlaubter Anteil doppelt gegangener Strecke in %
     loopWarnPct: 20,     // Rundtour: Warnung, wenn die Länge um mehr als … % von der Vorgabe abweicht
@@ -473,7 +473,7 @@
           numRow("bikeMaxKmh", "Rad bis", "km/h", 8, 80, 1) +
           '<label class="settings-row"><input type="checkbox" data-setting="listCheck"> Listenprüfung (Erwandert)</label>') +
         group("Ebenen",
-          numRow("printMarginM", "Drucken: Rand um die Positionen", "m", 0, 5000, 10)) +
+          numRow("printMarginM", "PDF: Rand um die Positionen", "m", 0, 5000, 10)) +
         group("Daten",
           '<div class="settings-act"><span>Sicherung</span><span class="icon-row">' +
             '<button type="button" class="icon-btn settings-backup" title="Sichern (alle Touren, Routen, Tracks, Einstellungen)" aria-label="Sichern">' + icon("download") + "</button>" +

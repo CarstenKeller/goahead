@@ -5,7 +5,7 @@ GoAhead ist, wie es aufgebaut ist und welche Entscheidungen schon getroffen wurd
 Arbeitsregeln stehen in [`CLAUDE.md`](../CLAUDE.md), die Funktionsbeschreibung für Nutzer in [`README.md`](../README.md).
 Bei Widersprüchen gilt: Code > CLAUDE.md > diese Datei. Beim Ändern bitte hier mitpflegen.
 
-Stand: Version 55 (App-Version in `app.js`), November 2026.
+Stand: Version 56 (App-Version in `app.js`), November 2026.
 
 ---
 
@@ -163,11 +163,13 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
   Altdaten werden beim Laden zusammengeführt); zweites Foto desselben Wegzeichens = Gegenrichtung, wird ergänzt.
   Positionen ohne Wegzeichen bleiben nur, solange sie ausgewählt sind (gerade erfasst), sonst werden sie samt Fotos
   gelöscht (auch beim Laden – vorher blieb nach dem Entfernen aller Wegzeichen ein „?“ stehen).
-- Version 55: Drucken als PDF (A4). Druckansicht = #map wird in ein A4-Blatt (CSS-Pixel 734 × 1063, 8 mm Rand)
-  verschoben, am Bildschirm verkleinert; Druck über `@media print`. Ausschnitt = gefilterte Positionen + Rand
-  (Einstellung `printMarginM`, Standard 100 m); Querformat, wenn breiter als hoch. Browser: `window.print()`;
-  Android-App: neue Methode `printPage(titel, quer)` → **neue APK nötig**. Getestet mit Chromium-PDF (eine Seite A4,
-  Ausschnitt geprüft); auf dem Gerät und mit echten Kacheln ungeprüft.
+- Version 55/56: PDF der Ebene. Nutzer wollte kein Drucken aus GoAhead, sondern eine PDF-Datei erzeugen und öffnen
+  (drucken aus dem PDF-Viewer). Umsetzung: Seite (A4, 150 dpi) auf einer Leinwand zusammensetzen – Karte aus den
+  sichtbaren Ebenen (Kacheln mit CORS; Mosaik über `renderTile`), gefilterte Positionen mit Wegzeichen, Kopf, Maßstab,
+  Legende, Quellenangabe – als JPEG in ein selbst geschriebenes einseitiges PDF. Ausschnitt = gefilterte Positionen +
+  Rand (`printMarginM`, Standard 100 m), Querformat, wenn breiter als hoch. App: `openFile` (neue APK nötig);
+  Browser: Download. Ebenen ohne CORS fehlen und werden gemeldet (Waymarked Trails: CORS ungeprüft).
+  Getestet mit Chromium und nachgebildeten Kacheln (PDF eine Seite A4, Inhalt angesehen); am Gerät ungeprüft.
 - Schritt 2 (offen): Foto mit den hinterlegten Wegzeichen vergleichen, beste Treffer zuerst anbieten; bestätigte Fotos
   als weitere Vergleichsbilder. Braucht echte Fotos von Markierungen zum Prüfen. Ob ein Vergleich auf dem Gerät
   verwitterte, schräg fotografierte Markierungen zuverlässig erkennt, ist **ungeprüft**.
@@ -186,8 +188,8 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
   im Secret `GOAHEAD_KEYSTORE_PASSWORD`. **Schlüssel und applicationId nie ändern** (sonst kein Update möglich).
 - Brücke `window.GoAheadNative` (nur über `G.native.call`): `appVersion, recordingState, startRecording,
   pauseRecording, stopRecording, pointCount, getPoints, setTurns, hasCamera, takePhoto, batteryOptimized,
-  requestBatteryExemption, openAppSettings, saveFile, shareText, shareFile, printPage` (printPage ab Web-Version 55:
-  Android-Druckdienst, da `window.print()` in der WebView nichts tut). **Nur ergänzen, nie umbenennen**
+  requestBatteryExemption, openAppSettings, saveFile, shareText, shareFile, printPage, openFile` (printPage: Android-Druckdienst, seit Version 56 ungenutzt;
+  openFile(name, mime, base64) ab Version 56: unter „Downloads“ speichern und öffnen → "opened"/"saved"/""). **Nur ergänzen, nie umbenennen**
   (installierte Apps aktualisieren sich nicht selbst). Web-Änderungen brauchen keinen neuen App-Build.
 - Aufzeichnung: Vordergrunddienst sammelt Punkte in `track.jsonl`, `nav.js` holt sie ab (`pullNative`).
 - Samsung: Akku-Optimierung ausschalten (Dialog in *Einstellungen → Android-App*).

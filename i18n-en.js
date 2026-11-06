@@ -551,10 +551,16 @@ window.GOAHEAD_I18N_EN = {
   "{0} zugeordnet": "{0} assigned",
   "{0} Fotos": "{0} photos",
   "„{0}“ ist an dieser Stelle schon erfasst.": "“{0}” is already recorded at this spot.",
-  "Drucken": "Print",
-  "Drucken oder als PDF speichern": "Print or save as PDF",
-  "Druckansicht schließen": "Close print preview",
-  "Keine Positionen zum Drucken.": "No positions to print.",
-  "Zum Drucken bitte die neue Version der Android-App installieren.": "To print, please install the new version of the Android app.",
-  "Drucken: Rand um die Positionen": "Print: margin around the positions"
+  "PDF erstellen": "Create PDF",
+  "Keine Positionen für das PDF.": "No positions for the PDF.",
+  "Für das PDF bitte die neue Version der Android-App installieren.": "For the PDF, please install the new version of the Android app.",
+  "PDF gespeichert unter „Downloads“: {0}": "PDF saved in “Downloads”: {0}",
+  "PDF gespeichert unter „Downloads“: {0}. Zum Öffnen fehlt ein PDF-Programm.": "PDF saved in “Downloads”: {0}. No app to open PDFs was found.",
+  "Das PDF konnte nicht gespeichert werden.": "The PDF could not be saved.",
+  "PDF erstellt: {0}": "PDF created: {0}",
+  "PDF wird erstellt … {0} %": "Creating PDF … {0} %",
+  "Im PDF fehlt die Karte „{0}“. Bitte später noch einmal versuchen oder eine andere Karte wählen.": "The map “{0}” is missing in the PDF. Please try again later or choose another map.",
+  "Das PDF konnte nicht erstellt werden.": "The PDF could not be created.",
+  "Karte: {0}": "Map: {0}",
+  "PDF: Rand um die Positionen": "PDF: margin around the positions"
 };
