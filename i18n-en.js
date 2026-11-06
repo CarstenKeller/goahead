@@ -510,7 +510,6 @@ window.GOAHEAD_I18N_EN = {
   "Zustand": "Condition",
   "1 Wegzeichen hinterlegt": "1 waymark added",
   "{0} Wegzeichen hinterlegt": "{0} waymarks added",
-  "TFIS-Wegzeichen (Signaturnummer) hinzufügen": "Add TFIS waymark (symbol number)",
   "Eigenes Wegzeichen-Bild hinzufügen": "Add own waymark image",
   "Zuerst Wegzeichen für diese Ebene hinterlegen.": "First add waymarks to this layer.",
   "Keine GPS-Position – Position in der Kartenmitte angelegt. Zum Verschieben ziehen.": "No GPS position – position created in the map centre. Drag to move.",
@@ -524,8 +523,6 @@ window.GOAHEAD_I18N_EN = {
   "„{0}“ entfernen?": "Remove “{0}”?",
   "Es ist an 1 Stelle zugeordnet; dort wird es ebenfalls entfernt.": "It is assigned at 1 spot; it will be removed there too.",
   "Es ist an {0} Stellen zugeordnet; dort wird es ebenfalls entfernt.": "It is assigned at {0} spots; it will be removed there too.",
-  "Signaturnummer (TFIS)": "Symbol number (TFIS)",
-  "Die Signaturnummer besteht nur aus Ziffern.": "The symbol number consists of digits only.",
   "Dieses Wegzeichen ist schon in „{0}“.": "This waymark is already in “{0}”.",
   "Zu dieser Signaturnummer gibt es kein Wegzeichen-Bild.": "There is no waymark image for this symbol number.",
   "Wegzeichen in „{0}“ übernommen.": "Waymark added to “{0}”.",
@@ -542,5 +539,11 @@ window.GOAHEAD_I18N_EN = {
   "Ebene „{0}“ löschen?": "Delete layer “{0}”?",
   "Die Ebene konnte nicht gelöscht werden.": "The layer could not be deleted.",
   "Wegzeichen in eine Ebene übernehmen": "Add waymark to a layer",
-  "Nr": "No."
+  "Nr": "No.",
+  "Wegenummer oder Signaturnummer (TFIS)": "Route number or symbol number (TFIS)",
+  "TFIS-Wegzeichen (Wegenummer) hinzufügen": "Add TFIS waymark (route number)",
+  "Zur Wegenummer {0} ist kein Wegzeichen bekannt.": "No waymark is known for route number {0}.",
+  "Wegenummer {0}": "Route number {0}",
+  "Signaturnummer {0}": "Symbol number {0}",
+  "Die Wegenummern lassen sich gerade nicht laden. Bitte mit Internetverbindung noch einmal versuchen.": "The route numbers cannot be loaded right now. Please try again with an internet connection."
 };

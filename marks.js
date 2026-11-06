@@ -8,7 +8,7 @@
  *
  * Gespeichert in IndexedDB, Speicher "marklayers" (über G.db aus tracks.js):
  *   {id, name, created, visible,
- *    symbols: [{id, name, tfis|null, img|null}],
+ *    symbols: [{id, name, tfis|null (Signaturnummer), key|null (Wegenummer), img|null}],
  *    points:  [{id, lat, lng, time, photos: [fotoId], signs: [{id, sym, state: "ok"|"renew"|"missing", photo|null}]}]}
  * Fotos liegen im Speicher "photos" (photos.js) mit walkId "mark:<ebenenId>:<positionsId|>" – so findet die
  * Rückmeldung der Kamera-App die Ebene auch dann, wenn die Seite zwischendurch neu geladen wurde.
@@ -347,14 +347,14 @@
     var layer = current;
     var html = '<div class="list-head list-head-one"><span class="list-sum">' +
       esc(T(layer.symbols.length === 1 ? "1 Wegzeichen hinterlegt" : "{0} Wegzeichen hinterlegt", layer.symbols.length)) + "</span>" +
-      '<button type="button" class="icon-btn mk-add-tfis" title="TFIS-Wegzeichen (Signaturnummer) hinzufügen" aria-label="TFIS-Wegzeichen (Signaturnummer) hinzufügen"><span class="icon-letter">Nr</span></button>' +
+      '<button type="button" class="icon-btn mk-add-tfis" title="TFIS-Wegzeichen (Wegenummer) hinzufügen" aria-label="TFIS-Wegzeichen (Wegenummer) hinzufügen"><span class="icon-letter">Nr</span></button>' +
       '<button type="button" class="icon-btn mk-add-img" title="Eigenes Wegzeichen-Bild hinzufügen" aria-label="Eigenes Wegzeichen-Bild hinzufügen">' + G.icon("image") + "</button></div>";
     html += layer.symbols.map(function (sym) {
       var c = symCounts(layer, sym.id);
       return '<div class="trk-item mk-sym' + (filter.sym === sym.id ? " on" : "") + '" data-sym="' + esc(sym.id) + '">' +
         '<span class="trk-main" data-act="filter">' + '<span class="mk-sym-box"><img alt="" src="' + esc(symUrl(sym)) + '"></span>' +
           '<span class="trk-text"><span class="trk-name" data-noi18n>' + esc(sym.name) + "</span>" +
-          '<span class="trk-info">' + esc((sym.tfis ? "TFIS " + sym.tfis + " · " : "") + symCountText(c)) + "</span></span></span>" +
+          '<span class="trk-info">' + esc((sym.tfis ? "TFIS " + (sym.key || sym.tfis) + " · " : "") + symCountText(c)) + "</span></span></span>" +
         '<span class="trk-actions"><button type="button" class="icon-btn" data-act="more" title="Weitere Aktionen" aria-label="Weitere Aktionen">' + G.icon("more") + "</button></span>" +
         "</div>";
     }).join("");
@@ -589,39 +589,69 @@
       im.src = url;
     });
   }
+  // Verzeichnis Wegenummer (TFIS „schluessel“, z. B. „01-0A0-00“) → {s: [Signaturnummern], n: Name};
+  // erzeugt im Pages-Workflow aus dem TFIS-GeoPackage (.github/scripts/tfis_index.py)
+  var keyIndex = null;
+  function loadKeyIndex() {
+    if (keyIndex) return keyIndex;
+    var ctl = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 10000);
+    keyIndex = fetch("symbols/tfis/index.json", ctl ? { signal: ctl.signal } : {}).then(function (r) {
+      clearTimeout(timer);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    });
+    keyIndex.catch(function (err) { console.warn("[GoAhead] Wegenummern:", err); keyIndex = null; });
+    return keyIndex;
+  }
+
+  // Eingabe: Wegenummer oder Signaturnummer, optional mit Namen dahinter („01-0A0-00 Eggeweg“)
   function askTfis(layer) {
-    G.askText("Signaturnummer (TFIS)", "", function (v) {
-      var nr = String(v || "").trim();
-      if (!nr) return;
-      if (!/^\d+$/.test(nr)) { G.showStatus("Die Signaturnummer besteht nur aus Ziffern.", 5000); return; }
-      addTfisTo(layer, nr, "");
+    G.askText("Wegenummer oder Signaturnummer (TFIS)", "", function (v) {
+      var m = /^\s*(\S+)\s*(.*)$/.exec(String(v || ""));
+      if (!m) return;
+      var code = m[1], rest = m[2].trim();
+      if (/^\d+$/.test(code)) { addTfisTo(layer, code, rest); return; }
+      var key = code.toUpperCase();
+      loadKeyIndex().then(function (idx) {
+        var e = idx && idx[key];
+        if (!e || !e.s || !e.s.length) { G.showStatus(T("Zur Wegenummer {0} ist kein Wegzeichen bekannt.", key), 6000); return; }
+        var name = rest || e.n || "";
+        if (e.s.length === 1) { addTfisTo(layer, e.s[0], name, key); return; }
+        G.actionSheet(T("Wegenummer {0}", key), name, e.s.map(function (nr) {
+          return { label: T("Signaturnummer {0}", nr), onClick: function () { addTfisTo(layer, nr, name, key); } };
+        }));
+      }).catch(function () {
+        G.showStatus("Die Wegenummern lassen sich gerade nicht laden. Bitte mit Internetverbindung noch einmal versuchen.", 7000);
+      });
     }, "Weiter");
   }
-  function addTfisTo(layer, nr, name) {
+  function addTfisTo(layer, nr, name, key) {
     for (var i = 0; i < layer.symbols.length; i++) {
       if (layer.symbols[i].tfis === nr) { G.showStatus(T("Dieses Wegzeichen ist schon in „{0}“.", layer.name), 5000); return; }
     }
     checkImage(symUrl({ tfis: nr })).then(function (ok) {
       if (!ok) { G.showStatus("Zu dieser Signaturnummer gibt es kein Wegzeichen-Bild.", 6000); return; }
       G.askText("Name des Wegzeichens", name || ("TFIS " + nr), function (v) {
-        addSymbol(layer, { name: (v || "").trim() || "TFIS " + nr, tfis: nr, img: null });
+        addSymbol(layer, { name: (v || "").trim() || "TFIS " + nr, tfis: nr, key: key || null, img: null });
         G.showStatus(T("Wegzeichen in „{0}“ übernommen.", layer.name), 4000);
       }, "Übernehmen");
     });
   }
 
   // Aus dem Infofenster (Weg antippen): in die geöffnete Ebene, sonst Ebene wählen bzw. anlegen
-  function addTfis(nr, name) {
+  function addTfis(nr, name, key) {
     nr = String(nr || "").trim();
+    key = key ? String(key).trim().toUpperCase() : null;
     if (!nr) return;
-    if (current) { addTfisTo(current, nr, name); return; }
+    if (current) { addTfisTo(current, nr, name, key); return; }
     if (!layers.length) {
-      createLayer(function (layer) { addTfisTo(layer, nr, name); });
+      createLayer(function (layer) { addTfisTo(layer, nr, name, key); });
       return;
     }
-    if (layers.length === 1) { addTfisTo(layers[0], nr, name); return; }
+    if (layers.length === 1) { addTfisTo(layers[0], nr, name, key); return; }
     G.actionSheet("In welche Ebene?", "", layers.map(function (l) {
-      return { label: l.name, onClick: function () { addTfisTo(l, nr, name); } };
+      return { label: l.name, onClick: function () { addTfisTo(l, nr, name, key); } };
     }));
   }
 

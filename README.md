@@ -97,8 +97,10 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
 - **Ebenen** (Knopf mit Wegzeichen-Schild im Menü), Modul `marks.js`: eigene Markierungsebenen, z. B. für die
   eigene Wabe. Seite *Ebenen*: neue Ebene anlegen, Ebenen ein-/ausblenden, umbenennen, löschen. Eine Ebene öffnen
   zeigt sie mit einer Leiste über der Karte:
-  - **Wegzeichen hinterlegen:** amtliche TFIS-Wegzeichen über die Signaturnummer (Knopf *Nr*) oder direkt aus dem
-    Infofenster (Weg antippen, *+* neben dem Wegzeichen), dazu eigene Bilder (Knopf mit Bild-Symbol).
+  - **Wegzeichen hinterlegen:** amtliche TFIS-Wegzeichen über die Wegenummer (z. B. `01-0A0-00`, optional mit Namen
+    dahinter) oder die Signaturnummer (Knopf *Nr*) oder direkt aus dem Infofenster (Weg antippen, *+* neben dem
+    Wegzeichen), dazu eigene Bilder (Knopf mit Bild-Symbol). Das Verzeichnis Wegenummer → Signaturnummer
+    (`symbols/tfis/index.json`) erzeugt der Pages-Workflow aus dem TFIS-GeoPackage (`.github/scripts/tfis_index.py`).
   - **Erfassen:** Kamera in der Kopfzeile fotografiert die Markierung an der GPS-Position und legt eine Position an;
     danach das passende Wegzeichen antippen. Ist eine Position ausgewählt, ergänzt das nächste Foto dieselbe Stelle
     (mehrere Wegzeichen nacheinander). *+* erfasst ein Wegzeichen ohne Foto (z. B. wenn es fehlt).
