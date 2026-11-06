@@ -164,14 +164,14 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   Browser ohne Unschärfe-Unterstützung bekommen automatisch weniger durchsichtige Flächen.
 - **Richtungspfeile** auf geplanten Strecken (Planen, Ansehen, Unterwegs): kleine weiße Pfeile im Abstand von
   etwa 110 Bildpunkten, beim Zoomen neu verteilt.
-- **Einstellungen** (Zahnrad im Menü): eigene Seite, nach Bereichen geordnet (Karte, Planen, Unterwegs, Touren,
-  Daten, App, Android-App) – Zoom-Knöpfe ein/aus,
+- **Einstellungen** (Zahnrad im Menü): eigene Seite, nach Bereichen geordnet (App mit Sprache und
+  Darstellung ganz oben, dann Karte, Planen, Unterwegs, Touren, Daten, Android-App) – Zoom-Knöpfe ein/aus,
   Routing beim Planen (BRouter, Standard, mit Höhen / OSRM), Gehgeschwindigkeit (Ebene, Steigung, Gefälle in km/h,
   Schwelle in %), Unterwegs: Offline-Abstand (km) und Vibrationsabstand (m), App-Version, Link zur Diagnose.
   Alles wird gespeichert.
-- **Darstellung** (*Einstellungen → App*): *Wie das Gerät* (Standard, folgt dem hellen/dunklen Modus des Telefons),
+- **Darstellung** (*Einstellungen → App*, ganz oben): *System-Modus* (Standard, folgt dem hellen/dunklen Modus des Telefons),
   *Hell* oder *Dunkel*. Dunkel färbt Leisten, Seiten, Dialoge und Kartenknöpfe um; die Karte selbst bleibt unverändert.
-- **Sprache** (*Einstellungen → App*): Deutsch (Standard) oder English. Der Wechsel lädt die Seite neu (eine laufende
+- **Sprache** (*Einstellungen → App*, ganz oben): Deutsch (Standard) oder English. Der Wechsel lädt die Seite neu (eine laufende
   Tour bleibt erhalten). Nicht übersetzt: Quellenangaben der Karten, die Diagnose-Seite und – in der Android-App – die
   Benachrichtigung des Aufnahme-Dienstes („GoAhead – Aufnahme läuft“). Namen von Touren/Routen, die beim Anlegen
   automatisch entstehen (z. B. „Route vom …“), bleiben in der Sprache, in der sie angelegt wurden.

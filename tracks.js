@@ -503,8 +503,8 @@
       btn.title = "Tracks";
       btn.setAttribute("aria-label", "Tracks");
       btn.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">' +
-        '<path d="M3 19c3-1 3-6 6-7s5 3 8 1 2-7 4-8" fill="none" stroke="#1971c2" stroke-width="2.5" stroke-linecap="round"/>' +
-        '<circle cx="3" cy="19" r="2" fill="#333"/><circle cx="21" cy="5" r="2" fill="#333"/></svg>';
+        '<path d="M3 19c3-1 3-6 6-7s5 3 8 1 2-7 4-8" fill="none" stroke-width="2.5" stroke-linecap="round" style="stroke: var(--c-icon-blue)"/>' +
+        '<circle cx="3" cy="19" r="2" fill="currentColor"/><circle cx="21" cy="5" r="2" fill="currentColor"/></svg>';
       L.DomEvent.on(btn, "click", function (e) {
         L.DomEvent.preventDefault(e);
         openPage();

@@ -33,7 +33,7 @@ Platz wie möglich:
   Keinen Knopf für etwas, das auf der Karte direkt geht.
 - Selten gebrauchte Eingaben (z. B. Suche) erst auf Knopfdruck einblenden.
 - **Einstellungen** sind eine eigene Seite (`.page`, wie *Tracks*), nach Bereichen gruppiert (`.settings-group`:
-  Karte, Planen, Unterwegs, Touren, Daten, App). Neue Einstellungen in den passenden Bereich. Kurze Auswahlen
+  App (Sprache, Darstellung – immer ganz oben), Karte, Planen, Unterwegs, Touren, Daten). Neue Einstellungen in den passenden Bereich. Kurze Auswahlen
   (z. B. Kartenwahl) sind eine ziehbare `.sheet` – keine Klappfelder in der Menüleiste.
 - Globale Ereignis-Abfangungen (z. B. Klick nach Tooltip verschlucken) dürfen nie einen späteren,
   unabhängigen Tipp blockieren: Zustand bei jeder neuen Berührung zurücksetzen.
@@ -44,7 +44,8 @@ Platz wie möglich:
   Bruchstücken zusammensetzen. Zahlen mit Nachkommastellen über `G.i18n.dec`, Datum mit `G.i18n.locale`.
   Nutzerdaten (Namen) in Elementen mit `data-noi18n`. Neue Texte: Test mit `lang: "en"` und `GOAHEAD_I18N.missing`.
 - **Darstellung:** Hell/Dunkel nur über die Variablen in `styles.css` (Block `:root[data-theme="dark"]`); neue Farben
-  immer für beide Varianten anlegen.
+  immer für beide Varianten anlegen. Keine festen Farben in Symbolen (`currentColor` bzw. `style="fill: var(--…)"`).
+  Kontrast prüfen: Text/Symbole mindestens 4,5 : 1 zum Untergrund; Flächen mit weißer Schrift über `--c-accent-fill`.
 - Das `hidden`-Attribut blendet immer aus (globale Regel `[hidden] { display: none !important }`) –
   nicht mit eigenen `display`-Regeln dagegen arbeiten.
 

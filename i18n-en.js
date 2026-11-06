@@ -147,7 +147,7 @@ window.GOAHEAD_I18N_EN = {
   "Wiederherstellen": "Restore",
   "App": "App",
   "Darstellung": "Appearance",
-  "Wie das Gerät": "Like the device",
+  "System-Modus": "System mode",
   "Hell": "Light",
   "Dunkel": "Dark",
   "Sprache": "Language",

@@ -1954,8 +1954,8 @@
       btn.title = "Route planen";
       btn.setAttribute("aria-label", "Route planen");
       btn.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">' +
-        '<path d="M6 18c4 0 3-6 7-6s4-5 5-6" fill="none" stroke="' + COLOR_ROUTE + '" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="3 3"/>' +
-        '<circle cx="6" cy="18" r="2.6" fill="#2f9e44"/><path d="M18 2.5a3 3 0 0 1 3 3c0 2.2-3 5-3 5s-3-2.8-3-5a3 3 0 0 1 3-3z" fill="' + COLOR_ROUTE + '"/></svg>';
+        '<path d="M6 18c4 0 3-6 7-6s4-5 5-6" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="3 3" style="stroke: var(--c-icon-route)"/>' +
+        '<circle cx="6" cy="18" r="2.6" style="fill: var(--c-icon-start)"/><path d="M18 2.5a3 3 0 0 1 3 3c0 2.2-3 5-3 5s-3-2.8-3-5a3 3 0 0 1 3-3z" style="fill: var(--c-icon-route)"/></svg>';
       L.DomEvent.on(btn, "click", function (e) {
         L.DomEvent.preventDefault(e);
         start();

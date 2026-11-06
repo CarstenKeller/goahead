@@ -58,6 +58,10 @@
   --c-tab-bg: rgba(0, 0, 0, 0.06);
   --c-tab-active: #ffffff;
   --c-attr: rgba(255, 255, 255, 0.65);         /* Quellenangabe, Maßstab */
+  --c-accent-fill: #2e7d32;                    /* Flächen mit weißer Schrift (Hauptknopf, offenes Menü) */
+  --c-icon-blue: #1971c2;                      /* farbige Teile der Menü-Symbole */
+  --c-icon-route: #c2255c;
+  --c-icon-start: #2f9e44;
 
   /* Formen */
   --r-sm: 10px;
@@ -92,16 +96,13 @@
   --c-line: rgba(255, 255, 255, 0.1);
   --c-accent: #5cb860;
   --c-accent-soft: rgba(92, 184, 96, 0.18);
-  --c-blue: #5a9eea;
-  --c-blue-soft: rgba(90, 158, 234, 0.18);
-  --c-danger: #ef6461;
-  --c-danger-soft: rgba(239, 100, 97, 0.16);
-  --glass: rgba(32, 36, 40, 0.74);
-  --glass-strong: rgba(32, 36, 40, 0.9);
+  --c-blue: #74b5ff;
+  --c-blue-soft: rgba(116, 181, 255, 0.18);
+  --c-danger: #ff8a80;
+  --c-danger-soft: rgba(255, 138, 128, 0.16);
   --glass-dark: rgba(12, 14, 16, 0.82);
   --glass-sheet: rgba(26, 40, 29, 0.74);
   --c-card: rgba(44, 49, 54, 0.85);
-  --glass-border: rgba(255, 255, 255, 0.08);
   --btn-soft: rgba(255, 255, 255, 0.08);
   --btn-soft-hover: rgba(255, 255, 255, 0.14);
   --shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.35);
@@ -117,6 +118,15 @@
   --c-tab-bg: rgba(255, 255, 255, 0.08);
   --c-tab-active: rgba(255, 255, 255, 0.18);
   --c-attr: rgba(32, 36, 40, 0.7);
+  /* Kontrast: Kartenknöpfe fast deckend mit hellem Rand, damit sie sich von der hellen Karte abheben;
+     farbige Symbolteile heller; Flächen mit weißer Schrift bleiben dunkelgrün (Kontrast ≥ 4,5 : 1) */
+  --glass: rgba(38, 42, 47, 0.92);
+  --glass-strong: rgba(38, 42, 47, 0.96);
+  --glass-border: rgba(255, 255, 255, 0.18);
+  --c-accent-fill: #2e7d32;
+  --c-icon-blue: #74b5ff;
+  --c-icon-route: #f783ac;
+  --c-icon-start: #69db7c;
 }
 
 /* Ohne Unschärfe-Unterstützung: Flächen weniger durchsichtig, damit Text lesbar bleibt */
@@ -215,7 +225,7 @@ button {
 .dlg-ok,
 .dlg-action.primary,
 .nav-pause.on {
-  background: var(--c-accent) !important;
+  background: var(--c-accent-fill) !important;
   color: #ffffff !important;
 }
 .btn-danger,
@@ -346,7 +356,7 @@ button {
   transition: background 0.2s, color 0.2s;
 }
 .menu-btn[aria-expanded="true"] {
-  background: var(--c-accent);
+  background: var(--c-accent-fill);
   color: #ffffff;
 }
 
@@ -1514,4 +1524,6 @@ button {
 }
 
 /* Dunkle Darstellung: Links lesbar auf dunklem Grund */
-:root[data-theme="dark"] a { color: var(--c-blue); }
+:root[data-theme="dark"] .leaflet-control-attribution a,
+:root[data-theme="dark"] .page a,
+:root[data-theme="dark"] .sheet-body a { color: var(--c-blue); }

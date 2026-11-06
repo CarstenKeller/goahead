@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "38";
+  var APP_VERSION = "39";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {
@@ -432,6 +432,9 @@
         "<h1>Einstellungen</h1>" +
       "</header>" +
       '<div class="page-body settings-body">' +
+        group("App",
+          selectRow("lang", "Sprache", [["de", "Deutsch"], ["en", "English"]]) +
+          selectRow("theme", "Darstellung", [["system", "System-Modus"], ["light", "Hell"], ["dark", "Dunkel"]])) +
         group("Karte",
           '<label class="settings-row"><input type="checkbox" data-setting="zoomButtons"> Zoom-Knöpfe (+/−) anzeigen</label>' +
           '<label class="settings-num"><span>Wegemarkierungen</span><input type="range" class="settings-scale" min="1" max="3" step="0.25" aria-label="Größe der Wegemarkierungen">' +
@@ -462,9 +465,6 @@
             '<button type="button" class="icon-btn settings-backup" title="Sichern (alle Touren, Routen, Tracks, Einstellungen)" aria-label="Sichern">' + icon("download") + "</button>" +
             '<button type="button" class="icon-btn settings-restore" title="Wiederherstellen" aria-label="Wiederherstellen">' + icon("upload") + "</button>" +
           "</span></div>") +
-        group("App",
-          selectRow("theme", "Darstellung", [["system", "Wie das Gerät"], ["light", "Hell"], ["dark", "Dunkel"]]) +
-          selectRow("lang", "Sprache", [["de", "Deutsch"], ["en", "English"]])) +
         (NATIVE ? group("Android-App",
           '<div class="settings-act"><span class="settings-battery"></span><span class="icon-row">' +
             '<button type="button" class="icon-btn settings-battery-btn" title="Akku-Einstellungen" aria-label="Akku-Einstellungen">' + icon("battery") + "</button>" +
@@ -583,7 +583,7 @@
       btn.title = "Einstellungen";
       btn.setAttribute("aria-label", "Einstellungen");
       btn.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">' +
-        '<path fill="#444" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>';
+        '<path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>';
       L.DomEvent.on(btn, "click", function (e) {
         L.DomEvent.preventDefault(e);
         openSettings();
