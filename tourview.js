@@ -12,6 +12,8 @@
   "use strict";
 
   var G = window.GOAHEAD;
+
+  var T = window.GOAHEAD_I18N.t;
   if (!G || !G.map) return;
   var esc = G.escapeHtml;
 
@@ -25,7 +27,7 @@
   panel.innerHTML =
     '<div class="tour-head sheet-handle">' +
       '<span class="sheet-grip" aria-hidden="true"></span>' +
-      '<span class="sheet-titles"><span class="tour-title"></span><span class="tour-sub"></span></span>' +
+      '<span class="sheet-titles"><span class="tour-title" data-noi18n></span><span class="tour-sub"></span></span>' +
       '<span class="sheet-head-btns">' +
         '<button type="button" class="icon-btn tour-menu" title="Weitere Aktionen" aria-label="Weitere Aktionen">' + G.icon("more") + "</button>" +
         '<button type="button" class="icon-btn tour-close" title="Schließen" aria-label="Schließen">' + G.icon("close") + "</button>" +
@@ -116,7 +118,7 @@
 
   function km(m) {
     var k = m / 1000;
-    return k >= 100 ? Math.round(k).toLocaleString("de-DE") : k.toFixed(1).replace(".", ",");
+    return k >= 100 ? Math.round(k).toLocaleString(G.i18n.locale) : G.i18n.dec(k.toFixed(1));
   }
 
   function head(kind, items, opts) {
@@ -135,7 +137,7 @@
     var total = shown.reduce(function (s, it) { return s + (opts.metersOf(it) || 0); }, 0);
     var html =
       '<div class="list-head">' +
-        '<span class="list-sum">' + shown.length + (shown.length === 1 ? " Tour" : " Touren") + " · " + km(total) + " km</span>" +
+        '<span class="list-sum">' + T(shown.length === 1 ? "1 Tour" : "{0} Touren", shown.length) + " · " + km(total) + " km</span>" +
         '<select class="list-year" aria-label="Jahr" title="Jahr">' +
           '<option value="">Alle Jahre</option>' +
           ys.map(function (y) { return '<option value="' + y + '"' + (f.year === y ? " selected" : "") + ">" + y + "</option>"; }).join("") +

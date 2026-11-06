@@ -18,6 +18,9 @@
   "use strict";
 
   var G = window.GOAHEAD;
+
+  var T = window.GOAHEAD_I18N.t;
+  var dec = window.GOAHEAD_I18N.dec;
   if (!G || !G.map) return;
   var map = G.map;
   var esc = G.escapeHtml;
@@ -34,7 +37,7 @@
 
   // ---------- Hilfen ----------
 
-  function km(m) { return (m / 1000).toFixed(2).replace(".", ",") + " km"; }
+  function km(m) { return dec((m / 1000).toFixed(2)) + " km"; }
 
   function duration(ms) {
     var s = Math.max(0, Math.floor(ms / 1000));
@@ -172,7 +175,7 @@
     if (v <= setting("bikeMaxKmh", 32)) return "bike";
     return "car";
   }
-  function kindLabel(k) { for (var i = 0; i < KINDS.length; i++) if (KINDS[i][0] === k) return KINDS[i][1]; return ""; }
+  function kindLabel(k) { for (var i = 0; i < KINDS.length; i++) if (KINDS[i][0] === k) return T(KINDS[i][1]); return ""; }
 
   // ---------- Bildschirm anlassen (Screen Wake Lock) ----------
 
@@ -392,7 +395,7 @@
       if (ahead <= warn && !walk.turnsDone[i]) {
         walk.turnsDone[i] = true;
         if (!NATIVE) vibrateFor(t.dir);   // App: vibriert der Aufzeichnungsdienst (auch bei Bildschirm aus)
-        turnFlash = { text: (t.dir === "links" ? "↰ links" : "↱ rechts") + " in " + Math.round(ahead) + " m", until: Date.now() + 6000 };
+        turnFlash = { text: T(t.dir === "links" ? "↰ links in {0} m" : "↱ rechts in {0} m", Math.round(ahead)), until: Date.now() + 6000 };
       }
       break;   // nur die nächste Abbiegung
     }
@@ -543,7 +546,7 @@
   panel.innerHTML =
     '<div class="nav-head sheet-handle">' +
       '<span class="sheet-grip" aria-hidden="true"></span>' +
-      '<span class="sheet-titles"><span class="nav-title-row"><span class="nav-offline" hidden></span><span class="nav-title"></span></span><span class="nav-state"></span></span>' +
+      '<span class="sheet-titles"><span class="nav-title-row"><span class="nav-offline" hidden></span><span class="nav-title" data-noi18n></span></span><span class="nav-state"></span></span>' +
       '<span class="sheet-head-btns">' +
         '<button type="button" class="icon-btn nav-pause"></button>' +
         '<button type="button" class="icon-btn nav-photo" title="Foto aufnehmen" aria-label="Foto aufnehmen">' + G.icon("camera") + "</button>" +
@@ -648,7 +651,7 @@
     el.dist.textContent = num(walk.distance / 1000, 2);
     el.time.textContent = duration(moving);
     el.plan.textContent = walk.planLength ? num(walk.planLength / 1000, 1) : "–";
-    el.planLbl.textContent = walk.planHours && G.planner ? "geplant ≈" + G.planner.hm(walk.planHours) + " h" : "km geplant";
+    el.planLbl.textContent = walk.planHours && G.planner ? T("geplant ≈{0} h", G.planner.hm(walk.planHours)) : T("km geplant");
     el.avg.textContent = moving > 60000 && walk.distance > 0 ? num(walk.distance / 1000 / (moving / 3600000), 1) : "–";
     el.speed.textContent = speedNow != null ? num(speedNow * 3.6, 1) : "–";
     if (stats && progress) {
@@ -678,14 +681,14 @@
     if (comp) {
       // Begleiten: Stand-Zeit, sonst wie unterwegs (Abbiegung, neben der Route)
       if (turnFlash && Date.now() < turnFlash.until) { st = turnFlash.text; cls = "is-warn"; }
-      else if (progress && progress.off > OFF_ROUTE_M) { st = "⚠ " + Math.round(progress.off) + " m neben der Route"; cls = "is-warn"; }
+      else if (progress && progress.off > OFF_ROUTE_M) { st = T("⚠ {0} m neben der Route", Math.round(progress.off)); cls = "is-warn"; }
       else if (!walk.lastFix) st = "Begleiten · warte auf GPS";
-      else st = "Begleiten" + (comp.at ? " · Stand " + hhmm(comp.at) : "");
+      else st = T("Begleiten") + (comp.at ? " · " + T("Stand {0}", hhmm(comp.at)) : "");
       cls = cls === "is-warn" ? cls : "is-pause";
     }
-    else if (walk.paused) { st = walk.interrupted ? "Pause (neu geladen)" : "Pause"; cls = "is-pause"; }
+    else if (walk.paused) { st = T(walk.interrupted ? "Pause (neu geladen)" : "Pause"); cls = "is-pause"; }
     else if (turnFlash && Date.now() < turnFlash.until) { st = turnFlash.text; cls = "is-warn"; }
-    else if (progress && progress.off > OFF_ROUTE_M) { st = "⚠ " + Math.round(progress.off) + " m neben der Route"; cls = "is-warn"; }
+    else if (progress && progress.off > OFF_ROUTE_M) { st = T("⚠ {0} m neben der Route", Math.round(progress.off)); cls = "is-warn"; }
     else if (!walk.lastFix) { st = "● Aufnahme · warte auf GPS"; }
     else if (walk.weak) { st = "⚠ GPS ungenau"; cls = "is-warn"; }
     else if (NATIVE && nativeBattery) { st = "⚠ Akku-Optimierung an"; cls = "is-warn"; }
@@ -695,7 +698,7 @@
     el.state.className = "nav-state " + cls;
   }
 
-  function num(v, digits) { return v.toFixed(digits).replace(".", ","); }
+  function num(v, digits) { return dec(v.toFixed(digits)); }
   function hhmm(t) { var d = new Date(t); return d.getHours() + ":" + (d.getMinutes() < 10 ? "0" : "") + d.getMinutes(); }
 
   // Höhenprofil mit eigener Position (nur wenn die Route Höhen hat)
@@ -734,10 +737,10 @@
     if (el.offline.hidden) return;
     el.offline.innerHTML = G.icon("offline");
     el.offline.className = "nav-offline is-" + o.state;
-    var t = o.state === "done" ? "Karten entlang der Route offline gespeichert (" + o.total + " Kacheln)"
-      : o.state === "retry" ? "Offline-Speichern: kein Empfang, wird wiederholt (" + o.done + "/" + o.total + ")"
-      : "Karten werden offline gespeichert (" + o.done + "/" + o.total + ")";
-    if (o.skipped && o.skipped.length) t += " – nicht offline: " + o.skipped.join(", ");
+    var t = o.state === "done" ? T("Karten entlang der Route offline gespeichert ({0} Kacheln)", o.total)
+      : o.state === "retry" ? T("Offline-Speichern: kein Empfang, wird wiederholt ({0}/{1})", o.done, o.total)
+      : T("Karten werden offline gespeichert ({0}/{1})", o.done, o.total);
+    if (o.skipped && o.skipped.length) t += " – " + T("nicht offline: {0}", o.skipped.map(function (x) { return T(x); }).join(", "));
     el.offline.title = t;
     el.offline.setAttribute("aria-label", t);
   }
@@ -890,7 +893,7 @@
   function applyStand(st, rec) {
     if (!active || !walk || !walk.companion || (rec && walk.routeId !== rec.id)) {
       startCompanion(rec, st);
-      G.showStatus("Begleiten mit Stand von " + hhmm(st.at) + ".", 4000);
+      G.showStatus(T("Begleiten mit Stand von {0}.", hhmm(st.at)), 4000);
       return;
     }
     applyStandData(st);
@@ -903,7 +906,7 @@
     var here = G.getPosition && G.getPosition();
     if (here) progress = locateOnRoute(here.lat, here.lng);
     renderPanel();
-    G.showStatus("Stand von " + hhmm(st.at) + " übernommen.", 4000);
+    G.showStatus(T("Stand von {0} übernommen.", hhmm(st.at)), 4000);
   }
 
   // eigenen Stand für die Begleitung zusammenstellen
@@ -934,7 +937,7 @@
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
       free: true,
       routeId: null,
-      routeName: "Tour vom " + new Date().toLocaleDateString("de-DE"),
+      routeName: T("Tour vom {0}", new Date().toLocaleDateString(G.i18n.locale)),
       planLine: [],
       route: null,
       planLength: 0,
@@ -988,7 +991,7 @@
     }
     if (!walk.paused) pause();
     var pts = walk.segments.reduce(function (n, s) { return n + s.length; }, 0);
-    G.actionSheet("Tour beenden?", km(walk.distance) + " · " + duration(movingTime(walk)) + " · " + pts + " Punkte", [
+    G.actionSheet("Tour beenden?", km(walk.distance) + " · " + duration(movingTime(walk)) + " · " + T("{0} Punkte", pts), [
       { label: "✓ Beenden und unter „Erwandert“ speichern", primary: true, onClick: function () { finish(); } },
       { label: "▶ Weiterwandern", onClick: resume },
       { label: "Aufzeichnung verwerfen", danger: true, onClick: function () {
@@ -1022,7 +1025,7 @@
     });
     var rec = {
       id: walk.id,
-      name: walk.free ? nameGiven : walk.routeName + " – " + new Date(walk.startedAt).toLocaleDateString("de-DE"),
+      name: walk.free ? nameGiven : walk.routeName + " – " + new Date(walk.startedAt).toLocaleDateString(G.i18n.locale),
       free: !!walk.free,
       routeId: walk.routeId,
       routeName: walk.routeName,
@@ -1035,17 +1038,18 @@
       segments: segs
     };
     if (!G.db) {
-      G.showStatus("Lokaler Speicher nicht verfügbar – Aufzeichnung kann nicht gespeichert werden.", 8000);
+      G.showStatus("Speichern ist auf diesem Gerät gerade nicht möglich – die Aufzeichnung bleibt erhalten.", 8000);
       return;
     }
     G.db.put("walks", rec).then(function () {
       leave();
       loadWalks();
-      G.showStatus((rec.autoEnded ? "⚠ Fahrt erkannt (" + rec.autoEnded.peak + " km/h) – Tour bis zum Einstieg gekürzt und " : "Tour unter „Erwandert“ ") +
-        "gespeichert: " + km(rec.distance) + ".", rec.autoEnded ? 10000 : 5000);
+      G.showStatus(rec.autoEnded ? T("⚠ Fahrt erkannt ({0} km/h) – Tour bis zum Einstieg gekürzt und gespeichert: {1}.", rec.autoEnded.peak, km(rec.distance))
+        : T("Tour unter „Erwandert“ gespeichert: {0}.", km(rec.distance)), rec.autoEnded ? 10000 : 5000);
     }).catch(function (err) {
       // Aufzeichnung NICHT verwerfen: Sie bleibt als laufende Tour erhalten
-      G.showStatus("Speichern fehlgeschlagen: " + err.message + " Die Aufzeichnung bleibt erhalten.", 10000);
+      console.warn("[GoAhead] Speichern:", err);
+      G.showStatus("Die Tour konnte nicht gespeichert werden. Die Aufzeichnung bleibt erhalten – bitte erneut beenden.", 10000);
     });
   }
 
@@ -1099,24 +1103,24 @@
     var note = "";
     if (check && check.mode) {
       var n = Object.keys(check[check.mode]).length;
-      var lbl = { dups: [" vermutlich doppelt", "Doppelte löschen"], planned: [" vermutlich geplant", "Nach „Geplant“ verschieben"],
-        fast: [" Fahrzeug (Ø über " + setting("bikeMaxKmh", 32) + " km/h)", "Alle löschen"],
-        drive: [" mit Fahrt am Ende", "Alle kürzen"] }[check.mode];
-      note = '<div class="list-note"><span>' + n + lbl[0] + "</span>" +
+      var lbl = { dups: [T("{0} vermutlich doppelt", n), "Doppelte löschen"], planned: [T("{0} vermutlich geplant", n), "Nach „Geplant“ verschieben"],
+        fast: [T("{0} Fahrzeug (Ø über {1} km/h)", n, setting("bikeMaxKmh", 32)), "Alle löschen"],
+        drive: [T("{0} mit Fahrt am Ende", n), "Alle kürzen"] }[check.mode];
+      note = '<div class="list-note"><span>' + lbl[0] + "</span>" +
         '<button type="button" class="list-check-act">' + lbl[1] + "</button>" +
         '<button type="button" class="icon-btn list-check-off" title="Prüfung beenden" aria-label="Prüfung beenden">' + G.icon("close") + "</button></div>";
     }
     box.innerHTML = hd.html + note + hd.items.map(function (w) {
       var info = [km(w.distance), duration(w.movingMs)];
       var v = avgKmh(w);
-      if (v != null) info.push("Ø " + num(v, 1) + " km/h");
+      if (v != null) info.push(T("Ø {0} km/h", num(v, 1)));
       if (check && (check.mode === "planned" || check.mode === "drive") && check.why[w.id]) info.push(check.why[w.id]);
-      if (w.ascent) info.push("↑ ca. " + Math.round(w.ascent) + " m");
-      info.push(new Date(w.startedAt).toLocaleDateString("de-DE"));
+      if (w.ascent) info.push(T("↑ ca. {0} m", Math.round(w.ascent)));
+      info.push(new Date(w.startedAt).toLocaleDateString(G.i18n.locale));
       return '<div class="trk-item trk-tap" role="button" tabindex="0" data-id="' + esc(w.id) + '">' +
         '<div class="trk-main"><span class="trk-swatch" style="background:' + COLOR_WALK + '"></span>' +
-          '<span class="trk-text"><span class="trk-name">' +
-            (w.autoEnded ? '<span class="warn-ic" title="Automatisch beendet (Fahrt erkannt)">' + G.icon("warn") + "</span>" : "") +
+          '<span class="trk-text"><span class="trk-name" data-noi18n>' +
+            (w.autoEnded ? '<span class="warn-ic" title="' + T("Automatisch beendet (Fahrt erkannt)") + '">' + G.icon("warn") + "</span>" : "") +
             (kindOf(w) ? '<span class="kind-ic" title="' + kindLabel(kindOf(w)) + '">' + G.icon(kindOf(w)) + "</span>" : "") +
             esc(w.name) + (shown[w.id] ? " 👁" : "") + "</span>" +
           '<span class="trk-info">' + esc(info.join(" · ")) + "</span></span>" +
@@ -1180,26 +1184,26 @@
       }
       if (kindOf(w) === "car") fast[w.id] = 1;
       var det = detectDrive(w.segments);
-      if (det) { drive[w.id] = det; why[w.id] = "Fahrt " + Math.round(det.peak) + " km/h, kürzen auf " + num(segLength(cutSegments(w.segments, det.keep)) / 1000, 1) + " km"; }
+      if (det) { drive[w.id] = det; why[w.id] = T("Fahrt {0} km/h, kürzen auf {1} km", Math.round(det.peak), num(segLength(cutSegments(w.segments, det.keep)) / 1000, 1)); }
       if (w.free || !w.importKey) return;   // eigene Aufzeichnungen aus GoAhead sind sicher erwandert
       var st = walkStats(w);
-      if (st.timedShare < 0.5) { planned[w.id] = 1; why[w.id] = "ohne Zeitstempel"; }
+      if (st.timedShare < 0.5) { planned[w.id] = 1; why[w.id] = T("ohne Zeitstempel"); }
       else if (st.n >= 20 && st.stopShare < 0.01 && st.takt < 0.3) {
         planned[w.id] = 1;
-        why[w.id] = "Pausen " + Math.round(st.stopShare * 100) + " %, Takt " + Math.round(st.takt * 100) + " %";
+        why[w.id] = T("Pausen {0} %, Takt {1} %", Math.round(st.stopShare * 100), Math.round(st.takt * 100));
       }
     });
     var nd = Object.keys(dups).length, np = Object.keys(planned).length, nf = Object.keys(fast).length, nv = Object.keys(drive).length;
     function show(mode) { return function () { check = { dups: dups, planned: planned, fast: fast, drive: drive, why: why, mode: mode }; renderWalks(); }; }
     var kmOf = function (set) { return walks.filter(function (w) { return set[w.id]; }).reduce(function (s, w) { return s + (w.distance || 0); }, 0) / 1000; };
     var acts = [];
-    if (nd) acts.push({ label: "Doppelte zeigen (" + nd + ", " + num(kmOf(dups), 0) + " km)", onClick: show("dups") });
-    if (np) acts.push({ label: "Vermutlich geplante zeigen (" + np + ", " + num(kmOf(planned), 0) + " km)", onClick: show("planned") });
-    if (nv) acts.push({ label: "Mit Fahrt am Ende zeigen (" + nv + ")", onClick: show("drive") });
-    if (nf) acts.push({ label: "Fahrzeug zeigen (Ø über " + setting("bikeMaxKmh", 32) + " km/h: " + nf + ", " + num(kmOf(fast), 0) + " km)", onClick: show("fast") });
-    G.actionSheet("Liste prüfen", walks.length + " Touren: " + nd + " vermutlich doppelt, " + np + " vermutlich geplant, " + nv +
-      " mit Fahrt (über " + setting("autoEndKmh", 80) + " km/h), " + nf + " im Schnitt schneller als Rad." +
-      (nd || np || nf || nv ? " Erst ansehen, dann entscheiden." : ""), acts);
+    if (nd) acts.push({ label: T("Doppelte zeigen ({0}, {1} km)", nd, num(kmOf(dups), 0)), onClick: show("dups") });
+    if (np) acts.push({ label: T("Vermutlich geplante zeigen ({0}, {1} km)", np, num(kmOf(planned), 0)), onClick: show("planned") });
+    if (nv) acts.push({ label: T("Mit Fahrt am Ende zeigen ({0})", nv), onClick: show("drive") });
+    if (nf) acts.push({ label: T("Fahrzeug zeigen (Ø über {0} km/h: {1}, {2} km)", setting("bikeMaxKmh", 32), nf, num(kmOf(fast), 0)), onClick: show("fast") });
+    G.actionSheet("Liste prüfen", T("{0} Touren: {1} vermutlich doppelt, {2} vermutlich geplant, {3} mit Fahrt (über {4} km/h), {5} im Schnitt schneller als Rad.",
+      walks.length, nd, np, nv, setting("autoEndKmh", 80), nf) +
+      (nd || np || nf || nv ? " " + T("Erst ansehen, dann entscheiden.") : ""), acts);
   }
 
   function applyCheck() {
@@ -1207,31 +1211,31 @@
     var ids = Object.keys(check[check.mode]);
     if (check.mode === "drive") {
       var det = check.drive;
-      G.actionSheet(ids.length + " Touren kürzen?", "Jede wird bis zum erkannten Einstieg ins Fahrzeug gekürzt und mit ⚠ markiert.", [
+      G.actionSheet(T("{0} Touren kürzen?", ids.length), "Jede wird bis zum erkannten Einstieg ins Fahrzeug gekürzt und mit ⚠ markiert.", [
         { label: "Kürzen", primary: true, onClick: function () {
           var list = walks.filter(function (w) { return det[w.id]; }).map(function (w) { return trimmed(w, det[w.id].keep, det[w.id].peak); });
           G.db.putMany("walks", list).then(function () {
             check = null;
             loadWalks();
-            G.showStatus(list.length + " Touren gekürzt.", 4000);
-          }).catch(function (err) { G.showStatus("Kürzen fehlgeschlagen: " + err.message, 6000); });
+            G.showStatus(T("{0} Touren gekürzt.", list.length), 4000);
+          }).catch(function (err) { G.showStatus("Die Tour konnte nicht gekürzt werden.", 6000); });
         } }
       ]);
       return;
     }
     if (check.mode === "dups" || check.mode === "fast") {
-      G.actionSheet(ids.length + (check.mode === "dups" ? " doppelte Touren löschen?" : " Touren löschen?"),
+      G.actionSheet(T(check.mode === "dups" ? "{0} doppelte Touren löschen?" : "{0} Touren löschen?", ids.length),
         check.mode === "dups" ? "Die jeweils erste bleibt erhalten." : "Einzelne lassen sich vorher über ihr Menü löschen oder behalten.", [
         { label: "Löschen", danger: true, onClick: function () {
           Promise.all(ids.map(function (id) { return G.db.del("walks", id); })).then(function () {
             check = null;
             loadWalks();
-            G.showStatus(ids.length + " Touren gelöscht.", 4000);
-          }).catch(function (err) { G.showStatus("Löschen fehlgeschlagen: " + err.message, 6000); });
+            G.showStatus(T("{0} Touren gelöscht.", ids.length), 4000);
+          }).catch(function (err) { G.showStatus("Die Tour konnte nicht gelöscht werden.", 6000); });
         } }
       ]);
     } else {
-      G.actionSheet(ids.length + " Touren nach „Geplant“ verschieben?", "Sie werden zu geplanten Routen (Wegpunkte etwa alle 1 km) und unter „Erwandert“ entfernt.", [
+      G.actionSheet(T("{0} Touren nach „Geplant“ verschieben?", ids.length), "Sie werden zu geplanten Routen (Wegpunkte etwa alle 1 km) und unter „Erwandert“ entfernt.", [
         { label: "Verschieben", primary: true, onClick: function () { moveToPlanned(walks.filter(function (w) { return check.planned[w.id]; })); } }
       ]);
     }
@@ -1245,8 +1249,8 @@
     }).then(function () {
       check = null;
       window.dispatchEvent(new Event("goahead:data"));
-      G.showStatus(list.length + " Touren nach „Geplant“ verschoben.", 4000);
-    }).catch(function (err) { G.showStatus("Verschieben fehlgeschlagen: " + err.message, 6000); });
+      G.showStatus(T("{0} Touren nach „Geplant“ verschoben.", list.length), 4000);
+    }).catch(function (err) { G.showStatus("Die Tour konnte nicht verschoben werden.", 6000); });
   }
 
   function findWalk(id) {
@@ -1279,7 +1283,7 @@
         [ele.length ? Math.round(Math.min.apply(null, ele)) + "–" + Math.round(Math.max.apply(null, ele)) : "–", "Höhe m"],
         [hhmm(t0), "Start"],
         [hhmm(t1), "Ende"],
-        [t0.toLocaleDateString("de-DE"), "Datum"]
+        [t0.toLocaleDateString(G.i18n.locale), "Datum"]
       ],
       profile: prof
     };
@@ -1314,9 +1318,9 @@
     if (ph) ph.layer.addTo(map);
     var opts = {
       title: w.name,
-      sub: (w.autoEnded ? "⚠ automatisch beendet (" + w.autoEnded.peak + " km/h) · " : "") +
+      sub: (w.autoEnded ? T("⚠ automatisch beendet ({0} km/h)", w.autoEnded.peak) + " · " : "") +
         (kindOf(w) ? kindLabel(kindOf(w)) + " · " : "") +
-        num(w.distance / 1000, 1) + " km · " + new Date(w.startedAt).toLocaleDateString("de-DE"),
+        num(w.distance / 1000, 1) + " km · " + new Date(w.startedAt).toLocaleDateString(G.i18n.locale),
       stats: d.stats,
       profile: d.profile,
       photos: [],
@@ -1364,8 +1368,9 @@
       var box = document.querySelector(".trim-info");
       if (box) {
         var tt = e[3] ? new Date(e[3]) : null;
-        box.textContent = "Behalten " + num(f.cum[keep - 1] / 1000, 2) + " km" + (tt ? " bis " + tt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "") +
-          " · weg " + num((f.cum[n - 1] - f.cum[keep - 1]) / 1000, 2) + " km";
+        box.textContent = T("Behalten {0} km", num(f.cum[keep - 1] / 1000, 2)) +
+          (tt ? " " + T("bis {0}", tt.toLocaleTimeString(G.i18n.locale, { hour: "2-digit", minute: "2-digit" })) : "") +
+          " · " + T("weg {0} km", num((f.cum[n - 1] - f.cum[keep - 1]) / 1000, 2));
       }
     }
     var html = '<div class="trim-box">' +
@@ -1390,8 +1395,8 @@
           G.tourView.close();
           loadWalks();
           setTimeout(function () { var nw = findWalk(c.id); if (nw) showWalk(nw); }, 300);
-          G.showStatus("Tour gekürzt auf " + num(c.distance / 1000, 2) + " km.", 4000);
-        }).catch(function (err) { G.showStatus("Speichern fehlgeschlagen: " + err.message, 6000); });
+          G.showStatus(T("Tour gekürzt auf {0} km.", num(c.distance / 1000, 2)), 4000);
+        }).catch(function (err) { G.showStatus("Die Änderung konnte nicht gespeichert werden.", 6000); });
       });
     });
     // Linie antippen setzt das Ende auf den nächsten Punkt
@@ -1436,16 +1441,16 @@
   }
 
   function walkMenu(w) {
-    var sub = km(w.distance) + " · " + duration(w.movingMs) + " · " + new Date(w.startedAt).toLocaleString("de-DE");
+    var sub = km(w.distance) + " · " + duration(w.movingMs) + " · " + new Date(w.startedAt).toLocaleString(G.i18n.locale);
     G.actionSheet(w.name, sub, [
       shown[w.id]
         ? { label: "Von der Karte entfernen", onClick: function () { if (G.tourView && G.tourView.isOpen()) G.tourView.close(); else hideWalk(w); } }
         : { label: "👁 Ansehen (Karte und Details)", primary: true, onClick: function () { showWalk(w); } },
       { label: "↗ Teilen (z. B. WhatsApp)", onClick: function () {
         var fn = G.planner ? G.planner.fileNameFor(w.name) : "tour.gpx";
-        var details = km(w.distance) + " · " + duration(w.movingMs) + " h unterwegs" +
-          (w.ascent ? " · ↑ ca. " + Math.round(w.ascent) + " m" : "") + " · " + new Date(w.startedAt).toLocaleDateString("de-DE");
-        G.shareGpx(fn, walkToGpx(w), w.name, w.name + "\n" + details + "\n(GPX-Datei, aufgezeichnet mit GoAhead)");
+        var details = km(w.distance) + " · " + T("{0} h unterwegs", duration(w.movingMs)) +
+          (w.ascent ? " · " + T("↑ ca. {0} m", Math.round(w.ascent)) : "") + " · " + new Date(w.startedAt).toLocaleDateString(G.i18n.locale);
+        G.shareGpx(fn, walkToGpx(w), w.name, w.name + "\n" + details + "\n" + T("(GPX-Datei, aufgezeichnet mit GoAhead)"));
       } },
       { label: "⬇ GPX exportieren", onClick: function () {
         var fn = G.planner ? G.planner.fileNameFor(w.name) : "tour.gpx";
@@ -1456,16 +1461,16 @@
         if (openSheetOpts && openSheetOpts.w.id === w.id) startTrim(w, openSheetOpts.opts);
       } },
       { label: "⇄ Nach „Geplant“ verschieben", onClick: function () {
-        G.actionSheet("„" + w.name + "“ nach „Geplant“ verschieben?", "Sie wird zur geplanten Route und unter „Erwandert“ entfernt.", [
+        G.actionSheet(T("„{0}“ nach „Geplant“ verschieben?", w.name), "Sie wird zur geplanten Route und unter „Erwandert“ entfernt.", [
           { label: "Verschieben", primary: true, onClick: function () { if (G.tourView) G.tourView.close(); moveToPlanned([w]); } }
         ]);
       } },
       { label: "🗑 Löschen", danger: true, onClick: function () {
-        G.actionSheet("„" + w.name + "“ löschen?", "Die Aufzeichnung wird vom Gerät gelöscht.", [
+        G.actionSheet(T("„{0}“ löschen?", w.name), "Die Aufzeichnung wird vom Gerät gelöscht.", [
           { label: "Löschen", danger: true, onClick: function () {
             hideWalk(w);
             G.db.del("walks", w.id).then(loadWalks).catch(function (err) {
-              G.showStatus("Löschen fehlgeschlagen: " + err.message, 6000);
+              G.showStatus("Die Tour konnte nicht gelöscht werden.", 6000);
             });
           } }
         ]);

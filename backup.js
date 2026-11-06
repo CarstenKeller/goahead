@@ -22,6 +22,8 @@
   "use strict";
 
   var G = window.GOAHEAD;
+
+  var T = window.GOAHEAD_I18N.t;
   if (!G || !G.map) return;
 
   var STORES = ["tracks", "routes", "walks", "photos"];
@@ -92,19 +94,19 @@
   }
 
   function save() {
-    if (!G.db) { G.showStatus("Lokaler Speicher nicht verfügbar.", 5000); return; }
+    if (!G.db) { G.showStatus("Speichern ist auf diesem Gerät gerade nicht möglich.", 5000); return; }
     G.showStatus("Sicherung wird erstellt …");
     collect().then(function (data) {
       var text = JSON.stringify(data);
       var name = "goahead-sicherung-" + today() + ".json";
-      var sub = data.stores.routes.length + " geplant · " + data.stores.walks.length + " erwandert · " +
-        data.stores.tracks.length + " GPX · " + data.stores.photos.length + " Fotos · " + (text.length / 1048576).toFixed(1).replace(".", ",") + " MB";
+      var sub = T("{0} geplant · {1} erwandert · {2} GPX · {3} Fotos · {4} MB", data.stores.routes.length, data.stores.walks.length,
+        data.stores.tracks.length, data.stores.photos.length, G.i18n.dec((text.length / 1048576).toFixed(1)));
       if (G.hideStatus) G.hideStatus();
       var actions = [{ label: "⬇ Speichern (Downloads)", primary: true, onClick: function () { G.downloadFile(name, text, "application/json"); } }];
       if (G.native) {
         actions.push({ label: "↗ Teilen (z. B. Google Drive, E-Mail)", onClick: function () {
           if (!G.native.call("shareFile", name, "application/json", text, "GoAhead-Sicherung", "GoAhead-Sicherung " + today())) {
-            G.showStatus("Teilen fehlgeschlagen.", 5000);
+            G.showStatus("Teilen hat nicht geklappt.", 5000);
           }
         } });
       } else {
@@ -113,14 +115,15 @@
         if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
           actions.push({ label: "↗ Teilen (z. B. Google Drive, E-Mail)", onClick: function () {
             navigator.share({ files: [file], title: "GoAhead-Sicherung" }).catch(function (err) {
-              if (!err || err.name !== "AbortError") G.showStatus("Teilen fehlgeschlagen: " + (err && err.message || err), 6000);
+              if (!err || err.name !== "AbortError") G.showStatus("Teilen hat nicht geklappt.", 6000);
             });
           } });
         }
       }
       G.actionSheet("Sicherung", sub, actions);
     }).catch(function (err) {
-      G.showStatus("Sicherung fehlgeschlagen: " + (err.message || err), 8000);
+      console.warn("[GoAhead] Sicherung:", err);
+      G.showStatus("Die Sicherung konnte nicht erstellt werden.", 8000);
     });
   }
 
@@ -133,7 +136,8 @@
     var f = restoreInput.files && restoreInput.files[0];
     restoreInput.value = "";
     if (f) readText(f).then(restoreFrom).catch(function (err) {
-      G.showStatus("Sicherung nicht lesbar: " + (err.message || err), 8000);
+      console.warn("[GoAhead] Sicherung:", err);
+      G.showStatus("Diese Datei ist keine lesbare GoAhead-Sicherung.", 8000);
     });
   });
 
@@ -144,9 +148,9 @@
     try { data = JSON.parse(text); } catch (e) { throw new Error("keine gültige Sicherungsdatei"); }
     if (!data || data.app !== "GoAhead" || !data.stores) throw new Error("keine GoAhead-Sicherung");
     var counts = STORES.map(function (n) { return (data.stores[n] || []).length; });
-    var when = data.createdAt ? new Date(data.createdAt).toLocaleString("de-DE") : "?";
-    G.actionSheet("Sicherung vom " + when + " wiederherstellen?",
-      counts[1] + " geplant · " + counts[2] + " erwandert · " + counts[0] + " GPX. Gleiche Einträge werden überschrieben, andere bleiben.", [
+    var when = data.createdAt ? new Date(data.createdAt).toLocaleString(G.i18n.locale) : "?";
+    G.actionSheet(T("Sicherung vom {0} wiederherstellen?", when),
+      T("{0} geplant · {1} erwandert · {2} GPX. Gleiche Einträge werden überschrieben, andere bleiben.", counts[1], counts[2], counts[0]), [
         { label: "Wiederherstellen", primary: true, onClick: function () {
           var chain = Promise.resolve();
           STORES.forEach(function (n) {
@@ -167,12 +171,13 @@
               });
             } catch (e) { /* Speicher voll o. ä. – Daten sind trotzdem zurück */ }
             changed();
-            G.showStatus("Wiederhergestellt: " + counts[1] + " geplant, " + counts[2] + " erwandert, " + counts[0] + " GPX." +
-              (hasLocal ? " Einstellungen gelten nach dem Neuladen." : ""), 6000);
+            G.showStatus(T("Wiederhergestellt: {0} geplant, {1} erwandert, {2} GPX.", counts[1], counts[2], counts[0]) +
+              (hasLocal ? " " + T("Einstellungen gelten nach dem Neuladen.") : ""), 6000);
             // Einstellungen werden beim Start gelesen: neu laden (laufende Tour bleibt erhalten)
             if (hasLocal) setTimeout(function () { window.location.reload(); }, 2500);
           }).catch(function (err) {
-            G.showStatus("Wiederherstellen fehlgeschlagen: " + (err.message || err), 8000);
+            console.warn("[GoAhead] Wiederherstellen:", err);
+            G.showStatus("Wiederherstellen hat nicht geklappt.", 8000);
           });
         } }
       ]);
@@ -196,7 +201,7 @@
 
   function inflateRaw(bytes) {
     if (typeof DecompressionStream === "undefined") {
-      return Promise.reject(new Error("Dieser Browser kann ZIP nicht entpacken – bitte die GPX-Dateien einzeln wählen."));
+      return Promise.reject(new Error("ZIP-Dateien lassen sich hier nicht öffnen – bitte die GPX-Dateien einzeln wählen."));
     }
     var stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
     return new Response(stream).arrayBuffer().then(function (b) { return new Uint8Array(b); });
@@ -213,11 +218,11 @@
     if (eocd < 0) return Promise.reject(new Error("ZIP-Datei beschädigt"));
     var count = dv.getUint16(eocd + 10, true);
     var p = dv.getUint32(eocd + 16, true);
-    if (p === 0xffffffff || count === 0xffff) return Promise.reject(new Error("ZIP64-Archive werden nicht unterstützt"));
+    if (p === 0xffffffff || count === 0xffff) return Promise.reject(new Error("Dieses ZIP-Format lässt sich nicht öffnen – bitte die GPX-Dateien einzeln wählen."));
     var dec = new TextDecoder("utf-8");
     var jobs = [];
     for (var n = 0; n < count; n++) {
-      if (dv.getUint32(p, true) !== 0x02014b50) return Promise.reject(new Error("ZIP-Verzeichnis beschädigt"));
+      if (dv.getUint32(p, true) !== 0x02014b50) return Promise.reject(new Error("ZIP-Datei beschädigt"));
       var method = dv.getUint16(p + 10, true);
       var size = dv.getUint32(p + 20, true);
       var nLen = dv.getUint16(p + 28, true);
@@ -232,7 +237,7 @@
       var short = name.split("/").pop();
       if (method === 0) jobs.push(Promise.resolve({ name: short, bytes: data }));
       else if (method === 8) jobs.push(inflateRaw(data).then((function (nm) { return function (b) { return { name: nm, bytes: b }; }; })(short)));
-      else jobs.push(Promise.resolve({ name: short, error: "„" + short + "“: Packverfahren " + method + " nicht unterstützt" }));
+      else jobs.push(Promise.resolve({ name: short, error: T("„{0}“ lässt sich nicht entpacken.", short) }));
     }
     return Promise.all(jobs);
   }
@@ -269,7 +274,7 @@
     files.forEach(function (f) {
       chain = chain.then(function () {
         return readBuffer(f).then(function (buf) { return fromBuffer(f.name, buf, 0); })
-          .catch(function (err) { errors.push("„" + f.name + "“: " + (err.message || err)); });
+          .catch(function (err) { console.warn("[GoAhead] Import:", err); errors.push(T("„{0}“ lässt sich nicht öffnen.", f.name)); });
       });
     });
     return chain.then(function () { return out; });
@@ -287,7 +292,7 @@
   function parse(text, fileName) {
     var doc = new DOMParser().parseFromString(text, "application/xml");
     if (doc.getElementsByTagName("parsererror").length || !doc.documentElement || doc.documentElement.localName !== "gpx") {
-      throw new Error("„" + fileName + "“ ist keine gültige GPX-Datei.");
+      throw new Error(T("„{0}“ ist keine gültige GPX-Datei.", fileName));
     }
     var root = doc.documentElement;
     var lines = [];
@@ -314,7 +319,7 @@
       var rtes = root.getElementsByTagNameNS("*", "rte");
       for (var j = 0; j < rtes.length; j++) { var b = read(rtes[j], "rtept"); if (b.length > 1) lines.push(b); }
     }
-    if (!lines.length) throw new Error("„" + fileName + "“ enthält keine Strecke.");
+    if (!lines.length) throw new Error(T("„{0}“ enthält keine Strecke.", fileName));
     var name = "";
     var metaTime = NaN;
     var meta = root.getElementsByTagNameNS("*", "metadata")[0];
@@ -463,10 +468,10 @@
       }
       var rec = parsed.filter(function (g) { return g.recorded; }).length;
       var plan = parsed.length - rec;
-      var sub = parsed.length + " Tour(en): " + rec + " mit Zeitstempeln (aufgezeichnet), " + plan + " ohne" +
-        (errors.length ? " · " + errors.length + " nicht lesbar" : "");
+      var sub = T("{0} Tour(en): {1} mit Zeitstempeln (aufgezeichnet), {2} ohne", parsed.length, rec, plan) +
+        (errors.length ? " · " + T("{0} nicht lesbar", errors.length) : "");
       G.actionSheet("Importieren nach …", sub, [
-        { label: "Automatisch: " + rec + " → Erwandert, " + plan + " → Geplant", primary: true, onClick: function () { run(parsed, "auto", errors); } },
+        { label: T("Automatisch: {0} → Erwandert, {1} → Geplant", rec, plan), primary: true, onClick: function () { run(parsed, "auto", errors); } },
         { label: "Alle unter „Geplant“", onClick: function () { run(parsed, "routes", errors); } },
         { label: "Alle unter „Erwandert“", onClick: function () { run(parsed, "walks", errors); } },
         { label: "Alle unter „GPX“", onClick: function () {
@@ -474,7 +479,8 @@
         } }
       ]);
     }).catch(function (err) {
-      G.showStatus("Import fehlgeschlagen: " + (err.message || err), 8000);
+      console.warn("[GoAhead] Import:", err);
+      G.showStatus("Der Import hat nicht geklappt.", 8000);
     });
   }
 
@@ -489,21 +495,22 @@
         var target = mode === "auto" ? (g.recorded ? "walks" : "routes") : mode;
         if (known[target][g.key]) { skipped++; return; }
         known[target][g.key] = true;   // auch Dubletten innerhalb dieses Imports
-        try { out[target].push(target === "walks" ? toWalk(g) : toRoute(g)); } catch (e) { errors.push("„" + g.fileName + "“: " + e.message); }
+        try { out[target].push(target === "walks" ? toWalk(g) : toRoute(g)); } catch (e) { console.warn("[GoAhead] Import:", e); errors.push(T("„{0}“ lässt sich nicht übernehmen.", g.fileName)); }
       });
       return G.db.putMany("routes", out.routes).then(function () {
         return G.db.putMany("walks", out.walks);
       }).then(function () {
         if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
         changed();
-        var msg = "Importiert: " + out.routes.length + " geplant, " + out.walks.length + " erwandert" +
-          (skipped ? ", " + skipped + " schon vorhanden" : "") + "." +
-          (errors.length ? " " + errors.length + " Fehler: " + errors.slice(0, 2).join(" ") : "");
+        var msg = T("Importiert: {0} geplant, {1} erwandert", out.routes.length, out.walks.length) +
+          (skipped ? ", " + T("{0} schon vorhanden", skipped) : "") + "." +
+          (errors.length ? " " + T("{0} Fehler:", errors.length) + " " + errors.slice(0, 2).join(" ") : "");
         G.showStatus(msg, errors.length ? 10000 : 6000);
         if (G.openTracksPage) G.openTracksPage(out.walks.length && !out.routes.length ? "walked" : "planned");
       });
     }).catch(function (err) {
-      G.showStatus("Import fehlgeschlagen: " + (err.message || err), 8000);
+      console.warn("[GoAhead] Import:", err);
+      G.showStatus("Der Import hat nicht geklappt.", 8000);
     });
   }
 

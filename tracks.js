@@ -9,6 +9,8 @@
   "use strict";
 
   var G = window.GOAHEAD;
+
+  var T = window.GOAHEAD_I18N.t;
   if (!G || !G.map) return;
   var map = G.map;
   var esc = G.escapeHtml;
@@ -27,7 +29,7 @@
     if (dbPromise) return dbPromise;
     dbPromise = new Promise(function (resolve, reject) {
       if (!window.indexedDB) {
-        reject(new Error("Dieser Browser bietet keinen lokalen Speicher (IndexedDB)."));
+        reject(new Error("Dieser Browser kann keine Daten auf dem Gerät speichern."));
         return;
       }
       var req = window.indexedDB.open("goahead", DB_VERSION);
@@ -43,15 +45,15 @@
         db.onversionchange = function () {
           db.close();
           dbPromise = null;
-          G.showStatus("GoAhead wurde in einem anderen Tab aktualisiert. Bitte diese Seite neu laden.", 10000);
+          G.showStatus("GoAhead wurde in einem anderen Fenster aktualisiert. Bitte neu laden.", 10000);
         };
         resolve(db);
       };
       // Ein anderer Tab mit älterer App-Version hält die Datenbank offen und verhindert die Umstellung
       req.onblocked = function () {
-        G.showStatus("Speicher blockiert: GoAhead ist noch in einem anderen Tab geöffnet. Bitte die anderen Tabs schließen und neu laden.", 15000);
+        G.showStatus("GoAhead ist noch in einem anderen Fenster geöffnet. Bitte das andere Fenster schließen und neu laden.", 15000);
       };
-      req.onerror = function () { reject(req.error || new Error("IndexedDB nicht verfügbar")); };
+      req.onerror = function () { reject(req.error || new Error("Speicher nicht verfügbar")); };
     });
     // Fehlschlag nicht dauerhaft merken, damit ein späterer Versuch neu öffnen kann
     dbPromise.catch(function () { dbPromise = null; });
@@ -64,7 +66,7 @@
       promise,
       new Promise(function (resolve, reject) {
         timer = setTimeout(function () {
-          reject(new Error("Lokaler Speicher antwortet nicht. Ist GoAhead noch in einem anderen Tab geöffnet? Diese schließen und neu laden."));
+          reject(new Error("Der Speicher antwortet nicht. Ist GoAhead noch in einem anderen Fenster geöffnet? Dieses schließen und neu laden."));
         }, ms);
       })
     ]).then(function (v) { clearTimeout(timer); return v; }, function (e) { clearTimeout(timer); throw e; });
@@ -127,7 +129,7 @@
     var doc = new DOMParser().parseFromString(text, "application/xml");
     if (doc.getElementsByTagName("parsererror").length || !doc.documentElement ||
         doc.documentElement.localName !== "gpx") {
-      throw new Error("„" + fileName + "“ ist keine gültige GPX-Datei.");
+      throw new Error(T("„{0}“ ist keine gültige GPX-Datei.", fileName));
     }
     var root = doc.documentElement;
     var lines = [];
@@ -154,7 +156,7 @@
     }
 
     if (!lines.length && !waypoints.length) {
-      throw new Error("„" + fileName + "“ enthält weder Track noch Route noch Wegpunkte.");
+      throw new Error(T("„{0}“ enthält weder Track noch Route noch Wegpunkte.", fileName));
     }
 
     // Name: Metadaten, sonst erster Track bzw. erste Route, sonst Dateiname
@@ -297,7 +299,7 @@
         requestPersistentStorage();
       }
       renderList();
-      var msg = imported.length ? imported.length + " Track(s) importiert und gespeichert." : "";
+      var msg = imported.length ? T(imported.length === 1 ? "1 Track importiert und gespeichert." : "{0} Tracks importiert und gespeichert.", imported.length) : "";
       if (errors.length) msg += (msg ? " " : "") + errors.join(" ");
       if (msg) G.showStatus(msg, errors.length ? 8000 : 4000);
     });
@@ -318,12 +320,12 @@
   var listEl = null;
 
   function formatKm(m) {
-    return (m / 1000).toFixed(1).replace(".", ",") + " km";
+    return G.i18n.dec((m / 1000).toFixed(1)) + " km";
   }
 
   function formatDate(iso) {
     try {
-      return new Date(iso).toLocaleDateString("de-DE");
+      return new Date(iso).toLocaleDateString(G.i18n.locale);
     } catch (e) {
       return "";
     }
@@ -340,14 +342,14 @@
       var st = r.stats || {};
       var info = [];
       if (st.length) info.push(formatKm(st.length));
-      if (st.ascent) info.push("↑ ca. " + Math.round(st.ascent) + " m");
-      if (st.waypoints) info.push(st.waypoints + (st.waypoints === 1 ? " Wegpunkt" : " Wegpunkte"));
+      if (st.ascent) info.push(T("↑ ca. {0} m", Math.round(st.ascent)));
+      if (st.waypoints) info.push(T(st.waypoints === 1 ? "1 Wegpunkt" : "{0} Wegpunkte", st.waypoints));
       info.push(formatDate(r.importedAt));
       return '<div class="trk-item" data-id="' + esc(r.id) + '">' +
         '<label class="trk-main">' +
           '<input type="checkbox" data-act="toggle"' + (r.visible ? " checked" : "") + ">" +
           '<span class="trk-swatch" style="background:' + esc(r.color) + '"></span>' +
-          '<span class="trk-text"><span class="trk-name">' + esc(r.name) + "</span>" +
+          '<span class="trk-text"><span class="trk-name" data-noi18n>' + esc(r.name) + "</span>" +
           '<span class="trk-info">' + esc(info.join(" · ")) + "</span></span>" +
         "</label>" +
         '<div class="trk-actions">' +
@@ -375,7 +377,7 @@
     if (act === "toggle" && e.type === "change") {
       rec.visible = target.checked;
       if (rec.visible) showTrack(rec, false); else hideTrack(rec);
-      dbPut(rec).catch(function (err) { G.showStatus("Speichern fehlgeschlagen: " + err.message, 6000); });
+      dbPut(rec).catch(function () { G.showStatus("Die Änderung konnte nicht gespeichert werden.", 6000); });
     } else if (act === "zoom" && e.type === "click") {
       if (!rec.visible) {
         rec.visible = true;
@@ -388,14 +390,15 @@
     } else if (act === "download" && e.type === "click") {
       G.downloadFile(rec.fileName || (rec.name + ".gpx"), rec.gpx, "application/gpx+xml");
     } else if (act === "delete" && e.type === "click") {
-      if (!window.confirm("Track „" + rec.name + "“ vom Gerät löschen?")) return;
-      dbDelete(rec.id).then(function () {
-        hideTrack(rec);
-        delete layers[rec.id];
-        delete parsedCache[rec.id];
-        records = records.filter(function (r) { return r.id !== rec.id; });
-        renderList();
-      }).catch(function (err) { G.showStatus("Löschen fehlgeschlagen: " + err.message, 6000); });
+      G.actionSheet("Track löschen?", T("„{0}“ wird vom Gerät gelöscht.", rec.name), [{ label: "Löschen", danger: true, onClick: function () {
+        dbDelete(rec.id).then(function () {
+          hideTrack(rec);
+          delete layers[rec.id];
+          delete parsedCache[rec.id];
+          records = records.filter(function (r) { return r.id !== rec.id; });
+          renderList();
+        }).catch(function () { G.showStatus("Der Track konnte nicht gelöscht werden.", 6000); });
+      } }]);
     }
   }
 
@@ -430,10 +433,10 @@
           '<p class="trk-note">Tracks werden nur auf diesem Gerät gespeichert.</p>' +
         "</div>" +
         '<div class="page-panel" data-panel="planned" role="tabpanel" hidden>' +
-          '<p class="trk-empty">Noch keine geplanten Routen. Eine Route planen und im Planungsfeld „Speichern“ wählen.</p>' +
+          '<p class="trk-empty">Noch keine geplanten Routen.</p>' +
         "</div>" +
         '<div class="page-panel" data-panel="walked" role="tabpanel" hidden>' +
-          '<p class="trk-empty">Hier erscheinen erwanderte Strecken. Was genau hier hineinkommt, legen wir noch fest.</p>' +
+          '<p class="trk-empty">Noch keine erwanderten Touren.</p>' +
         "</div>" +
       "</div>";
     document.body.appendChild(pageEl);
@@ -532,7 +535,7 @@
       renderList();
     }).catch(function (err) {
       console.warn("[GoAhead] Tracks konnten nicht geladen werden:", err);
-      if (listEl) listEl.innerHTML = '<p class="trk-empty">Lokaler Speicher nicht verfügbar: ' + esc(err.message || String(err)) + "</p>";
+      if (listEl) listEl.innerHTML = '<p class="trk-empty">Die gespeicherten Daten lassen sich gerade nicht öffnen. Bitte die App neu starten.</p>';
     });
   }
   loadAll();

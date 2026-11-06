@@ -14,6 +14,8 @@
   "use strict";
 
   var G = window.GOAHEAD;
+
+  var T = window.GOAHEAD_I18N.t;
   if (!G || !G.map) return;
   var map = G.map;
   var MAX_PX = 1600;
@@ -97,7 +99,7 @@
     var p = pending;
     shrink(f).then(function (blob) {
       return finish(p, blob, { name: f.name });
-    }).catch(function (err) { G.showStatus("Foto nicht lesbar: " + (err && err.message || err), 6000); });
+    }).catch(function (err) { console.warn("[GoAhead] Foto:", err); G.showStatus("Das Foto konnte nicht geöffnet werden.", 6000); });
   });
 
   // Rückmeldung der Android-App: {ok, dataUrl, name, uri, error}
@@ -107,14 +109,14 @@
       try { p = JSON.parse(window.localStorage.getItem(PENDING_KEY) || "null"); } catch (e) { p = null; }
     }
     if (!res || !res.ok) {
-      if (res && res.error) G.showStatus("Foto: " + res.error, 6000);
+      if (res && res.error) { console.warn("[GoAhead] Foto:", res.error); G.showStatus("Das Foto konnte nicht übernommen werden.", 6000); }
       clearPending();
       return;
     }
     if (!p) { G.showStatus("Foto in der Galerie gespeichert (ohne Tour-Zuordnung).", 5000); return; }
     dataUrlToBlob(res.dataUrl).then(function (blob) {
       return finish(p, blob, { name: res.name, galleryUri: res.uri });
-    }).catch(function (err) { G.showStatus("Foto nicht übernommen: " + (err && err.message || err), 6000); });
+    }).catch(function (err) { console.warn("[GoAhead] Foto:", err); G.showStatus("Das Foto konnte nicht übernommen werden.", 6000); });
   };
 
   function clearPending() {
@@ -130,7 +132,7 @@
       G.showStatus(G.native && extra.galleryUri ? "Foto gespeichert (Galerie: Album „GoAhead“)." : "Foto gespeichert.", 3000);
       listeners.forEach(function (fn) { try { fn(rec); } catch (e) { console.warn(e); } });
       return rec;
-    }).catch(function (err) { G.showStatus("Foto nicht gespeichert: " + err.message, 6000); });
+    }).catch(function (err) { console.warn("[GoAhead] Foto:", err); G.showStatus("Das Foto konnte nicht gespeichert werden.", 6000); });
   }
 
   // ---------- Karte: Marker ----------
@@ -170,7 +172,7 @@
     if (e.target.closest(".photo-close") || e.target === view) { view.hidden = true; shown = null; return; }
     if (e.target.closest(".photo-del") && shown) {
       var ph = shown;
-      G.actionSheet("Foto löschen?", "Es wird aus GoAhead entfernt" + (ph.galleryUri ? "; in der Galerie bleibt es erhalten." : "."), [
+      G.actionSheet("Foto löschen?", T(ph.galleryUri ? "Es wird aus GoAhead entfernt; in der Galerie bleibt es erhalten." : "Es wird aus GoAhead entfernt."), [
         { label: "Löschen", danger: true, onClick: function () {
           remove(ph).then(function () {
             view.hidden = true;
@@ -186,7 +188,7 @@
   function open(ph) {
     shown = ph;
     view.querySelector("img").src = url(ph);
-    view.querySelector(".photo-view-info").textContent = new Date(ph.time).toLocaleString("de-DE");
+    view.querySelector(".photo-view-info").textContent = new Date(ph.time).toLocaleString(G.i18n.locale);
     view.hidden = false;
   }
 

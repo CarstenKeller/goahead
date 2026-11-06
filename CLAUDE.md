@@ -37,6 +37,14 @@ Platz wie möglich:
   (z. B. Kartenwahl) sind eine ziehbare `.sheet` – keine Klappfelder in der Menüleiste.
 - Globale Ereignis-Abfangungen (z. B. Klick nach Tooltip verschlucken) dürfen nie einen späteren,
   unabhängigen Tipp blockieren: Zustand bei jeder neuen Berührung zurücksetzen.
+- **Sprache:** Deutsch ist die Ausgangssprache, Englisch kommt aus `i18n-en.js` (Schlüssel = deutscher Text).
+  Feste Oberflächentexte (Knöpfe, Überschriften, `title`/`aria-label`/`placeholder`) werden automatisch übersetzt –
+  dafür nur den deutschen Text als eigenen Textknoten bzw. Attribut schreiben und ins Wörterbuch eintragen.
+  Texte mit Werten immer als ganzer Satz mit Platzhaltern: `T("Route „{0}“ gespeichert.", name)` – nie aus
+  Bruchstücken zusammensetzen. Zahlen mit Nachkommastellen über `G.i18n.dec`, Datum mit `G.i18n.locale`.
+  Nutzerdaten (Namen) in Elementen mit `data-noi18n`. Neue Texte: Test mit `lang: "en"` und `GOAHEAD_I18N.missing`.
+- **Darstellung:** Hell/Dunkel nur über die Variablen in `styles.css` (Block `:root[data-theme="dark"]`); neue Farben
+  immer für beide Varianten anlegen.
 - Das `hidden`-Attribut blendet immer aus (globale Regel `[hidden] { display: none !important }`) –
   nicht mit eigenen `display`-Regeln dagegen arbeiten.
 
@@ -60,8 +68,10 @@ Platz wie möglich:
 4. **Knöpfe:** in `.sheet`, `.page`, `.dlg` automatisch einheitlich; Symbolknöpfe `.icon-btn` (44 × 44 px),
    Reihen davon in `.icon-row`. Varianten über die vorhandenen Klassen (`.btn-primary`, `.btn-danger`
    bzw. die dort gelisteten). Mindestgröße für Touch 44 px.
-5. **Dialoge:** nie `window.prompt`/`alert` (werden teils unterdrückt). Stattdessen
-   `GOAHEAD.askText(...)` und `GOAHEAD.actionSheet(...)`. `window.confirm` nur, wo bereits verwendet.
+5. **Dialoge:** nie `window.prompt`/`alert`/`confirm` (zeigen die Web-Adresse, werden teils unterdrückt). Stattdessen
+   `GOAHEAD.askText(...)` und `GOAHEAD.actionSheet(...)` („Abbrechen“ kommt automatisch dazu).
+   Meldungen für Wanderer formulieren: was passiert ist und was man tun kann – keine HTTP-Codes, Fehlertexte
+   (`err.message`), URLs, Dienst- oder Technikbegriffe. Technisches nach `console.warn` bzw. in den Diagnose-Modus.
 6. **Menü:** Funktionen kommen als Knopf in die Leiste per `GOAHEAD.addToToolbar(control)`.
    Modi (Planen, Unterwegs) blenden über eine Body-Klasse (`mode-…`) alles außer der Kartenwahl (`.maps-control`) aus.
    Auswahlen und Einstellungen öffnen eine `.sheet` (z. B. Kartenwahl), keine Klappfelder im Menü. Die Leaflet-Ebenensteuerung
@@ -94,7 +104,7 @@ Platz wie möglich:
   (Quellen in `config.js`, unten = überall → oben = genaueste, `region` = Länderkürzel). Neue Kartendienste erst
   im Workflow „Kartendienste prüfen“ (`.github/scripts/probe_maps.py`) testen. Overlays mit Inhalt nur in einem Gebiet
   bekommen `region` (keine Anfragen außerhalb, auch nicht offline). Reihenfolge der Skripte in `index.html` beachten
-  (config → regions → mosaic → app → tracks → planner → tourview → offline → photos → nav → share → backup).
+  (im `<head>`: i18n-en → i18n; dann config → regions → mosaic → app → tracks → planner → tourview → offline → photos → nav → share → backup).
 - `share.js`: Teilen ohne Server (Link `#g=` mit gepacktem JSON). Begleiten ist ein Modus in `nav.js`
   (`walk.companion`): nie aufzeichnen, nie die App-Aufzeichnung (`G.native`) anfassen, nichts speichern.
 

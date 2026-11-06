@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "37";
+  var APP_VERSION = "38";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {
@@ -55,6 +55,9 @@
   var NATIVE = window.GoAheadNative || null;
 
   var STORAGE_KEY = "goahead.view.v1";
+  var DIAG = /[?&]diagnose\b/.test(window.location.search);
+  var I18N = window.GOAHEAD_I18N;
+  var T = I18N.t;
 
   // ---------- kleine Helfer ----------
 
@@ -382,7 +385,9 @@
     listCheck: false,    // Erwandert: Knopf „Liste prüfen“ anzeigen
     loopPrefer: "longer", // Rundtour nach Länge: passt die Länge nicht, die nächstlängere ("longer") oder -kürzere ("shorter")
     loopOverlapPct: 0,   // Rundtour: erlaubter Anteil doppelt gegangener Strecke in %
-    loopWarnPct: 20      // Rundtour: Warnung, wenn die Länge um mehr als … % von der Vorgabe abweicht
+    loopWarnPct: 20,     // Rundtour: Warnung, wenn die Länge um mehr als … % von der Vorgabe abweicht
+    theme: "system",     // Darstellung: "system" (wie das Gerät), "light", "dark" – angewandt in i18n.js
+    lang: "de"           // Sprache: "de" oder "en" – gelesen in i18n.js beim Start (Wechsel lädt neu)
   };
   var settings = JSON.parse(JSON.stringify(SETTING_DEFAULTS));
   try {
@@ -457,11 +462,14 @@
             '<button type="button" class="icon-btn settings-backup" title="Sichern (alle Touren, Routen, Tracks, Einstellungen)" aria-label="Sichern">' + icon("download") + "</button>" +
             '<button type="button" class="icon-btn settings-restore" title="Wiederherstellen" aria-label="Wiederherstellen">' + icon("upload") + "</button>" +
           "</span></div>") +
+        group("App",
+          selectRow("theme", "Darstellung", [["system", "Wie das Gerät"], ["light", "Hell"], ["dark", "Dunkel"]]) +
+          selectRow("lang", "Sprache", [["de", "Deutsch"], ["en", "English"]])) +
         (NATIVE ? group("Android-App",
           '<div class="settings-act"><span class="settings-battery"></span><span class="icon-row">' +
             '<button type="button" class="icon-btn settings-battery-btn" title="Akku-Einstellungen" aria-label="Akku-Einstellungen">' + icon("battery") + "</button>" +
           "</span></div>") : "") +
-        '<p class="settings-note">App-Version ' + APP_VERSION + (NATIVE ? " · Android-App " + escapeHtml(nativeCall("appVersion") || "?") : "") +
+        '<p class="settings-note">' + T("App-Version {0}", APP_VERSION) + (NATIVE ? " · " + T("Android-App {0}", escapeHtml(nativeCall("appVersion") || "?")) : "") +
           ' · <a href="?diagnose">Diagnose</a></p>' +
       "</div>";
     document.body.appendChild(settingsSheet);
@@ -488,6 +496,8 @@
       sel.addEventListener("change", function () {
         settings[key] = sel.value;
         saveSettings();
+        if (key === "theme") I18N.setTheme(sel.value);
+        if (key === "lang") { window.location.reload(); return; }   // Texte werden beim Start gewählt; laufende Tour bleibt
         settingsListeners.forEach(function (fn) { try { fn(settings); } catch (e) { console.warn(e); } });
       });
     });
@@ -555,9 +565,9 @@
   // Samsung beendet „optimierte“ Apps im Hintergrund – dann bricht die Aufzeichnung ab.
   // Menüpfade nach Samsung-/Fachseiten (One UI 6), auf dem Gerät nicht geprüft.
   function batteryDialog() {
-    actionSheet("Akku-Einstellungen", "Damit die Aufzeichnung bei ausgeschaltetem Bildschirm weiterläuft: " +
+    actionSheet("Akku-Einstellungen", T("Damit die Aufzeichnung bei ausgeschaltetem Bildschirm weiterläuft: " +
       "Akku-Optimierung ausschalten. Samsung zusätzlich: App-Info → Akku → „Nicht eingeschränkt“, " +
-      "und unter Akku → Grenzen der Hintergrundnutzung GoAhead nicht in „Schlafende Apps“.", [
+      "und unter Akku → Grenzen der Hintergrundnutzung GoAhead nicht in „Schlafende Apps“."), [
       { label: "Akku-Optimierung ausschalten", primary: true, onClick: function () { nativeCall("requestBatteryExemption"); } },
       { label: "App-Info öffnen (Akku → Nicht eingeschränkt)", onClick: function () { nativeCall("openAppSettings"); } }
     ]);
@@ -594,8 +604,7 @@
     var def = e.layer._goaheadDef;
     activeOverlays[def.id] = true;
     if (def.type === "wms" && !def.layers) {
-      showStatus("„" + def.name + "“: Kartenebenen des Dienstes noch unbekannt. " +
-        "Details: Adresse mit ?diagnose öffnen.", 8000);
+      showStatus(T("„{0}“ ist gerade nicht verfügbar.", T(def.name)), 8000);
     }
     saveView();
   });
@@ -615,7 +624,7 @@
       failed++;
       if (!warned && ok === 0 && failed >= 4) {
         warned = true;
-        showStatus("Kartendienst „" + def.name + "“ liefert keine Kacheln. Netz prüfen oder andere Karte wählen.", 8000);
+        showStatus(T("Die Karte „{0}“ lädt nicht. Bitte Internetverbindung prüfen oder eine andere Karte wählen.", T(def.name)), 8000);
       }
     });
   }
@@ -961,7 +970,7 @@
     });
     var out = props.map(function (kv) {
       var v = kv[1];
-      if (kv[0] === "offizielleLaenge" && /^\d+([.,]\d+)?$/.test(v)) v = String(v).replace(".", ",") + " km";
+      if (kv[0] === "offizielleLaenge" && /^\d+([.,]\d+)?$/.test(v)) v = I18N.dec(v) + " km";
       return [prettyLabel(kv[0]), v];
     });
     var symbol = f.symbol;
@@ -1083,7 +1092,7 @@
           if (rt.symbol_description) props.push(["Wegzeichen", rt.symbol_description]);
           if (det.operator) props.push(["Betreuer", det.operator]);
           if (rt.group) props.push(["Netz", wmtGroupLabel(rt.group)]);
-          if (det.official_length) props.push(["Länge", (det.official_length / 1000).toFixed(1).replace(".", ",") + " km"]);
+          if (det.official_length) props.push(["Länge", I18N.dec((det.official_length / 1000).toFixed(1)) + " km"]);
           if (rt.itinerary && rt.itinerary.length) props.push(["Verlauf", [].concat(rt.itinerary).join(" – ")]);
           if (det.description) props.push(["Beschreibung", det.description]);
           if (det.note) props.push(["Notiz", det.note]);
@@ -1092,7 +1101,7 @@
           var tags = det.tags || {};
           Object.keys(tags).sort().forEach(function (k) { extra.push([k, tags[k]]); });
           return {
-            type: rt.name || rt.ref || ("Route " + rt.id),
+            type: rt.name || rt.ref || T("Route {0}", rt.id),
             symbol: rt.symbol_id ? base + "/symbols/id/" + encodeURIComponent(rt.symbol_id) + ".svg" : null,
             props: props,
             extra: extra,
@@ -1206,7 +1215,7 @@
     shown.forEach(function (res) {
       html += '<div class="fi-source">' + escapeHtml(res.def.name) + "</div>";
       if (res.error) {
-        html += '<p class="fi-error">Abfrage fehlgeschlagen (' + escapeHtml(res.error) + ")</p>";
+        html += '<p class="fi-error">' + escapeHtml(T("Gerade keine Antwort – bitte später noch einmal antippen.")) + "</p>";
       }
       (res.features || []).forEach(function (f) {
         html += '<div class="fi-feature"><div class="fi-type">' +
@@ -1225,7 +1234,7 @@
         }
         html += "</div>";
       });
-      if (res.htmlUrl) {
+      if (res.htmlUrl && DIAG) {
         html += '<p class="fi-raw"><a href="' + escapeHtml(res.htmlUrl) + '" target="_blank" rel="noopener">Original-Antwort des Servers öffnen</a></p>';
       }
     });
@@ -1239,7 +1248,7 @@
           (e.snippet ? "Antwort (Anfang):\n" + e.snippet + "\n" : "") + "\n";
       });
     });
-    if (details) {
+    if (details && DIAG) {   // technische Angaben nur im Diagnose-Modus (Adresse mit ?diagnose)
       details = "App-Version " + APP_VERSION + "\n\n" + details;
       html += '<details class="fi-details"><summary>Technische Details</summary><pre>' + escapeHtml(details) + "</pre></details>";
     }
@@ -1507,9 +1516,9 @@
   function onPositionError(err) {
     locateBtn.classList.remove("waiting");
     if (err.code === 1) {
-      showStatus("Standortzugriff verweigert. Bitte in den Browser-/Systemeinstellungen erlauben.");
+      showStatus("GoAhead darf die Position nicht verwenden. Bitte in den Einstellungen des Telefons erlauben.");
     } else if (err.code === 2) {
-      showStatus("Position derzeit nicht verfügbar (kein GPS-Empfang?).", 6000);
+      showStatus("Position gerade nicht verfügbar – vielleicht kein GPS-Empfang.", 6000);
     } else if (err.code === 3 && !hadFix) {
       showStatus("Suche GPS-Position …");
     }
@@ -1518,11 +1527,11 @@
   var watchId = null;
   function startWatching() {
     if (!("geolocation" in navigator)) {
-      showStatus("Dieses Gerät/dieser Browser unterstützt keine Standortbestimmung.");
+      showStatus("Dieses Gerät kann die Position nicht bestimmen.");
       return;
     }
     if (!window.isSecureContext) {
-      showStatus("Standort nur über HTTPS verfügbar.");
+      showStatus("Die Position ist hier nicht verfügbar.");
       return;
     }
     if (watchId !== null) return;
@@ -1749,7 +1758,7 @@
     // Android-App: echte .gpx-Datei über das Teilen-Menü von Android
     if (NATIVE) {
       if (!nativeCall("shareFile", fileName, "application/gpx+xml", gpxText, title || "", detailText || "")) {
-        showStatus("Teilen fehlgeschlagen.", 5000);
+        showStatus("Teilen hat nicht geklappt.", 5000);
       }
       return;
     }
@@ -1758,12 +1767,12 @@
       if (file) data.files = [file];
       return navigator.share(data).catch(function (err) {
         if (err && err.name === "AbortError") return;   // vom Nutzer abgebrochen
-        showStatus("Teilen fehlgeschlagen: " + (err && err.message || err), 6000);
+        showStatus("Teilen hat nicht geklappt.", 6000);
       });
     }
     if (!navigator.share) {
       downloadFile(fileName, gpxText, "application/gpx+xml");
-      showStatus("Teilen wird von diesem Browser nicht unterstützt – GPX wurde heruntergeladen.", 6000);
+      showStatus("Teilen geht hier nicht – die GPX-Datei wurde stattdessen gespeichert.", 6000);
       return;
     }
     var gpxFile = null;
@@ -1777,23 +1786,23 @@
     var canTxt = txtFile && navigator.canShare && navigator.canShare({ files: [txtFile] });
     var actions = [];
     if (canTxt) {
-      actions.push({ label: "Als „" + fileName + ".txt“ teilen", primary: true, onClick: function () { tryShare(txtFile); } });
+      actions.push({ label: T("Als „{0}.txt“ teilen", fileName), primary: true, onClick: function () { tryShare(txtFile); } });
     }
     actions.push({ label: "GPX herunterladen und Text teilen", onClick: function () {
       downloadFile(fileName, gpxText, "application/gpx+xml");
       tryShare(null);
     } });
-    actionSheet("GPX-Datei teilen", "Dieser Browser erlaubt keine .gpx-Dateien beim Teilen." +
-      (canTxt ? " Als .txt kommt sie an – zum Öffnen „.txt“ entfernen (GoAhead liest sie auch so)." : ""), actions);
+    actionSheet("GPX-Datei teilen", T("Dieser Browser erlaubt keine .gpx-Dateien beim Teilen.") +
+      (canTxt ? " " + T("Als .txt kommt sie an – zum Öffnen „.txt“ entfernen (GoAhead liest sie auch so).") : ""), actions);
   }
 
   function downloadFile(fileName, text, mime) {
     if (NATIVE) {
       // WebView kann keine Downloads über <a download> – die App legt die Datei in „Downloads“ ab
       if (nativeCall("saveFile", fileName, mime || "application/octet-stream", text)) {
-        showStatus("Gespeichert unter „Downloads“: " + fileName, 5000);
+        showStatus(T("Gespeichert unter „Downloads“: {0}", fileName), 5000);
       } else {
-        showStatus("Speichern fehlgeschlagen: " + fileName, 6000);
+        showStatus(T("„{0}“ konnte nicht gespeichert werden.", fileName), 6000);
       }
       return;
     }
@@ -1884,6 +1893,7 @@
     icon: icon,
     directionArrows: directionArrows,
     version: APP_VERSION,
+    i18n: I18N,
     // Android-App (sonst null): native.call("methode", …), native.batteryOptimized(), native.batteryDialog()
     native: NATIVE ? { call: nativeCall, batteryOptimized: batteryOptimized, batteryDialog: batteryDialog } : null
   };

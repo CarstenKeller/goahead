@@ -47,6 +47,17 @@
   --glass-blur: blur(18px) saturate(170%);
   --btn-soft: rgba(0, 0, 0, 0.06);
   --btn-soft-hover: rgba(0, 0, 0, 0.1);
+  --c-bg: #e8e8e8;                             /* hinter der Karte */
+  --c-field: rgba(255, 255, 255, 0.75);        /* Eingabefelder, Auswahlen */
+  --c-tile: rgba(255, 255, 255, 0.5);          /* Kennzahl-Kacheln, Profil, Weg-Einträge */
+  --c-item: rgba(255, 255, 255, 0.7);          /* Listeneinträge */
+  --c-item-active: rgba(255, 255, 255, 0.95);
+  --c-ctrl-fg: #333333;                        /* Symbole der Kartenknöpfe */
+  --c-grip: rgba(0, 0, 0, 0.22);
+  --c-code: rgba(0, 0, 0, 0.05);
+  --c-tab-bg: rgba(0, 0, 0, 0.06);
+  --c-tab-active: #ffffff;
+  --c-attr: rgba(255, 255, 255, 0.65);         /* Quellenangabe, Maßstab */
 
   /* Formen */
   --r-sm: 10px;
@@ -72,6 +83,42 @@
   --info-height: 34vh;          /* Standardhöhe Infofenster (per Ziehen änderbar) */
 }
 
+/* Dunkle Darstellung: Einstellung „Darstellung“ (System/Hell/Dunkel). i18n.js setzt data-theme="dark" am
+   <html>, bei „System“ nach prefers-color-scheme. Nur die Variablen ändern sich – die Karte selbst bleibt, wie sie ist. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --c-text: #e4e8eb;
+  --c-muted: #9ba6af;
+  --c-line: rgba(255, 255, 255, 0.1);
+  --c-accent: #5cb860;
+  --c-accent-soft: rgba(92, 184, 96, 0.18);
+  --c-blue: #5a9eea;
+  --c-blue-soft: rgba(90, 158, 234, 0.18);
+  --c-danger: #ef6461;
+  --c-danger-soft: rgba(239, 100, 97, 0.16);
+  --glass: rgba(32, 36, 40, 0.74);
+  --glass-strong: rgba(32, 36, 40, 0.9);
+  --glass-dark: rgba(12, 14, 16, 0.82);
+  --glass-sheet: rgba(26, 40, 29, 0.74);
+  --c-card: rgba(44, 49, 54, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --btn-soft: rgba(255, 255, 255, 0.08);
+  --btn-soft-hover: rgba(255, 255, 255, 0.14);
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-up: 0 -6px 24px rgba(0, 0, 0, 0.4);
+  --c-bg: #15181b;
+  --c-field: rgba(255, 255, 255, 0.08);
+  --c-tile: rgba(255, 255, 255, 0.06);
+  --c-item: rgba(255, 255, 255, 0.07);
+  --c-item-active: rgba(255, 255, 255, 0.15);
+  --c-ctrl-fg: #e4e8eb;
+  --c-grip: rgba(255, 255, 255, 0.3);
+  --c-code: rgba(255, 255, 255, 0.06);
+  --c-tab-bg: rgba(255, 255, 255, 0.08);
+  --c-tab-active: rgba(255, 255, 255, 0.18);
+  --c-attr: rgba(32, 36, 40, 0.7);
+}
+
 /* Ohne Unschärfe-Unterstützung: Flächen weniger durchsichtig, damit Text lesbar bleibt */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   :root {
@@ -81,6 +128,13 @@
     --glass-sheet: rgba(228, 243, 228, 0.95);
   }
 }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root[data-theme="dark"] {
+    --glass: rgba(32, 36, 40, 0.95);
+    --glass-strong: rgba(32, 36, 40, 0.98);
+    --glass-sheet: rgba(26, 40, 29, 0.96);
+  }
+}
 
 /* ---------- 2. Grundlagen ---------- */
 html, body {
@@ -88,7 +142,7 @@ html, body {
   padding: 0;
   height: 100%;
   overflow: hidden;
-  background: #e8e8e8;
+  background: var(--c-bg);
   color: var(--c-text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -223,7 +277,7 @@ button {
 .dlg-input {
   border: 1px solid var(--c-line);
   border-radius: var(--r-sm);
-  background: rgba(255, 255, 255, 0.75);
+  background: var(--c-field);
   padding: 10px 12px;
   font-size: 16px;   /* verhindert Auto-Zoom auf iOS */
   color: var(--c-text);
@@ -237,7 +291,7 @@ button {
 .sheet select {
   border: 1px solid var(--c-line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--c-field);
   padding: 5px 6px;
   font-size: 13px;
   color: var(--c-text);
@@ -256,7 +310,7 @@ button {
   height: 56px;
   border-radius: 50%;
   border: 1px solid var(--glass-border);
-  color: #333333;
+  color: var(--c-ctrl-fg);
   box-shadow: var(--shadow);
   display: flex;
   align-items: center;
@@ -283,7 +337,7 @@ button {
   height: var(--ctrl);
   border: 1px solid var(--glass-border);
   border-radius: var(--r-md);
-  color: #333333;
+  color: var(--c-ctrl-fg);
   box-shadow: var(--shadow);
   display: flex;
   align-items: center;
@@ -342,7 +396,7 @@ button {
 .leaflet-touch .leaflet-bar a {
   background: transparent;
   border-bottom-color: var(--c-line);
-  color: #333333;
+  color: var(--c-ctrl-fg);
 }
 .leaflet-bar a:hover {
   background: var(--btn-soft-hover);
@@ -383,13 +437,16 @@ button {
 
 /* Maßstab und Quellenangabe dezent */
 .leaflet-control-attribution {
-  background: rgba(255, 255, 255, 0.65) !important;
+  background: var(--c-attr) !important;
+  color: var(--c-text);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   border-top-left-radius: 8px;
 }
 .leaflet-control-scale-line {
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--c-attr);
+  color: var(--c-text);
+  border-color: var(--c-text);
 }
 
 /* Statusmeldung (oben) */
@@ -503,7 +560,7 @@ button {
   height: 5px;
   margin-left: -20px;
   border-radius: 3px;
-  background: rgba(0, 0, 0, 0.22);
+  background: var(--c-grip);
 }
 .sheet-titles {
   min-width: 0;     /* Titel kürzt sich; die (schlanken) Knöpfe passen immer ganz hinein */
@@ -583,7 +640,7 @@ button {
   margin-bottom: 10px;
   padding: 10px 12px;
   border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.55);
+  background: var(--c-tile);
   border: 1px solid var(--c-line);
 }
 .fi-type {
@@ -634,7 +691,7 @@ button {
   font-size: 11px;
   max-height: 200px;
   overflow: auto;
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--c-code);
   border-radius: 8px;
   padding: 8px;
   user-select: text;
@@ -707,7 +764,7 @@ button {
   flex-direction: column;
   padding: 6px 4px;
   border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--c-tile);
   border: 1px solid var(--c-line);
 }
 .nav-val {
@@ -775,7 +832,7 @@ button {
   margin: 6px 16px 8px;
   padding: 4px;
   border-radius: var(--r-md);
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--c-tab-bg);
   flex: none;
 }
 .page .page-tabs button {
@@ -787,7 +844,7 @@ button {
   font-size: 15px;
 }
 .page .page-tabs button.active {
-  background: #ffffff;
+  background: var(--c-tab-active);
   color: var(--c-text);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
 }
@@ -815,14 +872,14 @@ button {
   padding: 10px 12px;
   margin-bottom: 8px;
   border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--c-item);
   border: 1px solid var(--c-line);
 }
 .trk-tap {
   cursor: pointer;
 }
 .trk-tap:active {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--c-item-active);
 }
 .trk-main {
   flex: 1;
@@ -1066,7 +1123,7 @@ button {
   font-size: 16px;
   border: 1px solid var(--c-line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.75);
+  background: var(--c-field);
   color: var(--c-text);
   text-align: right;
 }
@@ -1081,7 +1138,7 @@ button {
   margin-top: 8px;
   padding: 4px 2px 0;
   border-radius: var(--r-sm);
-  background: rgba(255, 255, 255, 0.45);
+  background: var(--c-tile);
   touch-action: none;
 }
 .pf-svg {
@@ -1167,7 +1224,7 @@ button {
   font-size: 14px;
   border: 1px solid var(--c-line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.75);
+  background: var(--c-field);
   color: var(--c-text);
 }
 
@@ -1199,7 +1256,7 @@ button {
   margin-top: 8px;
   padding: 4px 2px 0;
   border-radius: var(--r-sm);
-  background: rgba(255, 255, 255, 0.45);
+  background: var(--c-tile);
   touch-action: none;
 }
 .pf-me {
@@ -1455,3 +1512,6 @@ button {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+/* Dunkle Darstellung: Links lesbar auf dunklem Grund */
+:root[data-theme="dark"] a { color: var(--c-blue); }

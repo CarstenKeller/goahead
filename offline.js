@@ -16,6 +16,8 @@
   "use strict";
 
   var G = window.GOAHEAD;
+
+  var T = window.GOAHEAD_I18N.t;
   if (!G || !G.map) return;
   var map = G.map;
 

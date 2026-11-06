@@ -17,6 +17,8 @@
   "use strict";
 
   var G = window.GOAHEAD;
+
+  var T = window.GOAHEAD_I18N.t;
   if (!G || !G.map) return;
 
   var BASE = location.origin + location.pathname.replace(/index\.html$/, "");
@@ -108,7 +110,7 @@
     var bytes = unb64url(str.slice(1));
     var p = kind === "1"
       ? (typeof DecompressionStream === "undefined"
-        ? Promise.reject(new Error("Dieser Browser kann den Stand nicht entpacken (zu alt)."))
+        ? Promise.reject(new Error("Dieser Browser ist zu alt für geteilte Stände."))
         : pipe(bytes, new DecompressionStream("deflate-raw")))
       : Promise.resolve(bytes);
     return p.then(function (b) { return JSON.parse(new TextDecoder().decode(b)); });
@@ -160,13 +162,13 @@
     }
   }
 
-  function km(m) { return (m / 1000).toFixed(1).replace(".", ","); }
+  function km(m) { return G.i18n.dec((m / 1000).toFixed(1)); }
 
   // geplante Tour teilen
   function tour(rec) {
     pack({ v: 1, t: "tour", id: rec.id, n: rec.name, r: packRoute(rec), len: rec.stats && rec.stats.length }).then(function (data) {
-      shareText("GoAhead: " + rec.name, "GoAhead-Tour „" + rec.name + "“ (" + km((rec.stats && rec.stats.length) || 0) + " km)\n" + BASE + "#g=" + data);
-    }).catch(function (err) { G.showStatus("Teilen fehlgeschlagen: " + (err.message || err), 6000); });
+      shareText("GoAhead: " + rec.name, T("GoAhead-Tour „{0}“ ({1} km)", rec.name, km((rec.stats && rec.stats.length) || 0)) + "\n" + BASE + "#g=" + data);
+    }).catch(function (err) { console.warn("[GoAhead] Teilen:", err); G.showStatus("Teilen hat nicht geklappt.", 6000); });
   }
 
   // Stand einer laufenden Aufzeichnung teilen
@@ -177,9 +179,9 @@
       s0: st.startedAt, at: st.at, km: Math.round(st.dist), mv: st.moving, dr: st.dRoute == null ? null : Math.round(st.dRoute), tr: track
     }).then(function (data) {
       var d = new Date(st.at);
-      shareText("GoAhead: Stand " + st.name, "GoAhead-Stand „" + st.name + "“ " + d.getHours() + ":" + (d.getMinutes() < 10 ? "0" : "") + d.getMinutes() +
-        " Uhr – " + km(st.dist) + " km gewandert\n" + BASE + "#g=" + data);
-    }).catch(function (err) { G.showStatus("Teilen fehlgeschlagen: " + (err.message || err), 6000); });
+      shareText(T("GoAhead: Stand {0}", st.name), T("GoAhead-Stand „{0}“ {1} Uhr – {2} km gewandert", st.name,
+        d.getHours() + ":" + (d.getMinutes() < 10 ? "0" : "") + d.getMinutes(), km(st.dist)) + "\n" + BASE + "#g=" + data);
+    }).catch(function (err) { console.warn("[GoAhead] Teilen:", err); G.showStatus("Teilen hat nicht geklappt.", 6000); });
   }
 
   // ---------- Empfangen ----------
@@ -209,7 +211,7 @@
       if (!o || (o.t !== "tour" && o.t !== "stand")) throw new Error("unbekannte Daten");
       return storeRoute(o).then(function (rec) {
         if (o.t === "tour") {
-          G.actionSheet("Tour „" + rec.name + "“ übernommen", km(rec.stats.length) + " km · unter „Geplant“ gespeichert", [
+          G.actionSheet(T("Tour „{0}“ übernommen", rec.name), T("{0} km · unter „Geplant“ gespeichert", km(rec.stats.length)), [
             { label: "👥 Begleiten", primary: true, onClick: function () { G.nav.startCompanion(rec); } },
             { label: "👁 Ansehen", onClick: function () { G.openTracksPage("planned"); } }
           ]);
@@ -222,7 +224,8 @@
         }, rec);
       });
     }).catch(function (err) {
-      G.showStatus("Geteilte Daten nicht lesbar: " + (err.message || err), 8000);
+      console.warn("[GoAhead] Geteilt:", err);
+      G.showStatus("Der geteilte Link ist unvollständig oder beschädigt.", 8000);
     });
   }
 

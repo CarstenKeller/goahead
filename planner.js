@@ -24,6 +24,9 @@
   "use strict";
 
   var G = window.GOAHEAD;
+
+  var T = window.GOAHEAD_I18N.t;
+  var dec = window.GOAHEAD_I18N.dec;
   if (!G || !G.map) return;
   var map = G.map;
   var esc = G.escapeHtml;
@@ -323,7 +326,7 @@
       var m = L.marker([p.lat, p.lng], {
         icon: pointIcon(label, kind),
         draggable: true,
-        title: i === 0 ? "Startpunkt" : "Punkt " + i,
+        title: i === 0 ? T("Startpunkt") : T("Punkt {0}", i),
         zIndexOffset: i === selected ? 700 : 500
       });
       m.on("click", function (e) {
@@ -864,7 +867,7 @@
     var preferShorter = (G.getSettings().loopPrefer === "shorter");
     function ask(d, radius) {
       n++;
-      G.showStatus("Rundtour " + String(km).replace(".", ",") + " km wird gesucht … (" + n + ")");
+      G.showStatus(T("Rundtour {0} km wird gesucht … ({1})", dec(km), n));
       return loopRequest(start, radius, d).then(function (res) {
         // erst Stichwege entfernen, dann Länge und doppelte Wege bewerten
         var before = lengthOf(res.latlngs);
@@ -917,17 +920,18 @@
       applyLoop(res, km, res.dir);
       var dev = (res.distance - target) / target;
       var warnAt = (function () { var v = G.getSettings().loopWarnPct; return typeof v === "number" ? v : 20; })() / 100;
-      var msg = "Rundtour: " + (res.distance / 1000).toFixed(1).replace(".", ",") + " km (gewünscht " + String(km).replace(".", ",") + " km)";
+      var msg = T("Rundtour: {0} km (gewünscht {1} km)", dec((res.distance / 1000).toFixed(1)), dec(km));
       var warn = false;
-      if (Math.abs(dev) > warnAt) { msg += " · ⚠ " + (dev > 0 ? "+" : "") + Math.round(dev * 100) + " % Länge"; warn = true; }
+      if (Math.abs(dev) > warnAt) { msg += " · ⚠ " + T("{0} % Länge", (dev > 0 ? "+" : "") + Math.round(dev * 100)); warn = true; }
       if (!okCore(res)) {
-        msg += " · ⚠ " + (res.core < 0.1 ? (res.core * 100).toFixed(1).replace(".", ",") : Math.round(res.core * 100)) + " % doppelt";
+        msg += " · ⚠ " + T("{0} % doppelt", res.core < 0.1 ? dec((res.core * 100).toFixed(1)) : Math.round(res.core * 100));
         warn = true;
       }
       G.showStatus(msg + ".", warn ? 10000 : 5000);
     }).catch(function (err) {
       loopBusy = false;
-      G.showStatus("Rundtour nicht berechnet: " + (err.message || err) + ". Netz prüfen oder anderen Startpunkt wählen.", 8000);
+      console.warn("[GoAhead] Rundtour:", err);
+      G.showStatus("Keine Rundtour gefunden. Bitte Internetverbindung prüfen oder einen anderen Startpunkt wählen.", 8000);
     });
   }
 
@@ -954,7 +958,7 @@
     plan = newPlanState();
     plan.savedId = savedId;
     plan.createdAt = createdAt;
-    plan.name = keepName || ("Rundtour " + (res.distance / 1000).toFixed(1).replace(".", ",") + " km");
+    plan.name = keepName || T("Rundtour {0} km", dec((res.distance / 1000).toFixed(1)));
     plan.points = cuts.map(function (c) { return { lat: ll[c][0], lng: ll[c][1] }; });
     for (var k = 1; k < cuts.length; k++) plan.segments.push(part(cuts[k - 1], cuts[k]));
     plan.roundtrip = true;
@@ -990,7 +994,7 @@
     if (plan.loop) {
       var lp = plan.loop;
       var start = plan.points[0];
-      G.actionSheet("Rundtour " + String(lp.km).replace(".", ",") + " km", "", [
+      G.actionSheet(T("Rundtour {0} km", dec(lp.km)), "", [
         { label: "↻ Andere Variante", primary: true, onClick: function () { computeLoop(start, lp.km, (lp.dir + 30) % 360); } },
         { label: "Länge ändern", onClick: function () { askLoopKm(function (km) { computeLoop(start, km, lp.dir); }); } },
         { label: "Als eigene Planung weiter (Rückweg öffnen)", onClick: function () { plan.loop = null; toggleRoundtrip(); } }
@@ -1002,7 +1006,7 @@
       var dir = Math.floor(Math.random() * 360);
       if (plan.points.length === 1) { computeLoop(plan.points[0], km, dir); return; }
       loopArmed = { km: km, dir: dir };
-      G.showStatus("Rundtour " + String(km).replace(".", ",") + " km – Startpunkt auf der Karte antippen.");
+      G.showStatus(T("Rundtour {0} km – Startpunkt auf der Karte antippen.", dec(km)));
     });
   }
 
@@ -1160,13 +1164,12 @@
     var txt = parts.join(" · ");
     if (withSpeeds && G.getSettings) {
       var st = G.getSettings();
-      txt += " (Gehzeit bei " + String(st.speedFlat).replace(".", ",") + " km/h eben, " +
-        String(st.speedUp).replace(".", ",") + " km/h bergauf, " + String(st.speedDown).replace(".", ",") + " km/h bergab)";
+      txt += " " + T("(Gehzeit bei {0} km/h eben, {1} km/h bergauf, {2} km/h bergab)", dec(st.speedFlat), dec(st.speedUp), dec(st.speedDown));
     }
     return txt;
   }
 
-  function km(m) { return (m / 1000).toFixed(1).replace(".", ",") + " km"; }
+  function km(m) { return dec((m / 1000).toFixed(1)) + " km"; }
 
   // ---------- Suche: Adresse oder Koordinaten ----------
 
@@ -1274,7 +1277,7 @@
         });
       });
     }).catch(function (err) {
-      resultsEl.innerHTML = '<p class="plan-hint">Suche fehlgeschlagen: ' + esc(err.message) + "</p>";
+      resultsEl.innerHTML = '<p class="plan-hint">Suche gerade nicht möglich. Bitte Internetverbindung prüfen.</p>';
     });
   }
 
@@ -1294,7 +1297,7 @@
     '<div class="plan-head sheet-handle">' +
       '<span class="sheet-grip" aria-hidden="true"></span>' +
       '<span class="sheet-titles">' +
-        '<span class="plan-title"><span class="plan-name"></span><span class="plan-dirty" title="ungespeichert" hidden></span></span>' +
+        '<span class="plan-title"><span class="plan-name" data-noi18n></span><span class="plan-dirty" title="ungespeichert" hidden></span></span>' +
         '<span class="plan-sum"></span>' +
       "</span>" +
       '<span class="sheet-head-btns">' +
@@ -1373,14 +1376,16 @@
     if (plan.points.length) goTo(plan.points[0]);
   });
   panel.querySelector(".plan-exit").addEventListener("click", function () {
-    if (plan.dirty && plan.points.length &&
-        !window.confirm("Die Änderungen sind noch nicht gespeichert. Trotzdem beenden?\n(Der Entwurf bleibt erhalten.)")) return;
-    stop();
+    if (!(plan.dirty && plan.points.length)) { stop(); return; }
+    G.actionSheet("Planung beenden?", "Die Änderungen sind noch nicht gespeichert. Der Entwurf bleibt erhalten und lässt sich später fortsetzen.", [
+      { label: "Speichern und beenden", primary: true, onClick: function () { saveRoute(stop); } },
+      { label: "Beenden ohne Speichern", onClick: stop }
+    ]);
   });
 
   function renderPanel() {
     var n = plan.points.length;
-    el.name.textContent = plan.name || "Neue Route";
+    el.name.textContent = plan.name || T("Neue Route");
     el.dirty.hidden = !(plan.dirty && n);
 
     // Kennzahlen; Vorschlag zusätzlich in Orange
@@ -1388,7 +1393,7 @@
     if (n) {
       var t = totals();
       lastStats = t.stats;
-      html = n + " Pkt · " + km(t.dist) +
+      html = T("{0} Pkt", n) + " · " + km(t.dist) +
         (t.asc != null ? " · ↑" + Math.round(t.asc) + " ↓" + Math.round(t.desc) + " m" : "") +
         (t.hours ? " · ≈" + hm(t.hours) + " h" : "");
       if (t.lines) html += ' · <span class="plan-warn" title="Abschnitte ohne gefundenen Weg">⚠ ' + t.lines + "</span>";
@@ -1537,25 +1542,26 @@
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
   function defaultName() {
-    return "Route vom " + new Date().toLocaleDateString("de-DE");
+    return T("Route vom {0}", new Date().toLocaleDateString(G.i18n.locale));
   }
 
-  function saveRoute() {
+  function saveRoute(done) {
+    if (typeof done !== "function") done = null;
     if (!plan.points.length) return;
     if (!G.db) {
-      G.showStatus("Lokaler Speicher nicht verfügbar – Speichern nicht möglich.", 6000);
+      G.showStatus("Speichern ist auf diesem Gerät gerade nicht möglich.", 6000);
       return;
     }
     if (plan.savedId) {
-      writeRoute(plan.name);
+      writeRoute(plan.name, done);
       return;
     }
     G.askText("Name der Route", plan.name || defaultName(), function (name) {
-      writeRoute(String(name).trim() || defaultName());
+      writeRoute(String(name).trim() || defaultName(), done);
     }, "Speichern");
   }
 
-  function writeRoute(name) {
+  function writeRoute(name, done) {
     var t = totals();
     var now = new Date().toISOString();
     var rec = {
@@ -1578,9 +1584,11 @@
       savePlan();
       render();
       loadRoutes();
-      G.showStatus("Route „" + rec.name + "“ gespeichert.", 3000);
+      G.showStatus(T("Route „{0}“ gespeichert.", rec.name), 3000);
+      if (done) done();
     }).catch(function (err) {
-      G.showStatus("Speichern fehlgeschlagen: " + err.message, 6000);
+      console.warn("[GoAhead] Speichern:", err);
+      G.showStatus("Die Route konnte nicht gespeichert werden.", 6000);
     });
   }
 
@@ -1613,14 +1621,14 @@
     }) : { html: "", items: savedRoutes };
     box.innerHTML = newBtn + hd.html + hd.items.map(function (r) {
       var info = [statsText(routeStats(r))];
-      info.push(r.points.length + " Punkte");
-      if (r.roundtrip) info.push("Rundtour");
-      info.push(new Date(r.updatedAt).toLocaleDateString("de-DE"));
+      info.push(T("{0} Punkte", r.points.length));
+      if (r.roundtrip) info.push(T("Rundtour"));
+      info.push(new Date(r.updatedAt).toLocaleDateString(G.i18n.locale));
       var editing = plan.savedId === r.id && plan.dirty;
       return '<div class="trk-item trk-tap" role="button" tabindex="0" data-id="' + esc(r.id) + '">' +
         '<div class="trk-main"><span class="trk-swatch" style="background:' + COLOR_ROUTE + '"></span>' +
-          '<span class="trk-text"><span class="trk-name">' + esc(r.name) + (viewed[r.id] ? " 👁" : "") + "</span>" +
-          '<span class="trk-info">' + esc(info.join(" · ")) + (editing ? " · <em>ungespeicherte Änderungen</em>" : "") + "</span></span>" +
+          '<span class="trk-text"><span class="trk-name" data-noi18n>' + esc(r.name) + (viewed[r.id] ? " 👁" : "") + "</span>" +
+          '<span class="trk-info">' + esc(info.join(" · ")) + (editing ? " · <em>" + T("ungespeicherte Änderungen") + "</em>" : "") + "</span></span>" +
         "</div>" +
         '<span class="trk-more" aria-hidden="true">›</span></div>';
     }).join("");
@@ -1632,15 +1640,20 @@
     return null;
   }
 
-  function editRoute(rec) {
+  function editRoute(rec, force) {
     var sameDraft = plan.savedId === rec.id;
-    if (plan.dirty && plan.points.length) {
-      var q = sameDraft
-        ? "Für diese Route gibt es ungespeicherte Änderungen. Mit den Änderungen weitermachen?\n(Abbrechen = Änderungen verwerfen und gespeicherten Stand laden)"
-        : "Die aktuelle Planung hat ungespeicherte Änderungen. Verwerfen und „" + rec.name + "“ laden?";
-      var ok = window.confirm(q);
-      if (sameDraft && ok) { openPlanner(); return; }
-      if (!sameDraft && !ok) return;
+    if (plan.dirty && plan.points.length && !force) {
+      if (sameDraft) {
+        G.actionSheet("Ungespeicherte Änderungen", "An dieser Route wurde zuletzt etwas geändert, aber nicht gespeichert.", [
+          { label: "Mit den Änderungen weitermachen", primary: true, onClick: openPlanner },
+          { label: "Gespeicherten Stand laden", danger: true, onClick: function () { editRoute(rec, true); } }
+        ]);
+      } else {
+        G.actionSheet("Andere Planung offen", "Die gerade geplante Route ist noch nicht gespeichert. Ihre Änderungen gehen verloren.", [
+          { label: T("Verwerfen und „{0}“ öffnen", rec.name), danger: true, onClick: function () { editRoute(rec, true); } }
+        ]);
+      }
+      return;
     }
     var profile = plan.profile;
     plan = newPlanState();
@@ -1663,9 +1676,13 @@
   }
 
   // Kopie als neue, noch ungespeicherte Planung (Vorlage für ähnliche Touren)
-  function copyRoute(rec) {
-    if (plan.dirty && plan.points.length &&
-        !window.confirm("Die aktuelle Planung hat ungespeicherte Änderungen. Verwerfen und eine Kopie von „" + rec.name + "“ planen?")) return;
+  function copyRoute(rec, force) {
+    if (plan.dirty && plan.points.length && !force) {
+      G.actionSheet("Andere Planung offen", "Die gerade geplante Route ist noch nicht gespeichert. Ihre Änderungen gehen verloren.", [
+        { label: "Verwerfen und Kopie planen", danger: true, onClick: function () { copyRoute(rec, true); } }
+      ]);
+      return;
+    }
     var profile = plan.profile;
     plan = newPlanState();
     plan.points = clone(rec.points);
@@ -1673,7 +1690,7 @@
     plan.roundtrip = !!rec.roundtrip;
     plan.closing = rec.closing ? clone(rec.closing) : null;
     plan.profile = PROFILES[rec.profile] ? rec.profile : profile;
-    plan.name = rec.name + " (Kopie)";
+    plan.name = T("{0} (Kopie)", rec.name);
     plan.dirty = true;   // erst „Speichern“ legt sie unter „Geplant“ ab
     candidate = null;
     selected = null;
@@ -1726,7 +1743,7 @@
           [t.down != null ? String(Math.round(t.down)) : "–", "↓ m"],
           [hm(t.hours), "Gehzeit ≈ h"],
           [String(rec.points.length), "Punkte"],
-          [new Date(rec.createdAt || rec.updatedAt).toLocaleDateString("de-DE"), "angelegt"]
+          [new Date(rec.createdAt || rec.updatedAt).toLocaleDateString(G.i18n.locale), "angelegt"]
         ],
         profile: t,
         onMenu: function () { routeMenu(rec); },
@@ -1745,8 +1762,13 @@
     start();
   }
 
-  function deleteRoute(rec) {
-    if (!window.confirm("Geplante Route „" + rec.name + "“ löschen?")) return;
+  function deleteRoute(rec, force) {
+    if (!force) {
+      G.actionSheet("Route löschen?", T("„{0}“ wird vom Gerät gelöscht.", rec.name), [
+        { label: "Löschen", danger: true, onClick: function () { deleteRoute(rec, true); } }
+      ]);
+      return;
+    }
     G.db.del("routes", rec.id).then(function () {
       if (viewed[rec.id]) { map.removeLayer(viewed[rec.id]); delete viewed[rec.id]; }
       if (plan.savedId === rec.id) {
@@ -1758,7 +1780,8 @@
       }
       return loadRoutes();
     }).catch(function (err) {
-      G.showStatus("Löschen fehlgeschlagen: " + err.message, 6000);
+      console.warn("[GoAhead] Löschen:", err);
+      G.showStatus("Die Route konnte nicht gelöscht werden.", 6000);
     });
   }
 
@@ -1775,7 +1798,7 @@
   })();
 
   function routeMenu(rec) {
-    var sub = [statsText(routeStats(rec)), rec.points.length + " Punkte", rec.roundtrip ? "Rundtour" : null]
+    var sub = [statsText(routeStats(rec)), T("{0} Punkte", rec.points.length), rec.roundtrip ? T("Rundtour") : null]
       .filter(Boolean).join(" · ");
     var actions = [];
     if (G.nav) actions.push({ label: "▶ Los geht's", primary: true, onClick: function () { G.nav.start(rec); } });
@@ -1824,7 +1847,7 @@
 
   // GPX 1.1: Track (berechnete Linie) und Wegpunkte (geplante Punkte)
   function routeDetails(rec) {
-    return statsText(routeStats(rec), true) + " · " + rec.points.length + " Punkte" + (rec.roundtrip ? " · Rundtour" : "");
+    return statsText(routeStats(rec), true) + " · " + T("{0} Punkte", rec.points.length) + (rec.roundtrip ? " · " + T("Rundtour") : "");
   }
 
   function routeToGpx(rec) {
@@ -1851,7 +1874,7 @@
   }
 
   function shareRoute(rec) {
-    G.shareGpx(fileNameFor(rec.name), routeToGpx(rec), rec.name, rec.name + "\n" + routeDetails(rec) + "\n(GPX-Datei, erstellt mit GoAhead)");
+    G.shareGpx(fileNameFor(rec.name), routeToGpx(rec), rec.name, rec.name + "\n" + routeDetails(rec) + "\n" + T("(GPX-Datei, erstellt mit GoAhead)"));
   }
 
   // Neue, leere Planung beginnen (Knopf in Tracks → Geplant)
