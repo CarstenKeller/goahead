@@ -40,6 +40,15 @@ def main(out_path, files):
         show = [c for c in ("scl", "snr", "kat", "nam", "bez", "wvi", "art", "sva") if c in cols]
         for row in db.execute(f'SELECT {", ".join(show)} FROM wanderwege LIMIT 5'):
             print("  Beispiel:", dict(zip(show, row)))
+        # Wie stehen die Wege des Nutzers in TFIS? (Name im Text, Nummer ohne Bindestriche)
+        textcols = [c for c in ("scl", "kat", "nam", "bez", "wvi", "wgv", "art", "sva", "svh", "pkt", "olg", "agl", "dtk", "info_ext") if c in cols]
+        for needle in ("Eggeweg", "E1", "Europ", "0A0", "0A8", "010A000", "000A800"):
+            where = " OR ".join(f'CAST("{c}" AS TEXT) LIKE ?' for c in textcols)
+            hits = db.execute(f'SELECT {", ".join(show)}, info_ext FROM wanderwege WHERE {where} LIMIT 4', [f"%{needle}%"] * len(textcols)).fetchall()
+            n = db.execute(f'SELECT COUNT(*) FROM wanderwege WHERE {where}', [f"%{needle}%"] * len(textcols)).fetchone()[0]
+            print(f"  SUCHE {needle!r}: {n} Zeilen")
+            for h in hits:
+                print("    ", dict(zip(show + ["info_ext"], h)))
         if "scl" not in cols or "snr" not in cols:
             print("  Spalten scl/snr fehlen")
             continue
