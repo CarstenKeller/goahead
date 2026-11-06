@@ -210,6 +210,8 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
    Repository-Einstellungen (Environments → `github-pages` → Deployment branches) freigeben lassen.
    Hängt eine Veröffentlichung („deployment_queued“, dann „Deployment failed, try again later“), scheitern weitere
    Läufe zum selben Commit offenbar ebenso (Vermutung, Kennung = Commit) – dann mit einem neuen Commit veröffentlichen.
+   **Nie einen Lauf abbrechen, dessen Android-Job noch läuft:** der Deploy-Job veröffentlicht trotzdem – dann ohne APK,
+   und `app/goahead.apk` liefert 404 (passiert am 6.11.2026). Laufende Läufe zu Ende laufen lassen.
 
 ## 10. Offen, ungeprüft, bekannte Grenzen
 
