@@ -235,7 +235,7 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     feineren Maßstäben zeigt.
   - OSM (Waymarked Trails): nur 100/200/400 %. Es werden Kacheln einer gröberen Zoomstufe vergrößert angezeigt.
 - **GPX-Tracks** (Reiter *GPX* auf der Seite *Tracks*):
-  - Eine oder mehrere GPX-Dateien importieren. Gelesen werden Tracks, Routen und Wegpunkte.
+  - Eine oder mehrere GPX-Dateien importieren (Symbolknopf rechts im Listenkopf). Gelesen werden Tracks, Routen und Wegpunkte.
   - **Sammel-Import** (z. B. aus komoot): viele GPX-Dateien oder ZIP-Archive (auch Ordner darin) auf einmal.
     Danach wählen: *Automatisch* (Dateien mit Zeitstempeln an fast allen Punkten → *Erwandert*, sonst → *Geplant*),
     alle nach *Geplant*, alle nach *Erwandert* oder alle nach *GPX*. Geplante werden zu Routen mit Wegpunkten etwa
@@ -337,6 +337,7 @@ Einmalig nötig: unter *Settings → Pages → Build and deployment → Source* 
 ## Dateien
 
 - `CLAUDE.md`: Arbeitsregeln für Änderungen (UI-Grundregeln, Versionen, Speicher, Tests)
+- `docs/PROJEKT.md`: Projektstand, Entscheidungen und Arbeitsweise (Einstieg für Weiterentwicklung)
 - `index.html`, `styles.css`, `app.js`: die App
 - `i18n.js`, `i18n-en.js`: Sprache (Deutsch/Englisch, Wörterbuch) und Darstellung (hell/dunkel), werden zuerst geladen
 - `tracks.js`: Seite *Tracks*, GPX-Import, lokale Speicherung, Track-Liste

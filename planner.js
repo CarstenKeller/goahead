@@ -1631,7 +1631,7 @@
     var pasteBtn = '<button type="button" class="icon-btn plan-paste" title="Geteilte Tour oder Stand einfügen" ' +
       'aria-label="Geteilte Tour oder Stand einfügen">' + G.icon("paste") + "</button>";
     if (!savedRoutes.length) {
-      box.innerHTML = '<div class="list-head"><span class="list-sum"></span>' + pasteBtn + "</div>" +
+      box.innerHTML = '<div class="list-head list-head-one"><span class="list-sum"></span>' + pasteBtn + "</div>" +
         '<p class="trk-empty">Noch keine geplanten Routen.</p>';
       return;
     }

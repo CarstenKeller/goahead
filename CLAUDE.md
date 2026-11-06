@@ -5,6 +5,9 @@ Routen planen, unterwegs aufzeichnen. Zielgeräte: Android- und iOS-Smartphones 
 Diese Regeln gelten für jede Änderung – sie halten fest, was sich bereits bewährt hat oder
 schon einmal falsch gemacht wurde.
 
+**Vor jeder Erweiterung `docs/PROJEKT.md` lesen** (Projektstand, Nutzer, getroffene Entscheidungen, offene Punkte)
+und nach der Änderung dort mitpflegen.
+
 ## Sprache und Haltung
 
 - Oberfläche, Kommentare, README, Commit-Nachrichten: **Deutsch**.

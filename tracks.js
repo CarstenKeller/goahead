@@ -333,12 +333,17 @@
 
   function renderList() {
     if (!listEl) return;
+    // Kopf wie bei Geplant/Erwandert: Anzahl · km, rechts der Symbolknopf „Importieren“
+    var total = records.reduce(function (s, r) { return s + ((r.stats && r.stats.length) || 0); }, 0);
+    var head = '<div class="list-head list-head-one"><span class="list-sum">' +
+      (records.length ? esc(T(records.length === 1 ? "1 Track" : "{0} Tracks", records.length) + " · " + formatKm(total)) : "") + "</span>" +
+      '<button type="button" class="icon-btn trk-import" title="GPX/ZIP importieren" aria-label="GPX/ZIP importieren">' + G.icon("upload") + "</button></div>";
     if (!records.length) {
-      listEl.innerHTML = '<p class="trk-empty">Noch keine Tracks gespeichert.</p>';
+      listEl.innerHTML = head + '<p class="trk-empty">Noch keine Tracks gespeichert.</p>';
       return;
     }
     var sorted = records.slice().sort(function (a, b) { return a.importedAt < b.importedAt ? 1 : -1; });
-    listEl.innerHTML = sorted.map(function (r) {
+    listEl.innerHTML = head + sorted.map(function (r) {
       var st = r.stats || {};
       var info = [];
       if (st.length) info.push(formatKm(st.length));
@@ -353,9 +358,9 @@
           '<span class="trk-info">' + esc(info.join(" · ")) + "</span></span>" +
         "</label>" +
         '<div class="trk-actions">' +
-          '<button type="button" data-act="zoom" title="Auf Track zoomen" aria-label="Auf Track zoomen">⤢</button>' +
-          '<button type="button" data-act="download" title="GPX herunterladen" aria-label="GPX herunterladen">⬇</button>' +
-          '<button type="button" data-act="delete" title="Löschen" aria-label="Löschen">🗑</button>' +
+          '<button type="button" class="icon-btn" data-act="zoom" title="Auf Track zoomen" aria-label="Auf Track zoomen">' + G.icon("fit") + "</button>" +
+          '<button type="button" class="icon-btn" data-act="download" title="GPX herunterladen" aria-label="GPX herunterladen">' + G.icon("download") + "</button>" +
+          '<button type="button" class="icon-btn trk-del" data-act="delete" title="Löschen" aria-label="Löschen">' + G.icon("trash") + "</button>" +
         "</div></div>";
     }).join("");
   }
@@ -427,10 +432,8 @@
       "</nav>" +
       '<div class="page-body">' +
         '<div class="page-panel" data-panel="gpx" role="tabpanel">' +
-          '<button type="button" class="trk-import">GPX/ZIP importieren …</button>' +
           '<input type="file" multiple hidden>' +
           '<div class="trk-list"></div>' +
-          '<p class="trk-note">Tracks werden nur auf diesem Gerät gespeichert.</p>' +
         "</div>" +
         '<div class="page-panel" data-panel="planned" role="tabpanel" hidden>' +
           '<p class="trk-empty">Noch keine geplanten Routen.</p>' +
@@ -444,7 +447,10 @@
     var input = pageEl.querySelector('input[type="file"]');
     // Viele Android-Dateiauswahlen kennen keinen GPX-Typ; daher großzügig
     input.accept = ".gpx,.zip,.txt,application/gpx+xml,application/xml,text/xml,application/zip,application/octet-stream";
-    pageEl.querySelector(".trk-import").addEventListener("click", function () { input.click(); });
+    // Import-Knopf sitzt im Listenkopf (renderList) – Klick hier abfangen
+    pageEl.querySelector('[data-panel="gpx"]').addEventListener("click", function (e) {
+      if (e.target.closest(".trk-import")) input.click();
+    });
     input.addEventListener("change", function () {
       var files = Array.prototype.slice.call(input.files || []);
       input.value = "";
