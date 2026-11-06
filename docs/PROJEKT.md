@@ -92,7 +92,7 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
 - **Luftbild (Mosaik):** DOP NRW, DOP von 12 weiteren Ländern, basemap.at Orthofoto, sonst Esri World Imagery.
 - **Overlays:** Wanderwege NRW (TFIS, WMS, nur NRW), Wanderwege OSM (Waymarked Trails).
 - **Routing:** BRouter (Standard, mit Höhen; Rundtour über `engineMode=4`), OSRM (FOSSGIS) als Alternative.
-- **Suche:** Nominatim; Koordinaten auch UTM 32.
+- **Suche:** Nominatim; Koordinaten auch UTM 32. Bedienung wie bei *Tracks*: Lupe in der Werkzeugreihe blendet das Feld ein/aus, gesucht wird mit der Eingabetaste (kein zweiter Suchknopf).
 - Neue Dienste erst im Workflow „Kartendienste prüfen“ testen; Overlays mit Gebietsinhalt bekommen `region`.
 
 ## 7. Funktionen und die Entscheidungen dahinter

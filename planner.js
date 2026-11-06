@@ -1305,19 +1305,18 @@
       "</span>" +
     "</div>" +
     '<div class="sheet-body">' +
-      '<div class="icon-row">' +
+      '<div class="icon-row plan-tools">' +
         iconBtn("plan-save", "save", "Speichern") +
         iconBtn("plan-undo", "undo", "Rückgängig") +
         iconBtn("plan-redo", "redo", "Wiederholen") +
         '<button type="button" class="icon-btn plan-start" title="Zum Startpunkt" aria-label="Zum Startpunkt"><span class="icon-letter">S</span></button>' +
         iconBtn("plan-round", "roundtrip", "Rundtour") +
-
         iconBtn("plan-find", "search", "Adresse oder Koordinaten suchen") +
       "</div>" +
       '<div class="plan-profile-box" hidden><svg class="pf-svg" aria-label="Höhenprofil"></svg></div>' +
+      // Suchfeld wie bei „Tracks“: Lupe blendet es ein/aus, gesucht wird mit der Eingabetaste (kein zweiter Knopf).
       '<form class="plan-search" autocomplete="off" hidden>' +
         '<input type="search" enterkeyhint="search" placeholder="Adresse oder Koordinaten (auch UTM 32)">' +
-        iconBtn("plan-go", "search", "Suchen").replace('type="button"', 'type="submit"') +
       "</form>" +
       '<div class="plan-results"></div>' +
     "</div>";
@@ -1348,6 +1347,7 @@
 
   function closeSearch() {
     el.form.hidden = true;
+    el.input.value = "";
     el.results.innerHTML = "";
     el.find.classList.remove("on");
   }

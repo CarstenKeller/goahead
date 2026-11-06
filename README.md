@@ -56,7 +56,7 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
       (OSRM, direkte Linien) werden zwischen bekannten Höhen linear aufgefüllt. Höhenmeter zählen ab 3 m Änderung.
     - Gehzeit: Route im 25-m-Raster; je Schritt Steigung (> Schwelle), Gefälle (< −Schwelle) oder Ebene mit der
       jeweiligen Geschwindigkeit aus den **Einstellungen** (Startwerte als Annahme: 4,5 / 3,0 / 4,0 km/h, Schwelle 5 %).
-  - Suche: Adresse (Nominatim/OpenStreetMap) oder Koordinaten: Dezimalgrad (`51.758, 9.030`, auch mit
+  - Suche (Lupe blendet das Feld ein/aus, Eingabetaste sucht): Adresse (Nominatim/OpenStreetMap) oder Koordinaten: Dezimalgrad (`51.758, 9.030`, auch mit
     Dezimalkomma oder vertauscht) oder UTM Zone 32 wie in TIM-online (`32U 494000 5735000` oder `494000 5735000`).
     Koordinaten setzen direkt einen Vorschlagspunkt.
   - Findet kein Routing-Dienst einen Weg, wird die gerade Linie genommen und mit ⚠ markiert.

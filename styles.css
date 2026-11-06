@@ -238,10 +238,20 @@ button {
   background: var(--c-blue-soft) !important;
   color: var(--c-blue) !important;
 }
-.plan-round.on,
-.plan-find.on {
+.plan-round.on {
   background: var(--c-route) !important;
   color: #ffffff !important;
+}
+/* Lupe eingeschaltet: wie bei „Tracks“ (.list-find.on) */
+.plan-find.on {
+  background: var(--c-accent-soft) !important;
+  color: var(--c-accent) !important;
+}
+/* Planen: alle Werkzeuge in einer Reihe (6 × 44 px + Abstände passen ab ca. 320 px Bildschirmbreite) */
+.icon-row.plan-tools {
+  flex-wrap: nowrap;
+  gap: 4px;
+  justify-content: space-between;
 }
 
 /* Symbolknöpfe (Beschriftung steht im title, langer Druck zeigt sie) */
@@ -751,7 +761,6 @@ a[role="button"] {
 }
 .plan-search {
   display: flex;
-  gap: 6px;
   margin-top: 8px;
 }
 .plan-search input {
