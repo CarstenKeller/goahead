@@ -775,14 +775,18 @@
 
   // Suche: bis zu LOOP_DIRS Richtungen (Radius aus dem bisher gemessenen Verhältnis Länge/Radius), dann
   // für die beste Richtung bis zu 2 Nachbesserungen der Länge. Gewählt wird eine Runde ohne doppelte Wege
-  // (höchstens LOOP_OVERLAP_OK), die der Wunschlänge am nächsten kommt; ist die Länge nicht zu treffen,
+  // (höchstens Einstellung „Doppelte Wege erlaubt bis … %“, Standard 0), die der Wunschlänge am nächsten kommt; ist die Länge nicht zu treffen,
   // je nach Einstellung „Rundtour, wenn die Länge nicht passt“ die nächstlängere oder nächstkürzere.
   var LOOP_DIRS = 6;
-  var LOOP_OVERLAP_OK = 0.03;
+  // erlaubter Anteil doppelt gegangener Strecke (Einstellung loopOverlapPct, Standard 0 %)
+  function overlapOk() {
+    var v = G.getSettings().loopOverlapPct;
+    return (typeof v === "number" && v >= 0 ? v : 0) / 100 + 1e-9;
+  }
 
   function pickLoop(cands, target, preferShorter) {
     if (!cands.length) return null;
-    var clean = cands.filter(function (c) { return c.ov <= LOOP_OVERLAP_OK; });
+    var clean = cands.filter(function (c) { return c.ov <= overlapOk(); });
     // keine ganz saubere Runde: alle, die kaum mehr doppelt sind als die beste (+2 Prozentpunkte)
     var minOv = Math.min.apply(null, cands.map(function (c) { return c.ov; }));
     var pool = clean.length ? clean : cands.filter(function (c) { return c.ov <= minOv + 0.02; });
@@ -818,7 +822,7 @@
       }, function () { return null; });
     }
     function good() {
-      return cands.some(function (c) { return c.ov <= LOOP_OVERLAP_OK && Math.abs(c.distance - target) / target <= LOOP_TOL; });
+      return cands.some(function (c) { return c.ov <= overlapOk() && Math.abs(c.distance - target) / target <= LOOP_TOL; });
     }
     var k = 0;
     function nextDir() {
@@ -830,7 +834,7 @@
     function refine(i) {
       if (i >= 2 || good()) return Promise.resolve();
       // beste saubere Richtung (sonst die mit den wenigsten doppelten Wegen) in der Länge nachbessern
-      var clean = cands.filter(function (c) { return c.ov <= LOOP_OVERLAP_OK; });
+      var clean = cands.filter(function (c) { return c.ov <= overlapOk(); });
       var base = (clean.length ? clean : cands.slice().sort(function (a, b) { return a.ov - b.ov; }))
         .sort(function (a, b) { return Math.abs(a.distance - target) - Math.abs(b.distance - target); })[0];
       if (!base) return Promise.resolve();
@@ -843,8 +847,8 @@
       if (!res) throw new Error("keine Runde gefunden");
       applyLoop(res, km, res.dir);
       var msg = "Rundtour: " + (res.distance / 1000).toFixed(1).replace(".", ",") + " km (gewünscht " + String(km).replace(".", ",") + " km)";
-      if (res.ov > LOOP_OVERLAP_OK) msg += " · ⚠ " + Math.round(res.ov * 100) + " % doppelt – „Andere Variante“ oder anderer Start";
-      G.showStatus(msg + ".", res.ov > LOOP_OVERLAP_OK ? 9000 : 5000);
+      if (res.ov > overlapOk()) msg += " · ⚠ " + (res.ov < 0.1 ? (res.ov * 100).toFixed(1).replace(".", ",") : Math.round(res.ov * 100)) + " % doppelt – „Andere Variante“ oder anderer Start";
+      G.showStatus(msg + ".", res.ov > overlapOk() ? 9000 : 5000);
     }).catch(function (err) {
       loopBusy = false;
       G.showStatus("Rundtour nicht berechnet: " + (err.message || err) + ". Netz prüfen oder anderen Startpunkt wählen.", 8000);

@@ -34,7 +34,8 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     Wegpunkten). GoAhead fragt daher 6 Richtungen ab (Radius aus dem gemessenen Verhältnis), misst je Runde den
     Anteil doppelt gegangener Strecke (Linie alle 10 m abgetastet; doppelt = ein anderer Teil der Runde näher als
     15 m) und bessert die beste Richtung bis zu 2-mal in der Länge nach. Gewählt wird eine Runde ohne doppelte Wege
-    (höchstens 3 %), die der Wunschlänge am nächsten kommt (±6 %); passt keine, die nächstlängere – oder, nach
+    (Einstellung *Planen → Rundtour: doppelte Wege erlaubt bis … %*, Standard 0 %), die der Wunschlänge am
+    nächsten kommt (±6 %); passt keine, die nächstlängere – oder, nach
     Einstellung *Planen → Rundtour, wenn die Länge nicht passt*, die nächstkürzere. Gibt es keine saubere Runde,
     erscheint „⚠ … % doppelt“. Ergebnis: normale Planung mit Wegpunkten alle 1–3 km
     (verschieben, löschen, einfügen wie gewohnt), Rückweg als Rundtour-Abschnitt. Erneut *Rundtour*: *Andere
