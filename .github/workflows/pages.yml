@@ -2,7 +2,7 @@ name: GitHub Pages
 
 on:
   push:
-    branches: [main, ccr-a56f7acc-f6tzvw]
+    branches: [main, ccr-a56f7acc-f6tzvw, ccr-83c115d1-hn09z3]
   workflow_dispatch:
   # monatlich neu bauen, damit neue Wegzeichen (TFIS-Signaturen) übernommen werden
   schedule:
