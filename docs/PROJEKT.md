@@ -5,7 +5,7 @@ GoAhead ist, wie es aufgebaut ist und welche Entscheidungen schon getroffen wurd
 Arbeitsregeln stehen in [`CLAUDE.md`](../CLAUDE.md), die Funktionsbeschreibung für Nutzer in [`README.md`](../README.md).
 Bei Widersprüchen gilt: Code > CLAUDE.md > diese Datei. Beim Ändern bitte hier mitpflegen.
 
-Stand: Version 48 (App-Version in `app.js`), November 2026.
+Stand: Version 49 (App-Version in `app.js`), November 2026.
 
 ---
 
@@ -139,10 +139,13 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
   der GPS-Stelle → Wegzeichen antippen; ausgewählte Position = nächstes Foto ergänzt sie; Reihenfolge per Pfeilen;
   Zustand per Tipp auf das Wegzeichen; Position verschiebbar; Filter nach Wegzeichen/Zustand mit Anzahl;
   TFIS-Wegzeichen per Signaturnummer oder aus dem Infofenster (*+*).
-- Version 47: auch per **Wegenummer** (TFIS `schluessel`, z. B. `01-0A0-00` – so kennt der Nutzer seine Wege).
-  Verzeichnis `symbols/tfis/index.json` entsteht im Pages-Workflow aus dem GeoPackage
-  (`Freizeitdaten_NRW_GeoPackage.gpkg`, Tabelle `wanderwege`, Spalten `scl`/`snr`/`nam` – per Protokoll belegt;
-  die WMS-Feldnamen `schluessel`/`signaturnummer` gibt es dort nicht). Vergleich ohne Bindestriche/Leerzeichen.
+- Version 47–49: Wegenummern des Nutzers (z. B. `01-0A0-00` Eggeweg, `00-0A8-00` E1) wurden nicht erkannt. Befund
+  aus dem Protokoll der Pages-Läufe: Sie stehen **nicht** in den offenen TFIS-Daten. GeoPackage
+  `Freizeitdaten_NRW_GeoPackage.gpkg`, Tabelle `wanderwege` (8396 Zeilen), Spalten u. a. `scl` (Form
+  `H0001072_200013`), `snr`, `kat`, `nam`, `bez`, `wvi`. Eggeweg = `nam` „Eggeweg“, `bez` „X“, `snr` 200013;
+  E1 = `nam` „Europäischer Fernwanderweg E1“, `snr` 100055. Lösung: Suche nach Name/Bezeichnung
+  (`symbols/tfis/index.json` = Liste [snr, nam, bez, wvi, kat]); die eigene Wegenummer davor wird als `key` beim
+  Wegzeichen gespeichert und angezeigt. Herkunft der Wegenummern unbekannt (vermutlich Vereinsnummerierung – ungeprüft).
 - Schritt 2 (offen): Foto mit den hinterlegten Wegzeichen vergleichen, beste Treffer zuerst anbieten; bestätigte Fotos
   als weitere Vergleichsbilder. Braucht echte Fotos von Markierungen zum Prüfen. Ob ein Vergleich auf dem Gerät
   verwitterte, schräg fotografierte Markierungen zuverlässig erkennt, ist **ungeprüft**.

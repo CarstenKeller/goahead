@@ -539,11 +539,10 @@ window.GOAHEAD_I18N_EN = {
   "Ebene „{0}“ löschen?": "Delete layer “{0}”?",
   "Die Ebene konnte nicht gelöscht werden.": "The layer could not be deleted.",
   "Wegzeichen in eine Ebene übernehmen": "Add waymark to a layer",
-  "Nr": "No.",
-  "Wegenummer oder Signaturnummer (TFIS)": "Route number or symbol number (TFIS)",
-  "TFIS-Wegzeichen (Wegenummer) hinzufügen": "Add TFIS waymark (route number)",
-  "Zur Wegenummer {0} ist kein Wegzeichen bekannt.": "No waymark is known for route number {0}.",
-  "Wegenummer {0}": "Route number {0}",
-  "Signaturnummer {0}": "Symbol number {0}",
-  "Die Wegenummern lassen sich gerade nicht laden. Bitte mit Internetverbindung noch einmal versuchen.": "The route numbers cannot be loaded right now. Please try again with an internet connection."
+  "Name oder Bezeichnung des Weges": "Name or label of the route",
+  "TFIS-Wegzeichen hinzufügen": "Add TFIS waymark",
+  "Die Wegenummer {0} steht nicht in den amtlichen Daten. Bitte den Namen des Weges dazuschreiben.": "Route number {0} is not in the official data. Please add the name of the route.",
+  "Kein Weg „{0}“ gefunden.": "No route “{0}” found.",
+  "Wege „{0}“": "Routes “{0}”",
+  "Das Wegeverzeichnis lässt sich gerade nicht laden. Bitte mit Internetverbindung noch einmal versuchen.": "The route directory cannot be loaded right now. Please try again with an internet connection."
 };

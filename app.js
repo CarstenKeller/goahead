@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "48";
+  var APP_VERSION = "49";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {
@@ -989,8 +989,7 @@
       type: byKey.name || f.type,
       props: out,
       symbol: symbol,
-      tfis: symbol && byKey.signaturnummer ? String(byKey.signaturnummer).trim() : null,
-      tfisKey: byKey.schluessel ? String(byKey.schluessel).trim() : null
+      tfis: symbol && byKey.signaturnummer ? String(byKey.signaturnummer).trim() : null
     };
   }
 
@@ -1235,7 +1234,7 @@
           "<span>" + escapeHtml(f.type) + "</span>" +
           // TFIS-Wegzeichen in eine eigene Ebene übernehmen (marks.js)
           (f.tfis && window.GOAHEAD && window.GOAHEAD.marks
-            ? '<button type="button" class="icon-btn fi-add" data-tfis="' + escapeHtml(f.tfis) + '" data-key="' + escapeHtml(f.tfisKey || "") + '" data-name="' + escapeHtml(f.type) +
+            ? '<button type="button" class="icon-btn fi-add" data-tfis="' + escapeHtml(f.tfis) + '" data-name="' + escapeHtml(f.type) +
               '" title="Wegzeichen in eine Ebene übernehmen" aria-label="Wegzeichen in eine Ebene übernehmen">' + icon("plus") + "</button>"
             : "") +
           "</div>";
@@ -1365,7 +1364,7 @@
 
   infoBody.addEventListener("click", function (e) {
     var b = e.target.closest(".fi-add");
-    if (b && window.GOAHEAD.marks) window.GOAHEAD.marks.addTfis(b.getAttribute("data-tfis"), b.getAttribute("data-name"), b.getAttribute("data-key"));
+    if (b && window.GOAHEAD.marks) window.GOAHEAD.marks.addTfis(b.getAttribute("data-tfis"), b.getAttribute("data-name"));
   });
 
   // Gesten im Infofenster nicht an die Karte weitergeben

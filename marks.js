@@ -8,7 +8,7 @@
  *
  * Gespeichert in IndexedDB, Speicher "marklayers" (über G.db aus tracks.js):
  *   {id, name, created, visible,
- *    symbols: [{id, name, tfis|null (Signaturnummer), key|null (Wegenummer), img|null}],
+ *    symbols: [{id, name, tfis|null (Signaturnummer), key|null (eigene Wegenummer des Vereins), img|null}],
  *    points:  [{id, lat, lng, time, photos: [fotoId], signs: [{id, sym, state: "ok"|"renew"|"missing", photo|null}]}]}
  * Fotos liegen im Speicher "photos" (photos.js) mit walkId "mark:<ebenenId>:<positionsId|>" – so findet die
  * Rückmeldung der Kamera-App die Ebene auch dann, wenn die Seite zwischendurch neu geladen wurde.
@@ -347,14 +347,14 @@
     var layer = current;
     var html = '<div class="list-head list-head-one"><span class="list-sum">' +
       esc(T(layer.symbols.length === 1 ? "1 Wegzeichen hinterlegt" : "{0} Wegzeichen hinterlegt", layer.symbols.length)) + "</span>" +
-      '<button type="button" class="icon-btn mk-add-tfis" title="TFIS-Wegzeichen (Wegenummer) hinzufügen" aria-label="TFIS-Wegzeichen (Wegenummer) hinzufügen"><span class="icon-letter">Nr</span></button>' +
+      '<button type="button" class="icon-btn mk-add-tfis" title="TFIS-Wegzeichen hinzufügen" aria-label="TFIS-Wegzeichen hinzufügen">' + G.icon("search") + "</button>" +
       '<button type="button" class="icon-btn mk-add-img" title="Eigenes Wegzeichen-Bild hinzufügen" aria-label="Eigenes Wegzeichen-Bild hinzufügen">' + G.icon("image") + "</button></div>";
     html += layer.symbols.map(function (sym) {
       var c = symCounts(layer, sym.id);
       return '<div class="trk-item mk-sym' + (filter.sym === sym.id ? " on" : "") + '" data-sym="' + esc(sym.id) + '">' +
         '<span class="trk-main" data-act="filter">' + '<span class="mk-sym-box"><img alt="" src="' + esc(symUrl(sym)) + '"></span>' +
           '<span class="trk-text"><span class="trk-name" data-noi18n>' + esc(sym.name) + "</span>" +
-          '<span class="trk-info">' + esc((sym.tfis ? "TFIS " + (sym.key || sym.tfis) + " · " : "") + symCountText(c)) + "</span></span></span>" +
+          '<span class="trk-info">' + esc((sym.key ? sym.key + " · " : sym.tfis ? "TFIS " + sym.tfis + " · " : "") + symCountText(c)) + "</span></span></span>" +
         '<span class="trk-actions"><button type="button" class="icon-btn" data-act="more" title="Weitere Aktionen" aria-label="Weitere Aktionen">' + G.icon("more") + "</button></span>" +
         "</div>";
     }).join("");
@@ -589,43 +589,79 @@
       im.src = url;
     });
   }
-  // Verzeichnis Wegenummer (TFIS „schluessel“, z. B. „01-0A0-00“) → {k: Schreibweise, s: [Signaturnummern], n: Name};
-  // erzeugt im Pages-Workflow aus dem TFIS-GeoPackage (.github/scripts/tfis_index.py)
-  var keyIndex = null;
-  function loadKeyIndex() {
-    if (keyIndex) return keyIndex;
+  // Verzeichnis der TFIS-Wanderwege: [[Signaturnummer, Name, Bezeichnung, Verein, Kategorie], …];
+  // erzeugt im Pages-Workflow aus dem TFIS-GeoPackage (.github/scripts/tfis_index.py, Aufbau dort belegt).
+  // Eigene Wegenummern der Vereine (z. B. „01-0A0-00“) stehen nicht in TFIS – gesucht wird nach Name/Bezeichnung.
+  var wayIndex = null;
+  function loadWayIndex() {
+    if (wayIndex) return wayIndex;
     var ctl = window.AbortController ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 10000);
-    keyIndex = fetch("symbols/tfis/index.json", ctl ? { signal: ctl.signal } : {}).then(function (r) {
+    wayIndex = fetch("symbols/tfis/index.json", ctl ? { signal: ctl.signal } : {}).then(function (r) {
       clearTimeout(timer);
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json();
+    }).then(function (list) {
+      if (!Array.isArray(list)) throw new Error("altes Format");
+      return list;
     });
-    keyIndex.catch(function (err) { console.warn("[GoAhead] Wegenummern:", err); keyIndex = null; });
-    return keyIndex;
+    wayIndex.catch(function (err) { console.warn("[GoAhead] Wegeverzeichnis:", err); wayIndex = null; });
+    return wayIndex;
   }
 
-  // Eingabe: Wegenummer oder Signaturnummer, optional mit Namen dahinter („01-0A0-00 Eggeweg“)
+  // Bei gleich guten Treffern: überregionale Wege zuerst (Kategorien laut TFIS-Protokoll, z. B. „Fernwanderweg“)
+  function katRank(kat) {
+    kat = (kat || "").toLowerCase();
+    if (kat.indexOf("fern") >= 0) return 0;
+    if (kat.indexOf("haupt") >= 0) return 1;
+    if (kat.indexOf("örtlich") >= 0) return 3;
+    return 2;
+  }
+
+  // Treffer nach Signaturnummer zusammenfassen (gleiches Wegzeichen), beste zuerst
+  function searchWays(list, q) {
+    q = q.toLowerCase();
+    var groups = {};
+    list.forEach(function (r) {
+      var nam = (r[1] || "").toLowerCase(), bez = (r[2] || "").toLowerCase();
+      var score = nam === q || bez === q ? 3 : (nam.indexOf(q) >= 0 ? 2 : 0);
+      if (!score) return;
+      var g = groups[r[0]];
+      if (!g || score > g.score) groups[r[0]] = { score: score, nr: r[0], nam: r[1], bez: r[2], verein: r[3], rank: katRank(r[4]) };
+    });
+    return Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) {
+      return b.score - a.score || a.rank - b.rank || (a.nam || a.bez).localeCompare(b.nam || b.bez, G.i18n.locale);
+    }).slice(0, 12);
+  }
+  function wayName(w) {
+    if (w.nam && w.bez && w.nam.indexOf(w.bez) < 0) return w.bez + " " + w.nam;
+    return w.nam || w.bez;
+  }
+
+  // Eingabe: Name oder Bezeichnung des Weges („Eggeweg“, „E1“, „X“), davor optional die eigene Wegenummer
+  // („01-0A0-00 Eggeweg“ – wird beim Wegzeichen angezeigt), oder die Signaturnummer (nur Ziffern)
+  var OWN_KEY = /^[0-9A-Z]{2}-[0-9A-Z]{3}-[0-9A-Z]{2}$/i;
   function askTfis(layer) {
-    G.askText("Wegenummer oder Signaturnummer (TFIS)", "", function (v) {
-      var m = /^\s*(\S+)\s*(.*)$/.exec(String(v || ""));
-      if (!m) return;
-      var code = m[1], rest = m[2].trim();
-      if (/^\d+$/.test(code)) { addTfisTo(layer, code, rest); return; }
-      var key = code.toUpperCase();
-      loadKeyIndex().then(function (idx) {
-        // Verzeichnis ist ohne Bindestriche/Leerzeichen geschlüsselt (tfis_index.py, norm)
-        var e = idx && idx[key.replace(/[^0-9A-Z]/g, "")];
-        if (!e || !e.s || !e.s.length) { G.showStatus(T("Zur Wegenummer {0} ist kein Wegzeichen bekannt.", key), 6000); return; }
-        var name = rest || e.n || "";
-        if (e.s.length === 1) { addTfisTo(layer, e.s[0], name, key); return; }
-        G.actionSheet(T("Wegenummer {0}", key), name, e.s.map(function (nr) {
-          return { label: T("Signaturnummer {0}", nr), onClick: function () { addTfisTo(layer, nr, name, key); } };
+    G.askText("Name oder Bezeichnung des Weges", "", function (v) {
+      var text = String(v || "").trim();
+      if (!text) return;
+      if (/^\d+$/.test(text)) { addTfisTo(layer, text, ""); return; }
+      var m = /^(\S+)\s*(.*)$/.exec(text);
+      var own = OWN_KEY.test(m[1]) ? m[1].toUpperCase() : null;
+      var q = own ? m[2].trim() : text;
+      if (!q) { G.showStatus(T("Die Wegenummer {0} steht nicht in den amtlichen Daten. Bitte den Namen des Weges dazuschreiben.", own), 7000); return; }
+      loadWayIndex().then(function (list) {
+        var hits = searchWays(list, q);
+        if (!hits.length) { G.showStatus(T("Kein Weg „{0}“ gefunden.", q), 6000); return; }
+        function take(w) { addTfisTo(layer, w.nr, wayName(w), own); }
+        if (hits.length === 1) { take(hits[0]); return; }
+        G.actionSheet(T("Wege „{0}“", q), "", hits.map(function (w) {
+          return { label: wayName(w) + (w.verein ? " · " + w.verein : ""), onClick: function () { take(w); } };
         }));
       }).catch(function () {
-        G.showStatus("Die Wegenummern lassen sich gerade nicht laden. Bitte mit Internetverbindung noch einmal versuchen.", 7000);
+        G.showStatus("Das Wegeverzeichnis lässt sich gerade nicht laden. Bitte mit Internetverbindung noch einmal versuchen.", 7000);
       });
-    }, "Weiter");
+    }, "Suchen");
   }
   function addTfisTo(layer, nr, name, key) {
     for (var i = 0; i < layer.symbols.length; i++) {
@@ -641,9 +677,9 @@
   }
 
   // Aus dem Infofenster (Weg antippen): in die geöffnete Ebene, sonst Ebene wählen bzw. anlegen
-  function addTfis(nr, name, key) {
+  function addTfis(nr, name) {
+    var key = null;   // eigene Wegenummer gibt es nur bei der Eingabe von Hand
     nr = String(nr || "").trim();
-    key = key ? String(key).trim().toUpperCase() : null;
     if (!nr) return;
     if (current) { addTfisTo(current, nr, name, key); return; }
     if (!layers.length) {
