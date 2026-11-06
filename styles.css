@@ -83,6 +83,14 @@
   --z-dialog: 3000;
   --z-photo: 2900;              /* Foto-Anzeige (über Seiten, unter Dialogen) */
   --c-photo: #7048e8;           /* Foto-Marker */
+  /* Markierungsebenen (marks.js): Zustand der Wegzeichen */
+  --c-mk-ok: #2f9e44;           /* Rahmen „gut“ */
+  --c-mk-renew: #f08c00;        /* Rahmen „erneuern“ */
+  --c-mk-missing: #c62828;      /* Rahmen „fehlt“ */
+  --c-mk-renew-text: #9a4d00;   /* Text „erneuern“ (Kontrast ≥ 4,5 : 1) */
+  --c-mk-plate: #ffffff;        /* Untergrund der Wegzeichen (Symbole sind für Weiß gezeichnet) */
+  --c-mk-sel: #1c6dd0;          /* ausgewählte Position */
+  --c-mk-plate-text: #5f6b75;   /* „?“ auf dem Wegzeichen-Untergrund */
 
   --info-height: 34vh;          /* Standardhöhe Infofenster (per Ziehen änderbar) */
 }
@@ -127,6 +135,13 @@
   --c-icon-blue: #74b5ff;
   --c-icon-route: #f783ac;
   --c-icon-start: #69db7c;
+  --c-mk-ok: #40c057;
+  --c-mk-renew: #ffa94d;
+  --c-mk-missing: #ff8a80;
+  --c-mk-renew-text: #ffb74d;
+  --c-mk-plate: #ffffff;
+  --c-mk-sel: #74b5ff;
+  --c-mk-plate-text: #5f6b75;
 }
 
 /* Ohne Unschärfe-Unterstützung: Flächen weniger durchsichtig, damit Text lesbar bleibt */
@@ -417,7 +432,8 @@ a[role="button"] {
 }
 /* Im Planungs- und Unterwegs-Modus bleibt nur die Kartenwahl */
 .mode-plan .toolbar > :not(.maps-control),
-.mode-nav .toolbar > :not(.maps-control) {
+.mode-nav .toolbar > :not(.maps-control),
+.mode-marks .toolbar > :not(.maps-control) {
   display: none;
 }
 
@@ -648,6 +664,7 @@ a[role="button"] {
 .info-title,
 .plan-title,
 .tour-title,
+.mk-title,
 .nav-title {
   font-weight: 650;
   font-size: 16px;
@@ -748,7 +765,8 @@ a[role="button"] {
   vertical-align: middle;
 }
 .plan-sum,
-.tour-sub {
+.tour-sub,
+.mk-sub {
   font-size: 13px;
   color: var(--c-muted);
 }
@@ -1492,13 +1510,15 @@ a[role="button"] {
 #maps-panel {
   z-index: var(--z-settings);
 }
-.maps-toggle {
+.maps-toggle,
+.mk-toggle {
   display: flex !important;
   align-items: center;
   justify-content: center;
   color: var(--c-text) !important;
 }
-.maps-toggle svg {
+.maps-toggle svg,
+.mk-toggle svg {
   width: 26px;
   height: 26px;
 }
@@ -1539,3 +1559,191 @@ a[role="button"] {
 :root[data-theme="dark"] .leaflet-control-attribution a,
 :root[data-theme="dark"] .page a,
 :root[data-theme="dark"] .sheet-body a { color: var(--c-blue); }
+
+/* ---------- Markierungsebenen (marks.js) ---------- */
+/* Marker: Wegzeichen der Position untereinander (Reihenfolge wie erfasst), Spitze = Ort */
+.mk-pin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.mk-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--c-mk-plate);
+  box-shadow: var(--shadow);
+}
+.mk-pin.sel .mk-stack {
+  outline: 3px solid var(--c-mk-sel);
+}
+.mk-tail {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid var(--c-mk-plate);
+}
+.mk-sign {
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border: 2px solid var(--c-mk-ok);
+  border-radius: 4px;
+  background: var(--c-mk-plate);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  overflow: hidden;
+  font-weight: 700;
+  color: var(--c-mk-plate-text);
+}
+.mk-sign img {
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+}
+.mk-sign.mk-renew { border-color: var(--c-mk-renew); }
+.mk-sign.mk-missing { border: 2px dashed var(--c-mk-missing); }
+.mk-sign.mk-missing img { opacity: 0.4; }
+.mk-sign.mk-none { border-color: var(--c-line); }
+.mk-sign.mk-dim { opacity: 0.35; }
+.mk-dot {
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid var(--c-mk-plate);
+  background: var(--c-mk-ok);
+  box-shadow: var(--shadow);
+}
+.mk-dot.mk-renew { background: var(--c-mk-renew); }
+.mk-dot.mk-missing { background: var(--c-mk-missing); }
+.mk-dot.mk-none { background: var(--c-muted); }
+
+/* Leiste „Ebene“: ausgewählte Position */
+.mk-point {
+  margin: 0 0 8px;
+  padding: 6px 8px 8px;
+  border-radius: var(--r-md);
+  background: var(--c-item);
+  border: 2px solid var(--c-mk-sel);
+}
+.mk-point-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.mk-point-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 14px;
+}
+.sheet .mk-point-head .icon-btn {
+  background: transparent;
+}
+.mk-photos {
+  margin: 2px 0 6px;
+}
+.mk-sign-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+  border-top: 1px solid var(--c-line);
+}
+.mk-sign-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.mk-sign-main .mk-sign {
+  width: 40px;
+  height: 40px;
+}
+.sheet .mk-sign-row .icon-btn {
+  background: transparent;
+}
+.mk-st-renew { color: var(--c-mk-renew-text); font-weight: 600; }
+.mk-st-missing { color: var(--c-danger); font-weight: 600; }
+/* Wegzeichen wählen (nach dem Foto) */
+.mk-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--c-line);
+}
+.sheet .mk-pick-btn {
+  width: 72px;
+  padding: 6px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--c-item-active);
+  border: 1px solid var(--c-line);
+}
+.mk-pick-btn img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  background: var(--c-mk-plate);
+  border-radius: 4px;
+}
+.mk-pick-btn span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sheet .mk-pick-cancel {
+  background: transparent;
+  margin-left: auto;
+}
+/* Filter wie bei den Tour-Listen */
+.mk-filter .list-kind,
+.mk-filter .list-year {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* Hinterlegte Wegzeichen */
+.mk-syms .trk-item {
+  padding: 6px 8px;
+}
+.mk-syms .trk-item.on {
+  border: 2px solid var(--c-accent);
+}
+.mk-sym-box {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 4px;
+  background: var(--c-mk-plate);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.mk-sym-box img {
+  max-width: 100%;
+  max-height: 100%;
+}
+.sheet .mk-syms .trk-actions .icon-btn {
+  background: transparent;
+}
+/* Infofenster: Wegzeichen übernehmen */
+.sheet .fi-add {
+  margin-left: auto;
+  background: transparent;
+}

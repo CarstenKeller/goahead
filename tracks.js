@@ -23,7 +23,8 @@
 
   // Version 3: Speicher "tracks" (GPX), "routes" (geplant, planner.js), "walks" (erwandert, nav.js)
   // Version 4: zusätzlich "photos" (Fotos unterwegs, photos.js)
-  var DB_VERSION = 4;
+  // Version 5: zusätzlich "marklayers" (eigene Markierungsebenen, marks.js)
+  var DB_VERSION = 5;
 
   function openDb() {
     if (dbPromise) return dbPromise;
@@ -35,7 +36,7 @@
       var req = window.indexedDB.open("goahead", DB_VERSION);
       req.onupgradeneeded = function () {
         var db = req.result;
-        ["tracks", "routes", "walks", "photos"].forEach(function (name) {
+        ["tracks", "routes", "walks", "photos", "marklayers"].forEach(function (name) {
           if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: "id" });
         });
       };

@@ -94,6 +94,23 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   - Begleiten zeichnet nicht auf, hält den Bildschirm nicht an und speichert beim Beenden nichts.
   - Daten: JSON, deflate (`CompressionStream`, Safari ab 16.4), base64url im Link-Teil `#g=`; Linien als
     Polyline-Zeichenkette (Google-Verfahren, Höhe als dritter Wert).
+- **Ebenen** (Knopf mit Wegzeichen-Schild im Menü), Modul `marks.js`: eigene Markierungsebenen, z. B. für die
+  eigene Wabe. Seite *Ebenen*: neue Ebene anlegen, Ebenen ein-/ausblenden, umbenennen, löschen. Eine Ebene öffnen
+  zeigt sie mit einer Leiste über der Karte:
+  - **Wegzeichen hinterlegen:** amtliche TFIS-Wegzeichen über die Signaturnummer (Knopf *Nr*) oder direkt aus dem
+    Infofenster (Weg antippen, *+* neben dem Wegzeichen), dazu eigene Bilder (Knopf mit Bild-Symbol).
+  - **Erfassen:** Kamera in der Kopfzeile fotografiert die Markierung an der GPS-Position und legt eine Position an;
+    danach das passende Wegzeichen antippen. Ist eine Position ausgewählt, ergänzt das nächste Foto dieselbe Stelle
+    (mehrere Wegzeichen nacheinander). *+* erfasst ein Wegzeichen ohne Foto (z. B. wenn es fehlt).
+  - **Position antippen:** Fotos, Wegzeichen in ihrer Reihenfolge (Pfeile ändern sie), Zustand je Wegzeichen
+    (*gut*, *erneuern*, *fehlt*); die ausgewählte Position lässt sich auf der Karte verschieben (GPS ist im Wald oft
+    einige Meter ungenau).
+  - **Karte:** an jeder Position die Wegzeichen untereinander, Rahmen nach Zustand (grün, orange, rot gestrichelt);
+    unter Zoomstufe 14 nur farbige Punkte. Die Ebenen stehen auch in der Kartenwahl.
+  - **Filter** nach Wegzeichen und Zustand mit Anzahl der Positionen und Wegzeichen; je hinterlegtem Wegzeichen die
+    Anzahl nach Zustand.
+  - Gespeichert in IndexedDB (Speicher `marklayers`, Fotos im Speicher `photos`), in der Sicherung enthalten.
+  - Noch offen (Schritt 2): automatische Erkennung des Wegzeichens im Foto als Vorschlag.
 - **Fotos unterwegs** (Kamera-Knopf in der Kopfzeile von *Unterwegs*), Modul `photos.js`: Das Foto wird an der
   aktuellen Position der Tour zugeordnet und als Kamera-Marker auf der Karte gezeigt; Antippen zeigt das Bild
   (dort auch löschen). In der **Android-App** speichert die Kamera das Bild in voller Größe in der Galerie,
@@ -347,6 +364,7 @@ Einmalig nötig: unter *Settings → Pages → Build and deployment → Source* 
 - `nav.js`: Unterwegs-Modus, Aufzeichnung, Abbiegungen, Liste *Erwandert*
 - `tourview.js`: Leiste mit Tour-Details, Listenkopf (Anzahl, km, Jahr, Suche)
 - `photos.js`: Fotos unterwegs (Kamera, Speicher, Marker, Anzeige)
+- `marks.js`: Seite *Ebenen*, eigene Markierungsebenen (Wegzeichen, Positionen, Zustand, Filter)
 - `share.js`: Tour und Stand für die Begleitung teilen und einfügen
 - `backup.js`: Sicherung/Wiederherstellen, Sammel-Import (GPX, ZIP) nach *Geplant*/*Erwandert*
 - `android/`: Android-App (WebView + Aufzeichnung im Hintergrund), Build im Pages-Workflow

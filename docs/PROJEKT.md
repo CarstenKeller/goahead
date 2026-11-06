@@ -5,7 +5,7 @@ GoAhead ist, wie es aufgebaut ist und welche Entscheidungen schon getroffen wurd
 Arbeitsregeln stehen in [`CLAUDE.md`](../CLAUDE.md), die Funktionsbeschreibung für Nutzer in [`README.md`](../README.md).
 Bei Widersprüchen gilt: Code > CLAUDE.md > diese Datei. Beim Ändern bitte hier mitpflegen.
 
-Stand: Version 44 (App-Version in `app.js`), November 2026.
+Stand: Version 46 (App-Version in `app.js`), November 2026.
 
 ---
 
@@ -51,7 +51,7 @@ Stand: Version 44 (App-Version in `app.js`), November 2026.
 
 | Datei | Aufgabe |
 |---|---|
-| `index.html` | Gerüst; im `<head>` `i18n-en.js`, `i18n.js`; danach config → regions → mosaic → app → tracks → planner → tourview → offline → photos → nav → share → backup |
+| `index.html` | Gerüst; im `<head>` `i18n-en.js`, `i18n.js`; danach config → regions → mosaic → app → tracks → planner → tourview → offline → photos → marks → nav → share → backup |
 | `i18n.js`, `i18n-en.js` | Sprache (T(), automatische Übersetzung fester Texte per MutationObserver), Darstellung (data-theme) |
 | `app.js` | Karte, Ebenen, Kartenwahl-Leiste, Position, Menü, Einstellungen, Infofenster, Dialoge, Tooltips, Brücke zur App; Schnittstelle `window.GOAHEAD` (G) |
 | `tracks.js` | Seite *Tracks* (Reiter GPX/Geplant/Erwandert), GPX-Import, **einzige Stelle, die IndexedDB öffnet** (`G.db`) |
@@ -59,6 +59,7 @@ Stand: Version 44 (App-Version in `app.js`), November 2026.
 | `tourview.js` | Tour-Details als Leiste (`G.tourView`), Listenkopf mit Anzahl/km/Jahr/Suche (`G.listTools`) |
 | `offline.js` | Kacheln im Korridor um eine Route offline speichern (`G.offline`) |
 | `photos.js` | Fotos unterwegs (`G.photos`) |
+| `marks.js` | Seite *Ebenen*, eigene Markierungsebenen (`G.marks`) |
 | `nav.js` | Unterwegs-Modus, Aufzeichnung, Abbiegungen, Begleiten, Liste *Erwandert* (`G.nav`) |
 | `share.js` | Tour/Stand teilen und einfügen (`G.share`) |
 | `backup.js` | Sicherung/Wiederherstellen, Sammel-Import GPX/ZIP (`G.backup`) |
@@ -75,8 +76,8 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
 
 ## 5. Daten
 
-- **IndexedDB „goahead“, Version 4**, Speicher (alle `keyPath: "id"`): `tracks` (GPX-Original), `routes` (geplant),
-  `walks` (erwandert), `photos` (Blob). Neue Speicher: `DB_VERSION` erhöhen (Nutzer auf andere offene Fenster hinweisen).
+- **IndexedDB „goahead“, Version 5**, Speicher (alle `keyPath: "id"`): `tracks` (GPX-Original), `routes` (geplant),
+  `walks` (erwandert), `photos` (Blob), `marklayers` (eigene Ebenen: Wegzeichen, Positionen, Zustand). Neue Speicher: `DB_VERSION` erhöhen (Nutzer auf andere offene Fenster hinweisen).
 - **localStorage** (`goahead.*`): `settings.v1` (alle Einstellungen), `view.v1` (Kartenausschnitt, Ebenen),
   `plan.v1` (Planungsentwurf), `walk.v1` (laufende Tour), `symbolScale.v1`, `loopKm.v1`, `tracksTab.v1`,
   `photoPending.v1`, Leistenhöhen (`*Height.v1`).
@@ -130,6 +131,20 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
   „Stand teilen“ (unterwegs: Zeit, km, Spur). Empfang: Link öffnen oder Nachricht kopieren → Einfügen.
 - Begleiten (`walk.companion`) zeichnet nie auf, fasst die App-Aufzeichnung nie an, speichert nichts.
 
+**Markierungsebenen (Wegemarkierer, `marks.js`)**
+- Ziel: Markierungszustand der eigenen Wabe festhalten und auf der Karte zeigen. Entscheidungen des Nutzers (11/2026):
+  Wegzeichen aus **TFIS und eigene Bilder**; Erkennung als **Vorschlag mit Bestätigung**; **Zustand je Wegzeichen**
+  (gut / erneuern / fehlt); Umsetzung **in zwei Schritten**.
+- Schritt 1 (Version 46): Seite *Ebenen*, Leiste je Ebene (Modus `mode-marks`), Kamera in der Kopfzeile → Position an
+  der GPS-Stelle → Wegzeichen antippen; ausgewählte Position = nächstes Foto ergänzt sie; Reihenfolge per Pfeilen;
+  Zustand per Tipp auf das Wegzeichen; Position verschiebbar; Filter nach Wegzeichen/Zustand mit Anzahl;
+  TFIS-Wegzeichen per Signaturnummer oder aus dem Infofenster (*+*).
+- Schritt 2 (offen): Foto mit den hinterlegten Wegzeichen vergleichen, beste Treffer zuerst anbieten; bestätigte Fotos
+  als weitere Vergleichsbilder. Braucht echte Fotos von Markierungen zum Prüfen. Ob ein Vergleich auf dem Gerät
+  verwitterte, schräg fotografierte Markierungen zuverlässig erkennt, ist **ungeprüft**.
+- Grenzen: Position = GPS des Handys (im Wald einige Meter ungenau) → verschiebbar. Ebenen-Modus und Unterwegs-Modus
+  schließen sich aus (beide sind untere Leisten mit eigenem Modus).
+
 **Sprache und Darstellung**
 - `T("Satz mit {0}", wert)` für Texte mit Werten; feste Texte übersetzt der Observer automatisch (nur bei Englisch).
   Nutzernamen in `data-noi18n`. Sprachwechsel lädt neu; Darstellung wirkt sofort.
@@ -173,3 +188,5 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
 - Kartenkacheln werden im Dunkelmodus nicht abgedunkelt (bewusst: Farben/Wegzeichen bleiben lesbar).
 - Automatisch vergebene Namen („Route vom …“) bleiben in der Sprache, in der sie entstanden.
 - Benachrichtigung der Android-App („GoAhead – Aufnahme läuft“) ist nur deutsch (bräuchte neuen App-Build).
+- Markierungsebenen: nur mit nachgebildeten Bildern/GPS getestet; TFIS-Wegzeichen erst nach dem ersten Anzeigen offline
+  verfügbar (Service Worker speichert sie beim Laden). Wiederherstellen-Meldung nennt die Zahl der Ebenen nicht.

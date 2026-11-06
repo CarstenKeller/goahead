@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "45";
+  var APP_VERSION = "46";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {
@@ -43,7 +43,12 @@
     layers: '<path d="M12 4l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 16l8 4 8-4"/>',
     paste: '<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M9 11h6M9 15h4"/>',
     scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.5 7.5L20 18M8.5 16.5L20 6"/>',
-    warn: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>'
+    warn: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>',
+    // Markierungsebenen (marks.js): Wegzeichen-Schild am Pfosten, Pfeile für die Reihenfolge, Bild
+    marks: '<rect x="5" y="3" width="14" height="11" rx="1.5"/><path d="M12 14v7"/><path d="M9 6l6 5M15 6l-6 5"/>',
+    up: '<path d="M6 15l6-6 6 6"/>',
+    down: '<path d="M6 9l6 6 6-6"/>',
+    image: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/>'
   };
   function icon(name) {
     return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" ' +
@@ -309,7 +314,7 @@
       if (o.overlay && !subOv) { html += '<div class="settings-sub">Ebenen</div>'; subOv = true; }
       var on = map.hasLayer(o.layer);
       html += '<label class="settings-row"><input type="' + (o.overlay ? "checkbox" : "radio") + '" name="maps-base" data-i="' + i + '"' +
-        (on ? " checked" : "") + "> " + escapeHtml(o.name) + "</label>";
+        (on ? " checked" : "") + "> " + (o.layer._goaheadMark ? '<span data-noi18n>' + escapeHtml(o.name) + "</span>" : escapeHtml(o.name)) + "</label>";
     });
     body.innerHTML = '<div class="settings-sub">Hintergrund</div>' + html;
   }
@@ -606,6 +611,7 @@
   map.on("overlayadd", function (e) {
     if (e.layer._rescaling) return;
     var def = e.layer._goaheadDef;
+    if (!def) return;   // eigene Ebenen (marks.js) merken sich ihre Sichtbarkeit selbst
     activeOverlays[def.id] = true;
     if (def.type === "wms" && !def.layers) {
       showStatus(T("„{0}“ ist gerade nicht verfügbar.", T(def.name)), 8000);
@@ -613,7 +619,7 @@
     saveView();
   });
   map.on("overlayremove", function (e) {
-    if (e.layer._rescaling) return;
+    if (e.layer._rescaling || !e.layer._goaheadDef) return;
     delete activeOverlays[e.layer._goaheadDef.id];
     saveView();
   });
@@ -982,7 +988,8 @@
     return {
       type: byKey.name || f.type,
       props: out,
-      symbol: symbol
+      symbol: symbol,
+      tfis: symbol && byKey.signaturnummer ? String(byKey.signaturnummer).trim() : null
     };
   }
 
@@ -1224,7 +1231,13 @@
       (res.features || []).forEach(function (f) {
         html += '<div class="fi-feature"><div class="fi-type">' +
           (f.symbol ? '<img class="fi-symbol" alt="" src="' + escapeHtml(f.symbol) + '" onerror="this.remove()">' : "") +
-          "<span>" + escapeHtml(f.type) + "</span></div>";
+          "<span>" + escapeHtml(f.type) + "</span>" +
+          // TFIS-Wegzeichen in eine eigene Ebene übernehmen (marks.js)
+          (f.tfis && window.GOAHEAD && window.GOAHEAD.marks
+            ? '<button type="button" class="icon-btn fi-add" data-tfis="' + escapeHtml(f.tfis) + '" data-name="' + escapeHtml(f.type) +
+              '" title="Wegzeichen in eine Ebene übernehmen" aria-label="Wegzeichen in eine Ebene übernehmen">' + icon("plus") + "</button>"
+            : "") +
+          "</div>";
         if (f.props.length) {
           html += table(f.props);
         } else if (!f.extra || !f.extra.length) {
@@ -1348,6 +1361,11 @@
     head.addEventListener("pointerup", end);
     head.addEventListener("pointercancel", end);
   })();
+
+  infoBody.addEventListener("click", function (e) {
+    var b = e.target.closest(".fi-add");
+    if (b && window.GOAHEAD.marks) window.GOAHEAD.marks.addTfis(b.getAttribute("data-tfis"), b.getAttribute("data-name"));
+  });
 
   // Gesten im Infofenster nicht an die Karte weitergeben
   L.DomEvent.disableClickPropagation(infoPanel);
@@ -1887,6 +1905,9 @@
     escapeHtml: escapeHtml,
     stopFollowing: stopFollowing,
     addToToolbar: addToToolbar,
+    // eigene Ebenen in der Kartenwahl (marks.js)
+    addOverlay: function (layer, name) { layersControl.addOverlay(layer, name); },
+    removeOverlay: function (layer) { layersControl.removeLayer(layer); },
     closeMenu: closeMenu,
     openMenu: openMenu,
     setMapClickHandler: setMapClickHandler,
