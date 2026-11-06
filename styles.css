@@ -1616,7 +1616,6 @@ a[role="button"] {
 .mk-sign.mk-missing { border: 2px dashed var(--c-mk-missing); }
 .mk-sign.mk-missing img { opacity: 0.4; }
 .mk-sign.mk-none { border-color: var(--c-line); }
-.mk-sign.mk-dim { opacity: 0.35; }
 .mk-dot {
   width: 14px;
   height: 14px;
@@ -1790,4 +1789,33 @@ a[role="button"] {
   border: 2px solid var(--c-mk-plate);
   box-shadow: 0 0 0 9999px var(--c-crop-dim);
   pointer-events: none;
+}
+/* Seite „Ebenen“: aufgeklappte Wegzeichen einer Ebene mit Anzahl */
+.mk-layer-item {
+  flex-wrap: wrap;
+}
+.mk-details {
+  flex: 1 1 100%;
+  margin-top: 6px;
+  border-top: 1px solid var(--c-line);
+}
+.mk-detail {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+.mk-detail-btns {
+  justify-content: flex-end;
+}
+.page .mk-detail-btns .icon-btn {
+  background: transparent;
+}
+.page .mk-detail-btns .trk-del {
+  color: var(--c-danger);
+}
+.page .mk-layer-item .trk-actions .icon-btn.on {
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
 }

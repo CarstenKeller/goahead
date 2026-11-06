@@ -90,18 +90,26 @@
     if (!filterActive()) return true;
     return p.signs.some(signMatches);
   }
-  function countText(nPos, nSigns) {
-    return T(nPos === 1 ? "1 Position" : "{0} Positionen", nPos) + " · " + T(nSigns === 1 ? "1 Wegzeichen" : "{0} Wegzeichen", nSigns);
+  // „Wegzeichen“ = vorhandene (gut + erneuern); fehlende werden getrennt gezählt
+  function countText(nPos, nSigns, nMissing) {
+    var t = T(nPos === 1 ? "1 Position" : "{0} Positionen", nPos);
+    if (nSigns || !nMissing) t += " · " + T(nSigns === 1 ? "1 Wegzeichen" : "{0} Wegzeichen", nSigns);
+    if (nMissing) t += " · " + T(nMissing === 1 ? "1 fehlt" : "{0} fehlen", nMissing);
+    return t;
   }
   function summary(layer, useFilter) {
-    var pos = 0, signs = 0;
+    var pos = 0, signs = 0, missing = 0;
+    var f = useFilter && filterActive();
     layer.points.forEach(function (p) {
       var n = 0;
-      p.signs.forEach(function (s) { if (!useFilter || signMatches(s)) n++; });
-      if (!useFilter || !filterActive()) { pos++; signs += p.signs.length; }
-      else if (n) { pos++; signs += n; }
+      p.signs.forEach(function (s) {
+        if (f && !signMatches(s)) return;
+        n++;
+        if (s.state === "missing") missing++; else signs++;
+      });
+      if (!f || n) pos++;
     });
-    return countText(pos, signs);
+    return countText(pos, signs, missing);
   }
   // Anzahl je Wegzeichen nach Zustand: {ok, renew, missing, all}
   function symCounts(layer, symId) {
@@ -113,10 +121,10 @@
   }
   function symCountText(c) {
     if (!c.all) return T("nicht zugeordnet");
-    var parts = [];
+    var parts = [T("{0} zugeordnet", c.all)];
     if (c.ok) parts.push(T("{0} gut", c.ok));
     if (c.renew) parts.push(T("{0} erneuern", c.renew));
-    if (c.missing) parts.push(T("{0} fehlt", c.missing));
+    if (c.missing) parts.push(T(c.missing === 1 ? "1 fehlt" : "{0} fehlen", c.missing));
     return parts.join(" · ");
   }
 
@@ -134,11 +142,13 @@
       if (!p.signs.length) worst = "none";
       return L.divIcon({ className: "", html: '<div class="mk-dot mk-' + worst + '"></div>', iconSize: [14, 14], iconAnchor: [7, 7] });
     }
-    var list = p.signs.length ? p.signs : [null];
+    // Beim Filtern nur die passenden Wegzeichen zeigen; die ausgewählte Position zeigt alle (zum Bearbeiten)
+    var list = p.signs;
+    if (current === layer && filterActive() && !sel) list = list.filter(signMatches);
+    if (!list.length) list = [null];
     var html = '<div class="mk-pin' + (sel ? " sel" : "") + '"><div class="mk-stack">' + list.map(function (s) {
       if (!s) return '<span class="mk-sign mk-none">?</span>';
-      var dim = current === layer && filterActive() && !signMatches(s) ? " mk-dim" : "";
-      return '<span class="mk-sign mk-' + s.state + dim + '"><img alt="" src="' + esc(symUrl(symOf(layer, s.sym))) + '"></span>';
+      return '<span class="mk-sign mk-' + s.state + '"><img alt="" src="' + esc(symUrl(symOf(layer, s.sym))) + '"></span>';
     }).join("") + '</div><span class="mk-tail"></span></div>';
     var h = list.length * 30 + 6 + 8;
     return L.divIcon({ className: "", html: html, iconSize: [36, h], iconAnchor: [18, h] });
@@ -377,6 +387,7 @@
     if (!layer) return;
     opts = opts || {};
     if (current !== layer) { filter = { sym: "", state: "" }; selId = null; pick = null; }
+    if (opts.filterSym !== undefined) filter = { sym: opts.filterSym, state: "" };
     var prev = current;
     current = layer;
     if (prev && prev !== layer) renderMarkers(prev);
@@ -956,14 +967,29 @@
     }
     var sorted = layers.slice().sort(function (a, b) { return a.name.localeCompare(b.name, G.i18n.locale); });
     listEl.innerHTML = head + sorted.map(function (l) {
-      return '<div class="trk-item" data-id="' + esc(l.id) + '">' +
+      var open = !!expanded[l.id];
+      var details = "";
+      if (open) {
+        details = '<div class="mk-details">' + (l.symbols.length ? l.symbols.map(function (sym) {
+          return '<div class="mk-detail" data-act="sym" data-sym="' + esc(sym.id) + '">' +
+            '<span class="mk-sym-box"><img alt="" src="' + esc(symUrl(sym)) + '"></span>' +
+            '<span class="trk-text"><span class="trk-name" data-noi18n>' + esc(sym.name) + "</span>" +
+            '<span class="trk-info">' + esc(symCountText(symCounts(l, sym.id))) + "</span></span></div>";
+        }).join("") : '<p class="trk-empty">Noch keine Wegzeichen hinterlegt.</p>') +
+          '<div class="icon-row mk-detail-btns">' +
+            '<button type="button" class="icon-btn" data-act="rename" title="Umbenennen" aria-label="Umbenennen">' + G.icon("edit") + "</button>" +
+            '<button type="button" class="icon-btn trk-del" data-act="delete" title="Löschen" aria-label="Löschen">' + G.icon("trash") + "</button>" +
+          "</div></div>";
+      }
+      return '<div class="trk-item mk-layer-item" data-id="' + esc(l.id) + '">' +
         '<input type="checkbox" class="mk-vis" data-act="toggle" aria-label="Auf der Karte zeigen" title="Auf der Karte zeigen"' + (l.visible ? " checked" : "") + ">" +
         '<span class="trk-main trk-tap" data-act="open"><span class="trk-text"><span class="trk-name" data-noi18n>' + esc(l.name) + "</span>" +
           '<span class="trk-info">' + esc(summary(l, false)) + "</span></span></span>" +
-        '<span class="trk-actions"><button type="button" class="icon-btn" data-act="more" title="Weitere Aktionen" aria-label="Weitere Aktionen">' + G.icon("more") + "</button></span>" +
-        "</div>";
+        '<span class="trk-actions"><button type="button" class="icon-btn' + (open ? " on" : "") + '" data-act="more" title="Weitere Aktionen" aria-label="Weitere Aktionen">' + G.icon("more") + "</button></span>" +
+        details + "</div>";
     }).join("");
   }
+  var expanded = {};   // Ebenen-id -> Wegzeichen aufgeklappt
 
   function createLayer(then) {
     G.askText("Name der Ebene", "", function (v) {
@@ -988,9 +1014,9 @@
     if (!layer) return;
     var act = actEl.getAttribute("data-act");
     if (act === "open") openLayer(layer.id);
-    else if (act === "more") {
-      G.actionSheet(layer.name, summary(layer, false), [
-        { label: "Umbenennen", onClick: function () {
+    else if (act === "more") { expanded[layer.id] = !expanded[layer.id]; renderPage(); }
+    else if (act === "sym") openLayer(layer.id, { filterSym: actEl.getAttribute("data-sym") });
+    else if (act === "rename") {
           G.askText("Name der Ebene", layer.name, function (v) {
             v = (v || "").trim();
             if (!v) return;
@@ -1004,12 +1030,9 @@
             save(layer);
             renderPage();
           });
-        } },
-        { label: "Löschen", danger: true, onClick: function () {
-          G.actionSheet(T("Ebene „{0}“ löschen?", layer.name), summary(layer, false), [
-            { label: "Löschen", danger: true, onClick: function () { removeLayer(layer); } }
-          ]);
-        } }
+    } else if (act === "delete") {
+      G.actionSheet(T("Ebene „{0}“ löschen?", layer.name), summary(layer, false), [
+        { label: "Löschen", danger: true, onClick: function () { removeLayer(layer); } }
       ]);
     }
   });

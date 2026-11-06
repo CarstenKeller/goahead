@@ -495,7 +495,6 @@ window.GOAHEAD_I18N_EN = {
   "fehlt": "missing",
   "{0} gut": "{0} good",
   "{0} erneuern": "{0} renew",
-  "{0} fehlt": "{0} missing",
   "Markierung fotografieren": "Photograph waymark",
   "Wegzeichen ohne Foto erfassen": "Record waymark without photo",
   "Position löschen": "Delete position",
@@ -546,5 +545,8 @@ window.GOAHEAD_I18N_EN = {
   "Alle Vereine": "All clubs",
   "Alle Kategorien": "All categories",
   "Keine passenden Wegzeichen.": "No matching waymarks.",
-  "Ausschnitt wählen": "Select area"
+  "Ausschnitt wählen": "Select area",
+  "1 fehlt": "1 missing",
+  "{0} fehlen": "{0} missing",
+  "{0} zugeordnet": "{0} assigned"
 };

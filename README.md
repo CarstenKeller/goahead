@@ -114,8 +114,11 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
     einige Meter ungenau).
   - **Karte:** an jeder Position die Wegzeichen untereinander, Rahmen nach Zustand (grün, orange, rot gestrichelt);
     unter Zoomstufe 14 nur farbige Punkte. Die Ebenen stehen auch in der Kartenwahl.
-  - **Filter** nach Wegzeichen und Zustand mit Anzahl der Positionen und Wegzeichen; je hinterlegtem Wegzeichen die
-    Anzahl nach Zustand.
+  - **Filter** nach Wegzeichen und Zustand mit Anzahl der Positionen und Wegzeichen; auf der Karte erscheinen dann nur
+    die passenden Wegzeichen (nicht passende werden ausgeblendet). Je hinterlegtem Wegzeichen die Anzahl nach Zustand.
+  - **Zählung:** „Wegzeichen“ = vorhandene (gut + erneuern), fehlende werden getrennt gezählt („… · 2 fehlen“).
+  - **Seite *Ebenen*, „…“:** klappt die Wegzeichen der Ebene mit Anzahl (zugeordnet, gut, erneuern, fehlen) auf;
+    Antippen öffnet die Ebene gefiltert auf dieses Wegzeichen. Dort auch Umbenennen und Löschen.
   - Gespeichert in IndexedDB (Speicher `marklayers`, Fotos im Speicher `photos`), in der Sicherung enthalten.
   - Noch offen (Schritt 2): automatische Erkennung des Wegzeichens im Foto als Vorschlag.
 - **Fotos unterwegs** (Kamera-Knopf in der Kopfzeile von *Unterwegs*), Modul `photos.js`: Das Foto wird an der

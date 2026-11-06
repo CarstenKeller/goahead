@@ -5,7 +5,7 @@ GoAhead ist, wie es aufgebaut ist und welche Entscheidungen schon getroffen wurd
 Arbeitsregeln stehen in [`CLAUDE.md`](../CLAUDE.md), die Funktionsbeschreibung für Nutzer in [`README.md`](../README.md).
 Bei Widersprüchen gilt: Code > CLAUDE.md > diese Datei. Beim Ändern bitte hier mitpflegen.
 
-Stand: Version 52 (App-Version in `app.js`), November 2026.
+Stand: Version 53 (App-Version in `app.js`), November 2026.
 
 ---
 
@@ -156,6 +156,9 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
 - Version 52: Wegzeichen im Kartenmarker wurden abgeschnitten statt verkleinert – Leaflet setzt für Bilder im
   Marker-Bereich `max-width: none !important` und `width: auto`. Lösung: feste Maße + `object-fit: contain` mit
   stärkerem Selektor (`.leaflet-container .leaflet-marker-pane .mk-sign img`). Bei Marker-Bildern immer beachten.
+- Version 53 (Wunsch des Nutzers): Filter blendet nicht passende Wegzeichen auf der Karte aus (vorher ausgegraut;
+  die ausgewählte Position zeigt weiter alle); fehlende Wegzeichen werden getrennt gezählt – Auslegung: „Wegzeichen“ =
+  gut + erneuern, „fehlen“ extra; „…“ auf der Seite *Ebenen* klappt die Wegzeichen mit Anzahl auf.
 - Schritt 2 (offen): Foto mit den hinterlegten Wegzeichen vergleichen, beste Treffer zuerst anbieten; bestätigte Fotos
   als weitere Vergleichsbilder. Braucht echte Fotos von Markierungen zum Prüfen. Ob ein Vergleich auf dem Gerät
   verwitterte, schräg fotografierte Markierungen zuverlässig erkennt, ist **ungeprüft**.
