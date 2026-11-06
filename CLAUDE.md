@@ -21,7 +21,8 @@ Platz wie möglich:
 - **Keine Erklärtexte zur Bedienung** in der Oberfläche. Angezeigt werden nur Daten (Name, Kennzahlen)
   und knappe Zustände/Warnungen, wenn sonst Daten verloren gehen könnten (z. B. „⚠ Bildschirm anlassen“).
 - **Knöpfe als Symbole mit Tooltip** statt Beschriftung: `class="icon-btn"`, Symbol aus `GOAHEAD.icon(name)`,
-  Beschriftung in `title` **und** `aria-label`. Langer Druck zeigt den Tooltip auf Touch-Geräten (global in app.js).
+  Beschriftung in `title` **und** `aria-label`. Langer Druck zeigt den Tooltip auf Touch-Geräten (global in app.js, sichtbar solange der Finger liegt).
+  Menüknöpfe als `<a role="button">` **ohne** `href` (sonst zeigt Android beim langen Druck die Link-Adresse).
   Textknöpfe nur in Dialogen/Auswahlmenüs.
 - **Wichtigste Aktionen in die Kopfzeile** der Leiste (z. B. Speichern, Beenden), Titel und Kennzahlen links daneben.
   Kopfknöpfe sind schlank und ohne Fläche (Titel braucht mindestens ein Drittel der Breite); die Leiste lässt

@@ -1522,7 +1522,7 @@
     onAdd: function () {
       var box = L.DomUtil.create("div", "leaflet-bar rec-control");
       var btn = L.DomUtil.create("a", "rec-toggle", box);
-      btn.href = "#";
+      btn.tabIndex = 0;   // ohne href: langer Druck zeigt sonst die Link-Adresse an
       btn.setAttribute("role", "button");
       btn.title = "Aufnahme ohne Route starten";
       btn.setAttribute("aria-label", "Aufnahme ohne Route starten");

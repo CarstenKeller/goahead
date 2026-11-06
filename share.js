@@ -259,7 +259,7 @@
     onAdd: function () {
       var box = L.DomUtil.create("div", "leaflet-bar paste-control");
       var btn = L.DomUtil.create("a", "paste-toggle", box);
-      btn.href = "#";
+      btn.tabIndex = 0;   // ohne href: langer Druck zeigt sonst die Link-Adresse an
       btn.setAttribute("role", "button");
       btn.title = "Geteilte Tour oder Stand einfügen";
       btn.setAttribute("aria-label", btn.title);

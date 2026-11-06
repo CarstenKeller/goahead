@@ -1942,7 +1942,7 @@
     onAdd: function () {
       var box = L.DomUtil.create("div", "leaflet-bar plan-control");
       var btn = L.DomUtil.create("a", "plan-toggle", box);
-      btn.href = "#";
+      btn.tabIndex = 0;   // ohne href: langer Druck zeigt sonst die Link-Adresse an
       btn.setAttribute("role", "button");
       btn.title = "Route planen";
       btn.setAttribute("aria-label", "Route planen");

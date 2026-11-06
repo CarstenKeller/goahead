@@ -14,7 +14,8 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   - Im Planungsmodus bleibt im Menü nur die Kartenwahl. Unten erscheint ein kompaktes Feld: Kopfzeile mit Name,
     Kennzahlen (Punkte, Länge, Anstieg; Vorschlag in Orange) und *Beenden*; darunter Symbolknöpfe
     *Speichern*, *Rückgängig*, *Wiederholen*, *S* (zum Startpunkt), *Rundtour* und *Suche*. Das Routing wird in den
-    Einstellungen gewählt; bei BRouter erscheint das Höhenprofil automatisch. Langer Druck auf einen Knopf zeigt seine Beschreibung.
+    Einstellungen gewählt; bei BRouter erscheint das Höhenprofil automatisch. Langer Druck auf einen Knopf zeigt seine Beschreibung – oben mittig wie die
+    Statusmeldung, solange der Finger liegt; beim Loslassen wird der Knopf nicht ausgelöst.
   - **Auf der Karte:**
     - Tipp auf die Karte: Vorschlagspunkt mit vorgeschlagener Strecke (orange, gestrichelt).
       Nochmal auf den Vorschlagspunkt tippen: einrasten.

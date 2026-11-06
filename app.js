@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "41";
+  var APP_VERSION = "42";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {
@@ -333,7 +333,7 @@
     onAdd: function () {
       var box = L.DomUtil.create("div", "leaflet-bar maps-control");
       var btn = L.DomUtil.create("a", "maps-toggle", box);
-      btn.href = "#";
+      btn.tabIndex = 0;   // ohne href: langer Druck zeigt sonst die Link-Adresse an
       btn.setAttribute("role", "button");
       btn.title = "Karten";
       btn.setAttribute("aria-label", "Karten");
@@ -404,7 +404,11 @@
 
   var zoomControl = L.control.zoom({ position: "topleft", zoomInTitle: "Vergrößern", zoomOutTitle: "Verkleinern" });
   function applyZoomButtons() {
-    if (settings.zoomButtons) zoomControl.addTo(map); else zoomControl.remove();
+    if (settings.zoomButtons) {
+      zoomControl.addTo(map);
+      // Leaflet setzt href="#" – ohne href zeigt ein langer Druck keine Link-Adresse
+      zoomControl.getContainer().querySelectorAll("a[href]").forEach(function (a) { a.removeAttribute("href"); a.tabIndex = 0; });
+    } else zoomControl.remove();
   }
   applyZoomButtons();
 
@@ -578,7 +582,7 @@
     onAdd: function () {
       var box = L.DomUtil.create("div", "leaflet-bar settings-control");
       var btn = L.DomUtil.create("a", "settings-toggle", box);
-      btn.href = "#";
+      btn.tabIndex = 0;   // ohne href: langer Druck zeigt sonst die Link-Adresse an
       btn.setAttribute("role", "button");
       btn.title = "Einstellungen";
       btn.setAttribute("aria-label", "Einstellungen");
@@ -1694,59 +1698,69 @@
   }
 
   // ---------- Tooltips per langem Druck (Touch zeigt title-Texte sonst nicht an) ----------
+  // Sichtbar, solange der Finger auf dem Knopf liegt; oben mittig wie die Statusmeldung, bei Knöpfen ganz oben
+  // mit Abstand darunter. Touch-Ereignisse statt Pointer: Android meldet beim langen Druck oft „pointercancel“,
+  // obwohl der Finger noch liegt – „touchend“ kommt dagegen erst beim Loslassen.
   (function () {
     var tip = document.createElement("div");
     tip.className = "tip";
+    tip.setAttribute("role", "tooltip");
     tip.hidden = true;
     document.body.appendChild(tip);
     var timer = null;
-    var shown = false;
+    var shown = false;     // Tooltip dieser Berührung wurde gezeigt → den folgenden Klick verschlucken
+    var shownAt = 0;
     var startX = 0;
     var startY = 0;
     function hide() {
       clearTimeout(timer);
+      timer = null;
       tip.hidden = true;
     }
-    var shownAt = 0;
-    document.addEventListener("pointerdown", function (e) {
-      shown = false;   // neue Berührung: eine alte Sperre darf nie den nächsten Tipp verschlucken
-      if (e.pointerType !== "touch") return;
-      var el = e.target.closest("button[title], a[title]");
-      if (!el) return;
-      startX = e.clientX;
-      startY = e.clientY;
-      clearTimeout(timer);
-      timer = setTimeout(function () {
-        tip.textContent = el.getAttribute("title");
-        tip.hidden = false;
-        var r = el.getBoundingClientRect();
-        var w = tip.offsetWidth;
-        var x = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
-        var y = r.top - tip.offsetHeight - 8;
-        if (y < 8) y = r.bottom + 8;
-        tip.style.left = x + "px";
+    function show(el) {
+      var text = el.getAttribute("title") || el.getAttribute("aria-label");
+      if (!text) return;
+      tip.textContent = text;
+      tip.style.top = "";
+      tip.hidden = false;
+      var r = el.getBoundingClientRect();
+      var t = tip.getBoundingClientRect();
+      if (r.top < t.bottom + 24) {
+        // Knopf liegt oben: Text mit Abstand darunter, notfalls darüber – immer ganz auf dem Bildschirm
+        var y = r.bottom + 24;
+        if (y + t.height > window.innerHeight - 8) y = Math.max(8, r.top - 24 - t.height);
         tip.style.top = y + "px";
-        shown = true;
-        shownAt = Date.now();
-        setTimeout(hide, 1800);
-      }, 450);
-    }, true);
-    document.addEventListener("pointermove", function (e) {
-      if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) clearTimeout(timer);
-    }, true);
-    document.addEventListener("pointerup", function () { clearTimeout(timer); }, true);
-    document.addEventListener("pointercancel", hide, true);
-    // nach angezeigtem Tooltip den Knopf nicht auslösen
+      }
+      shown = true;
+      shownAt = Date.now();
+    }
+    document.addEventListener("touchstart", function (e) {
+      shown = false;   // neue Berührung: eine alte Sperre darf nie den nächsten Tipp verschlucken
+      hide();
+      if (e.touches.length !== 1) return;
+      var el = e.target.closest && e.target.closest("button[title], a[title], [role=button][title]");
+      if (!el) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      timer = setTimeout(function () { timer = null; show(el); }, 450);
+    }, { capture: true, passive: true });
+    document.addEventListener("touchmove", function (e) {
+      if (!timer || !e.touches.length) return;
+      if (Math.abs(e.touches[0].clientX - startX) > 10 || Math.abs(e.touches[0].clientY - startY) > 10) { clearTimeout(timer); timer = null; }
+    }, { capture: true, passive: true });
+    document.addEventListener("touchend", hide, true);
+    document.addEventListener("touchcancel", hide, true);
+    // nach angezeigtem Tooltip den Knopf nicht auslösen (nur den Klick, der direkt zum langen Druck gehört)
     document.addEventListener("click", function (e) {
-      // nur den Klick verschlucken, der direkt zum langen Druck gehört
       if (shown && Date.now() - shownAt < 4000) {
         e.preventDefault();
         e.stopPropagation();
       }
       shown = false;
     }, true);
+    // kein Kontextmenü/keine Vorschau beim langen Druck auf Knöpfe
     document.addEventListener("contextmenu", function (e) {
-      if (e.target.closest("button[title], a[title]")) e.preventDefault();
+      if (e.target.closest && e.target.closest("button[title], a[title], [role=button][title]")) e.preventDefault();
     });
   })();
 
