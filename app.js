@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "33";
+  var APP_VERSION = "34";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {
@@ -379,7 +379,8 @@
     bikeMaxKmh: 32,
     autoEndKmh: 80,      // Unterwegs: ab dieser Spitzengeschwindigkeit (über 20 s) Fahrt erkannt → Tour beenden
     reversePct: 1,       // Unterwegs: Richtung umdrehen, wenn so viel % der Strecke entgegen der Richtung gegangen (0 = aus)
-    listCheck: false     // Erwandert: Knopf „Liste prüfen“ anzeigen
+    listCheck: false,    // Erwandert: Knopf „Liste prüfen“ anzeigen
+    loopPrefer: "longer" // Rundtour nach Länge: passt die Länge nicht, die nächstlängere ("longer") oder -kürzere ("shorter")
   };
   var settings = JSON.parse(JSON.stringify(SETTING_DEFAULTS));
   try {
@@ -400,10 +401,10 @@
   }
   applyZoomButtons();
 
-  // Einstellungen als untere Leiste (ziehbar, Inhalt scrollt) – Knopf in der Menüleiste öffnet sie
+  // Einstellungen als eigene Seite (wie „Tracks“), nach Bereichen geordnet – Knopf in der Menüleiste öffnet sie
   var settingsSheet = document.createElement("section");
   settingsSheet.id = "settings-panel";
-  settingsSheet.className = "sheet";
+  settingsSheet.className = "page settings-page";
   settingsSheet.hidden = true;
   settingsSheet.setAttribute("aria-label", "Einstellungen");
   (function buildSettingsSheet() {
@@ -415,44 +416,47 @@
       return '<label class="settings-num"><span>' + label + '</span><select data-select="' + key + '">' +
         options.map(function (o) { return '<option value="' + o[0] + '">' + o[1] + "</option>"; }).join("") + "</select></label>";
     }
+    function group(title, html) { return '<div class="settings-sub">' + title + '</div><div class="settings-group">' + html + "</div>"; }
     settingsSheet.innerHTML =
-      '<div class="settings-head sheet-handle">' +
-        '<span class="sheet-grip" aria-hidden="true"></span>' +
-        '<span class="sheet-titles"><span class="settings-title">Einstellungen</span></span>' +
-        '<span class="sheet-head-btns"><button type="button" class="icon-btn settings-close" title="Schließen" aria-label="Schließen">' +
-          icon("close") + "</button></span>" +
-      "</div>" +
-      '<div class="sheet-body">' +
-        '<label class="settings-row"><input type="checkbox" data-setting="zoomButtons"> Zoom-Knöpfe (+/−) anzeigen</label>' +
-        '<div class="settings-sub">Planen</div>' +
-        selectRow("routing", "Routing", [["brouter", "BRouter (Wandern, mit Höhen)"], ["osrm", "OSRM (Fußweg)"]]) +
-        '<div class="settings-sub">Gehgeschwindigkeit (für die Dauer)</div>' +
-        numRow("speedFlat", "Ebene", "km/h", 0.5, 10, 0.1) +
-        numRow("speedUp", "Steigung", "km/h", 0.5, 10, 0.1) +
-        numRow("speedDown", "Gefälle", "km/h", 0.5, 10, 0.1) +
-        numRow("slopePercent", "Steigung/Gefälle ab", "%", 1, 30, 1) +
-        '<div class="settings-sub">Unterwegs</div>' +
-        numRow("offlineKm", "Karten offline um die Route", "km", 0.2, 5, 0.1) +
-        numRow("turnWarnM", "Vibration vor Abbiegung", "m", 5, 200, 5) +
-        numRow("autoEndKmh", "Automatisch beenden ab", "km/h", 30, 250, 5) +
-        numRow("reversePct", "Richtung umdrehen nach", "% der Strecke", 0, 20, 0.5) +
-        '<div class="settings-sub">Art der Tour (Ø in Bewegung)</div>' +
-        numRow("walkMaxKmh", "Wandern bis", "km/h", 2, 15, 0.5) +
-        numRow("runMaxKmh", "Laufen bis", "km/h", 4, 30, 0.5) +
-        numRow("bikeMaxKmh", "Rad bis", "km/h", 8, 80, 1) +
-        '<div class="settings-sub">Karte</div>' +
-        '<label class="settings-num"><span>Wegemarkierungen</span><input type="range" class="settings-scale" min="1" max="3" step="0.25" aria-label="Größe der Wegemarkierungen">' +
-          '<output class="settings-unit settings-scale-out"></output></label>' +
-        '<div class="settings-sub">Daten</div>' +
-        '<label class="settings-row"><input type="checkbox" data-setting="listCheck"> Listenprüfung (Erwandert)</label>' +
-        '<div class="settings-act"><span>Sicherung</span><span class="icon-row">' +
-          '<button type="button" class="icon-btn settings-backup" title="Sichern (alle Touren, Routen, Tracks, Einstellungen)" aria-label="Sichern">' + icon("download") + "</button>" +
-          '<button type="button" class="icon-btn settings-restore" title="Wiederherstellen" aria-label="Wiederherstellen">' + icon("upload") + "</button>" +
-        "</span></div>" +
-        (NATIVE ? '<div class="settings-sub">Android-App</div>' +
+      '<header class="page-head">' +
+        '<button type="button" class="page-back settings-close" aria-label="Zurück zur Karte" title="Zurück zur Karte">' +
+          '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        "</button>" +
+        "<h1>Einstellungen</h1>" +
+      "</header>" +
+      '<div class="page-body settings-body">' +
+        group("Karte",
+          '<label class="settings-row"><input type="checkbox" data-setting="zoomButtons"> Zoom-Knöpfe (+/−) anzeigen</label>' +
+          '<label class="settings-num"><span>Wegemarkierungen</span><input type="range" class="settings-scale" min="1" max="3" step="0.25" aria-label="Größe der Wegemarkierungen">' +
+            '<output class="settings-unit settings-scale-out"></output></label>') +
+        group("Planen",
+          selectRow("routing", "Routing", [["brouter", "BRouter (Wandern, mit Höhen)"], ["osrm", "OSRM (Fußweg)"]]) +
+          selectRow("loopPrefer", "Rundtour, wenn die Länge nicht passt", [["longer", "nächstlängere"], ["shorter", "nächstkürzere"]]) +
+          '<div class="settings-mini">Gehgeschwindigkeit (für die Dauer)</div>' +
+          numRow("speedFlat", "Ebene", "km/h", 0.5, 10, 0.1) +
+          numRow("speedUp", "Steigung", "km/h", 0.5, 10, 0.1) +
+          numRow("speedDown", "Gefälle", "km/h", 0.5, 10, 0.1) +
+          numRow("slopePercent", "Steigung/Gefälle ab", "%", 1, 30, 1)) +
+        group("Unterwegs",
+          numRow("offlineKm", "Karten offline um die Route", "km", 0.2, 5, 0.1) +
+          numRow("turnWarnM", "Vibration vor Abbiegung", "m", 5, 200, 5) +
+          numRow("reversePct", "Richtung umdrehen nach (Anteil der Strecke)", "%", 0, 20, 0.5) +
+          numRow("autoEndKmh", "Automatisch beenden ab", "km/h", 30, 250, 5)) +
+        group("Touren",
+          '<div class="settings-mini">Art der Tour (Ø in Bewegung)</div>' +
+          numRow("walkMaxKmh", "Wandern bis", "km/h", 2, 15, 0.5) +
+          numRow("runMaxKmh", "Laufen bis", "km/h", 4, 30, 0.5) +
+          numRow("bikeMaxKmh", "Rad bis", "km/h", 8, 80, 1) +
+          '<label class="settings-row"><input type="checkbox" data-setting="listCheck"> Listenprüfung (Erwandert)</label>') +
+        group("Daten",
+          '<div class="settings-act"><span>Sicherung</span><span class="icon-row">' +
+            '<button type="button" class="icon-btn settings-backup" title="Sichern (alle Touren, Routen, Tracks, Einstellungen)" aria-label="Sichern">' + icon("download") + "</button>" +
+            '<button type="button" class="icon-btn settings-restore" title="Wiederherstellen" aria-label="Wiederherstellen">' + icon("upload") + "</button>" +
+          "</span></div>") +
+        (NATIVE ? group("Android-App",
           '<div class="settings-act"><span class="settings-battery"></span><span class="icon-row">' +
             '<button type="button" class="icon-btn settings-battery-btn" title="Akku-Einstellungen" aria-label="Akku-Einstellungen">' + icon("battery") + "</button>" +
-          "</span></div>" : "") +
+          "</span></div>") : "") +
         '<p class="settings-note">App-Version ' + APP_VERSION + (NATIVE ? " · Android-App " + escapeHtml(nativeCall("appVersion") || "?") : "") +
           ' · <a href="?diagnose">Diagnose</a></p>' +
       "</div>";
@@ -517,7 +521,6 @@
     });
     var batBtn = settingsSheet.querySelector(".settings-battery-btn");
     if (batBtn) batBtn.addEventListener("click", batteryDialog);
-    makeResizable(settingsSheet, settingsSheet.querySelector(".settings-head"), "goahead.settingsHeight.v1");
   })();
 
   function openSettings() {
@@ -1799,6 +1802,53 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   }
 
+  // ---------- Richtungspfeile entlang einer Linie ----------
+  // Kleine Pfeile im festen Bildschirmabstand (ARROW_PX), beim Zoomen neu verteilt. Nicht antippbar.
+  var ARROW_PX = 110;
+  var ArrowLayer = L.Layer.extend({
+    initialize: function (latlngs) {
+      this._ll = latlngs;
+      this._g = L.layerGroup();
+    },
+    onAdd: function (m) {
+      this._g.addTo(m);
+      m.on("zoomend", this._draw, this);
+      this._draw();
+    },
+    onRemove: function (m) {
+      m.off("zoomend", this._draw, this);
+      m.removeLayer(this._g);
+    },
+    _draw: function () {
+      var m = this._map;
+      if (!m) return;
+      this._g.clearLayers();
+      var z = m.getZoom();
+      var pts = this._ll.map(function (p) { return m.project(L.latLng(p[0], p[1]), z); });
+      var next = ARROW_PX / 2, acc = 0, count = 0;
+      for (var i = 1; i < pts.length && count < 500; i++) {
+        var a = pts[i - 1], b = pts[i];
+        var d = a.distanceTo(b);
+        while (d > 0 && acc + d >= next && count < 500) {
+          var t = (next - acc) / d;
+          var pos = m.unproject(L.point(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t), z);
+          var ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+          L.marker(pos, {
+            icon: L.divIcon({ className: "", iconSize: [16, 16], iconAnchor: [8, 8],
+              html: '<div class="dir-arrow" style="transform:rotate(' + ang.toFixed(0) + 'deg)">' +
+                '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M5 3l6 5-6 5"/></svg></div>' }),
+            interactive: false,
+            keyboard: false
+          }).addTo(this._g);
+          next += ARROW_PX;
+          count++;
+        }
+        acc += d;
+      }
+    }
+  });
+  function directionArrows(latlngs) { return new ArrowLayer(latlngs || []); }
+
   // ---------- Schnittstelle für weitere Module (z. B. tracks.js) ----------
 
   window.GOAHEAD = {
@@ -1828,6 +1878,7 @@
     onSettingsChange: function (fn) { settingsListeners.push(fn); },
     shareGpx: shareGpx,
     icon: icon,
+    directionArrows: directionArrows,
     version: APP_VERSION,
     // Android-App (sonst null): native.call("methode", …), native.batteryOptimized(), native.batteryDialog()
     native: NATIVE ? { call: nativeCall, batteryOptimized: batteryOptimized, batteryDialog: batteryDialog } : null

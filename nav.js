@@ -212,6 +212,7 @@
     if (!walk || !walk.planLine || walk.planLine.length < 2) return;
     L.polyline(walk.planLine, { color: "#ffffff", weight: 9, opacity: 0.8, interactive: false }).addTo(planLayer);
     L.polyline(walk.planLine, { color: COLOR_PLAN, weight: 5, opacity: 0.75, interactive: false }).addTo(planLayer);
+    if (G.directionArrows) G.directionArrows(walk.planLine).addTo(planLayer);
     var s = walk.planLine[0];
     L.circleMarker(s, { radius: 7, color: "#ffffff", weight: 2, fillColor: "#2f9e44", fillOpacity: 1, interactive: false }).addTo(planLayer);
   }

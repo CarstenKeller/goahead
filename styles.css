@@ -41,6 +41,8 @@
   --glass-strong: rgba(255, 255, 255, 0.86);
   --glass-dark: rgba(28, 31, 35, 0.72);
   --glass-sheet: rgba(222, 240, 222, 0.62);   /* untere Leisten: leicht grünlich, durchscheinend */
+  --c-card: rgba(255, 255, 255, 0.8);          /* Karten auf Seiten (z. B. Einstellungen) */
+  --c-arrow: #ffffff;                          /* Richtungspfeile auf geplanten Strecken */
   --glass-border: rgba(255, 255, 255, 0.55);
   --glass-blur: blur(18px) saturate(170%);
   --btn-soft: rgba(0, 0, 0, 0.06);
@@ -1124,12 +1126,40 @@ button {
   color: var(--c-blue);
 }
 
-/* Einstellungen als untere Leiste */
+/* Einstellungen als eigene Seite, Bereiche als Karten */
 #settings-panel {
-  z-index: var(--z-settings);
+  z-index: var(--z-page);
 }
-#settings-panel .sheet-body {
-  padding-bottom: 20px;
+.settings-body .settings-sub {
+  margin: 16px 4px 6px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.settings-group {
+  background: var(--c-card);
+  border-radius: var(--r-md);
+  padding: 6px 12px;
+}
+.settings-mini {
+  margin: 8px 0 2px;
+  font-size: 13px;
+  color: var(--c-muted);
+}
+.settings-group .settings-num + .settings-num,
+.settings-group .settings-row {
+  border-top: 1px solid var(--c-line);
+}
+.settings-group > :first-child {
+  border-top: none;
+}
+.page select {
+  border: 1px solid var(--c-line);
+  border-radius: 8px;
+  background: var(--c-card);
+  padding: 6px 8px;
+  font-size: 14px;
+  color: var(--c-text);
 }
 .settings-num select {
   max-width: 55%;
@@ -1396,9 +1426,32 @@ button {
 .settings-scale {
   flex: 1;
 }
+.settings-unit {
+  white-space: nowrap;
+}
+.settings-scale-out {
+  width: 48px;
+  text-align: right;
+}
 /* Listenkopf: Filter und Lupe in einer Zeile */
 .list-kind,
 .list-year {
   flex: 1 1 0;
   min-width: 0;
+}
+
+/* Richtungspfeile auf geplanten Strecken (G.directionArrows) */
+.dir-arrow {
+  width: 16px;
+  height: 16px;
+  color: var(--c-arrow);
+  pointer-events: none;
+}
+.dir-arrow svg {
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }

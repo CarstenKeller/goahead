@@ -32,8 +32,9 @@ Platz wie möglich:
   (z. B. Vorschlagspunkt erneut antippen = übernehmen; Strecke antippen = Zwischenpunkt; Doppeltipp = Modus wechseln).
   Keinen Knopf für etwas, das auf der Karte direkt geht.
 - Selten gebrauchte Eingaben (z. B. Suche) erst auf Knopfdruck einblenden.
-- **Einstellungen und ähnliche Formulare** sind ebenfalls eine ziehbare `.sheet` mit scrollendem Inhalt –
-  keine Klappfelder in der Menüleiste, die über den Bildschirmrand hinausragen.
+- **Einstellungen** sind eine eigene Seite (`.page`, wie *Tracks*), nach Bereichen gruppiert (`.settings-group`:
+  Karte, Planen, Unterwegs, Touren, Daten, App). Neue Einstellungen in den passenden Bereich. Kurze Auswahlen
+  (z. B. Kartenwahl) sind eine ziehbare `.sheet` – keine Klappfelder in der Menüleiste.
 - Globale Ereignis-Abfangungen (z. B. Klick nach Tooltip verschlucken) dürfen nie einen späteren,
   unabhängigen Tipp blockieren: Zustand bei jeder neuen Berührung zurücksetzen.
 - Das `hidden`-Attribut blendet immer aus (globale Regel `[hidden] { display: none !important }`) –
