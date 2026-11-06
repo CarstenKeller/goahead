@@ -86,7 +86,7 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   sieht Karte, Route, eigene Position, km gewandert/verbleibend, Restzeit, Ankunft und Höhenprofil.
   - *Geplant → „Für Begleitung teilen“* schickt einen Text mit GoAhead-Link (Route vereinfacht auf 5 m, gepackt).
   - Empfang: Link antippen, oder – in der Web-App auf dem Home-Bildschirm des iPhones, die einen eigenen Speicher
-    hat (Kenntnisstand, ungeprüft) – Nachricht kopieren und im Menü bzw. beim Begleiten „Einfügen“ tippen. Die Tour
+    hat (Kenntnisstand, ungeprüft) – Nachricht kopieren und unter *Tracks → Geplant* (Knopf „Einfügen“ im Listenkopf) bzw. beim Begleiten „Einfügen“ tippen. Die Tour
     landet unter *Geplant*, dann „Begleiten“ (auch über das Menü einer geplanten Tour).
   - *Unterwegs → „Stand teilen“* (Knopf neben „S“) schickt den aktuellen Stand: Route (auch umgedreht), Start, km,
     Zeit in Bewegung und die gelaufene Spur. Beim Begleiten „Einfügen“ übernimmt ihn; danach zählt GoAhead die Strecke

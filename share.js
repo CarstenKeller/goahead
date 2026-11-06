@@ -254,22 +254,7 @@
   window.addEventListener("hashchange", fromHash);
   fromHash();
 
-  // Menü: „Einfügen“
-  var PasteControl = L.Control.extend({
-    onAdd: function () {
-      var box = L.DomUtil.create("div", "leaflet-bar paste-control");
-      var btn = L.DomUtil.create("a", "paste-toggle", box);
-      btn.tabIndex = 0;   // ohne href: langer Druck zeigt sonst die Link-Adresse an
-      btn.setAttribute("role", "button");
-      btn.title = "Geteilte Tour oder Stand einfügen";
-      btn.setAttribute("aria-label", btn.title);
-      btn.innerHTML = G.icon("paste");
-      L.DomEvent.on(btn, "click", function (e) { L.DomEvent.preventDefault(e); if (G.closeMenu) G.closeMenu(); paste(); });
-      L.DomEvent.disableClickPropagation(box);
-      return box;
-    }
-  });
-  if (G.addToToolbar) G.addToToolbar(new PasteControl());
+  // „Einfügen“: Knopf im Kopf der Liste Tracks → Geplant (planner.js ruft G.share.paste auf)
 
   G.share = { tour: tour, stand: stand, paste: paste, receive: receive, _encode: encode, _decode: decode, _pack: pack, _unpack: unpack };
 })();

@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "42";
+  var APP_VERSION = "43";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {
@@ -1725,7 +1725,9 @@
       tip.hidden = false;
       var r = el.getBoundingClientRect();
       var t = tip.getBoundingClientRect();
-      if (r.top < t.bottom + 24) {
+      // nur ausweichen, wenn der Text den Knopf sonst (fast) berühren würde – auch seitlich
+      var near = r.top < t.bottom + 24 && r.left < t.right + 16 && r.right > t.left - 16;
+      if (near) {
         // Knopf liegt oben: Text mit Abstand darunter, notfalls darüber – immer ganz auf dem Bildschirm
         var y = r.bottom + 24;
         if (y + t.height > window.innerHeight - 8) y = Math.max(8, r.top - 24 - t.height);

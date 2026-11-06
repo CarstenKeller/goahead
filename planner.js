@@ -1627,15 +1627,20 @@
   function renderRoutesList() {
     var box = G.tracksPanel && G.tracksPanel("planned");
     if (!box) return;
+    // Knopf „Geteilte Tour einfügen“ (share.js) im Listenkopf – auch bei leerer Liste
+    var pasteBtn = '<button type="button" class="icon-btn plan-paste" title="Geteilte Tour oder Stand einfügen" ' +
+      'aria-label="Geteilte Tour oder Stand einfügen">' + G.icon("paste") + "</button>";
     if (!savedRoutes.length) {
-      box.innerHTML = '<p class="trk-empty">Noch keine geplanten Routen.</p>';
+      box.innerHTML = '<div class="list-head"><span class="list-sum"></span>' + pasteBtn + "</div>" +
+        '<p class="trk-empty">Noch keine geplanten Routen.</p>';
       return;
     }
     var hd = G.listTools ? G.listTools.head("routes", savedRoutes, {
       yearOf: function (r) { return new Date(r.createdAt || r.updatedAt).getFullYear(); },
       metersOf: function (r) { return (r.stats && r.stats.length) || 0; },
-      nameOf: function (r) { return r.name; }
-    }) : { html: "", items: savedRoutes };
+      nameOf: function (r) { return r.name; },
+      tools: pasteBtn
+    }) : { html: pasteBtn, items: savedRoutes };
     box.innerHTML = hd.html + hd.items.map(function (r) {
       var info = [statsText(routeStats(r))];
       info.push(T("{0} Punkte", r.points.length));
@@ -1806,6 +1811,7 @@
     var box = G.tracksPanel && G.tracksPanel("planned");
     if (!box) return;
     box.addEventListener("click", function (e) {
+      if (e.target.closest(".plan-paste")) { if (G.share) G.share.paste(); return; }
       var item = e.target.closest(".trk-item");
       if (!item) return;
       var rec = findRoute(item.getAttribute("data-id"));
