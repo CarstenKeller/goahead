@@ -1375,13 +1375,31 @@
   el.start.addEventListener("click", function () {
     if (plan.points.length) goTo(plan.points[0]);
   });
+  // Beenden: Gespeichertes ohne Änderungen → Planung leeren (die Route liegt unter „Geplant“), sonst nachfragen.
+  // „Verwerfen“ löscht den Entwurf wirklich – „Route planen“ beginnt danach leer.
   panel.querySelector(".plan-exit").addEventListener("click", function () {
-    if (!(plan.dirty && plan.points.length)) { stop(); return; }
-    G.actionSheet("Planung beenden?", "Die Änderungen sind noch nicht gespeichert. Der Entwurf bleibt erhalten und lässt sich später fortsetzen.", [
-      { label: "Speichern und beenden", primary: true, onClick: function () { saveRoute(stop); } },
-      { label: "Beenden ohne Speichern", onClick: stop }
+    if (!(plan.dirty && plan.points.length)) { clearPlan(); stop(); return; }
+    G.actionSheet("Planung beenden?", plan.savedId ? "Die Änderungen sind noch nicht gespeichert. Die gespeicherte Route bleibt unverändert."
+      : "Die Route ist noch nicht gespeichert.", [
+      { label: "Speichern und beenden", primary: true, onClick: function () { saveRoute(function () { clearPlan(); stop(); }); } },
+      { label: "Später weiterplanen", onClick: stop },
+      { label: "Verwerfen", danger: true, onClick: function () { clearPlan(); stop(); } }
     ]);
   });
+
+  // leere Planung (Profil bleibt); der verworfene Stand ist danach auch nicht mehr über „Rückgängig“ erreichbar
+  function clearPlan() {
+    var profile = plan.profile;
+    plan = newPlanState();
+    plan.profile = profile;
+    candidate = null;
+    selected = null;
+    armed = false;
+    fresh = null;
+    routeVersion++;
+    resetHistory();
+    savePlan();
+  }
 
   function renderPanel() {
     var n = plan.points.length;

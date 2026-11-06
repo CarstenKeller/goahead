@@ -157,6 +157,9 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
 - **Ende abschneiden** (Menü einer erwanderten Tour, „✂“): Schieberegler für den neuen Endpunkt oder die Linie auf der
   Karte antippen; vorgeschlagen ist der erkannte Einstieg ins Fahrzeug. Der abgeschnittene Teil wird grau gestrichelt
   gezeigt; „Kürzen“ speichert (Strecke, Zeit in Bewegung, Anstieg, Ende werden neu berechnet).
+- **Planung beenden** (× im Planungsfeld): ohne ungespeicherte Änderungen wird das Feld geleert. Sonst Auswahl
+  *Speichern und beenden*, *Später weiterplanen* (Entwurf bleibt, „Route planen“ setzt ihn fort) oder *Verwerfen*
+  (Entwurf gelöscht; eine schon gespeicherte Route bleibt unverändert).
 - **Untere Leisten ziehen:** Planungsfeld und Unterwegs-Feld lassen sich am Griff oben größer oder kleiner ziehen
   (Höhe wird gespeichert). Alle unteren Leisten legen sich über Positions-Knopf, Maßstab und Quellenangabe,
   ohne sie zu verschieben.
