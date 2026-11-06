@@ -5,7 +5,7 @@ GoAhead ist, wie es aufgebaut ist und welche Entscheidungen schon getroffen wurd
 Arbeitsregeln stehen in [`CLAUDE.md`](../CLAUDE.md), die Funktionsbeschreibung für Nutzer in [`README.md`](../README.md).
 Bei Widersprüchen gilt: Code > CLAUDE.md > diese Datei. Beim Ändern bitte hier mitpflegen.
 
-Stand: Version 57 (App-Version in `app.js`), November 2026.
+Stand: Version 58 (App-Version in `app.js`), November 2026.
 
 ---
 
@@ -42,7 +42,8 @@ Stand: Version 57 (App-Version in `app.js`), November 2026.
 - **Bedienung auf der Karte vor Knöpfen** (antippen, erneut antippen, ziehen).
 - **Dialoge** nur über `G.actionSheet` / `G.askText` – nie `alert/confirm/prompt` (zeigen die Web-Adresse).
   Meldungen für Wanderer formuliert: keine HTTP-Codes, Fehlertexte oder Technikbegriffe.
-- **Design:** „Glas“ (leicht transparent), untere Leisten leicht grünlich; Farben nur über CSS-Variablen.
+- **Design:** „Glas“ (leicht transparent), untere Leisten leicht grünlich; Vollbildseiten (`.page`) durchscheinend
+  (`--glass-page`, schwache Unschärfe `--glass-page-blur`), damit die Karte durchschimmert; Farben nur über CSS-Variablen.
 - **Hell/Dunkel** über `:root[data-theme="dark"]`; Kontrast ≥ 4,5 : 1; Symbole ohne feste Farben.
 - **Einstellungen** sind eine eigene Seite, Bereich **App (Sprache, Darstellung) immer ganz oben**.
 - **Sprache:** Deutsch ist Ausgangssprache, Englisch über Wörterbuch (`i18n-en.js`).

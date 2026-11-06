@@ -45,6 +45,8 @@
   --c-arrow: #ffffff;                          /* Richtungspfeile auf geplanten Strecken */
   --glass-border: rgba(255, 255, 255, 0.55);
   --glass-blur: blur(18px) saturate(170%);
+  --glass-page: rgba(255, 255, 255, 0.6);      /* Vollbildseiten (Tracks, Ebenen, Einstellungen): Karte schimmert durch */
+  --glass-page-blur: blur(6px) saturate(140%);
   --btn-soft: rgba(0, 0, 0, 0.06);
   --btn-soft-hover: rgba(0, 0, 0, 0.1);
   --c-bg: #e8e8e8;                             /* hinter der Karte */
@@ -133,6 +135,7 @@
      farbige Symbolteile heller; Flächen mit weißer Schrift bleiben dunkelgrün (Kontrast ≥ 4,5 : 1) */
   --glass: rgba(38, 42, 47, 0.92);
   --glass-strong: rgba(38, 42, 47, 0.96);
+  --glass-page: rgba(30, 34, 38, 0.72);
   --glass-border: rgba(255, 255, 255, 0.18);
   --c-accent-fill: #2e7d32;
   --c-icon-blue: #74b5ff;
@@ -155,6 +158,7 @@
   :root {
     --glass: rgba(255, 255, 255, 0.94);
     --glass-strong: rgba(255, 255, 255, 0.97);
+    --glass-page: rgba(255, 255, 255, 0.95);
     --glass-dark: rgba(28, 31, 35, 0.92);
     --glass-sheet: rgba(228, 243, 228, 0.95);
   }
@@ -163,6 +167,7 @@
   :root[data-theme="dark"] {
     --glass: rgba(32, 36, 40, 0.95);
     --glass-strong: rgba(32, 36, 40, 0.98);
+    --glass-page: rgba(32, 36, 40, 0.96);
     --glass-sheet: rgba(26, 40, 29, 0.96);
   }
 }
@@ -854,7 +859,10 @@ a[role="button"] {
   position: absolute;
   inset: 0;
   z-index: var(--z-page);
-  background: var(--glass-strong);
+  /* leicht durchscheinend: die Karte bleibt erkennbar (schwächere Unschärfe als bei den Leisten) */
+  background: var(--glass-page);
+  -webkit-backdrop-filter: var(--glass-page-blur);
+  backdrop-filter: var(--glass-page-blur);
   color: var(--c-text);
   display: flex;
   flex-direction: column;
