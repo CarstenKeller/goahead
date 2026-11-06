@@ -589,7 +589,7 @@
       im.src = url;
     });
   }
-  // Verzeichnis Wegenummer (TFIS „schluessel“, z. B. „01-0A0-00“) → {s: [Signaturnummern], n: Name};
+  // Verzeichnis Wegenummer (TFIS „schluessel“, z. B. „01-0A0-00“) → {k: Schreibweise, s: [Signaturnummern], n: Name};
   // erzeugt im Pages-Workflow aus dem TFIS-GeoPackage (.github/scripts/tfis_index.py)
   var keyIndex = null;
   function loadKeyIndex() {
@@ -614,7 +614,8 @@
       if (/^\d+$/.test(code)) { addTfisTo(layer, code, rest); return; }
       var key = code.toUpperCase();
       loadKeyIndex().then(function (idx) {
-        var e = idx && idx[key];
+        // Verzeichnis ist ohne Bindestriche/Leerzeichen geschlüsselt (tfis_index.py, norm)
+        var e = idx && idx[key.replace(/[^0-9A-Z]/g, "")];
         if (!e || !e.s || !e.s.length) { G.showStatus(T("Zur Wegenummer {0} ist kein Wegzeichen bekannt.", key), 6000); return; }
         var name = rest || e.n || "";
         if (e.s.length === 1) { addTfisTo(layer, e.s[0], name, key); return; }

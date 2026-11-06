@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "47";
+  var APP_VERSION = "48";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {

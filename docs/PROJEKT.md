@@ -5,7 +5,7 @@ GoAhead ist, wie es aufgebaut ist und welche Entscheidungen schon getroffen wurd
 Arbeitsregeln stehen in [`CLAUDE.md`](../CLAUDE.md), die Funktionsbeschreibung für Nutzer in [`README.md`](../README.md).
 Bei Widersprüchen gilt: Code > CLAUDE.md > diese Datei. Beim Ändern bitte hier mitpflegen.
 
-Stand: Version 47 (App-Version in `app.js`), November 2026.
+Stand: Version 48 (App-Version in `app.js`), November 2026.
 
 ---
 
@@ -140,8 +140,9 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
   Zustand per Tipp auf das Wegzeichen; Position verschiebbar; Filter nach Wegzeichen/Zustand mit Anzahl;
   TFIS-Wegzeichen per Signaturnummer oder aus dem Infofenster (*+*).
 - Version 47: auch per **Wegenummer** (TFIS `schluessel`, z. B. `01-0A0-00` – so kennt der Nutzer seine Wege).
-  Verzeichnis `symbols/tfis/index.json` entsteht im Pages-Workflow aus dem GeoPackage; Spalten werden per Name
-  gesucht (`schluessel`, `signaturnummer`, `name`), der gefundene Aufbau steht im Protokoll des Laufs.
+  Verzeichnis `symbols/tfis/index.json` entsteht im Pages-Workflow aus dem GeoPackage
+  (`Freizeitdaten_NRW_GeoPackage.gpkg`, Tabelle `wanderwege`, Spalten `scl`/`snr`/`nam` – per Protokoll belegt;
+  die WMS-Feldnamen `schluessel`/`signaturnummer` gibt es dort nicht). Vergleich ohne Bindestriche/Leerzeichen.
 - Schritt 2 (offen): Foto mit den hinterlegten Wegzeichen vergleichen, beste Treffer zuerst anbieten; bestätigte Fotos
   als weitere Vergleichsbilder. Braucht echte Fotos von Markierungen zum Prüfen. Ob ein Vergleich auf dem Gerät
   verwitterte, schräg fotografierte Markierungen zuverlässig erkennt, ist **ungeprüft**.
