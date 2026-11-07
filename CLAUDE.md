@@ -7,6 +7,8 @@ schon einmal falsch gemacht wurde.
 
 **Vor jeder Erweiterung `docs/PROJEKT.md` lesen** (Projektstand, Nutzer, getroffene Entscheidungen, offene Punkte)
 und nach der Änderung dort mitpflegen.
+Für Fragen zu **Veröffentlichung und Vermarktung** (Lizenzen, Dienste Dritter, Datenschutz, Stores, Marke):
+`docs/VEROEFFENTLICHUNG.md` – bei neuen Diensten, Berechtigungen oder Datenflüssen dort mitpflegen.
 
 ## Sprache und Haltung
 

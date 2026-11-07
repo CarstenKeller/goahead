@@ -377,6 +377,7 @@ Einmalig nötig: unter *Settings → Pages → Build and deployment → Source* 
 
 - `CLAUDE.md`: Arbeitsregeln für Änderungen (UI-Grundregeln, Versionen, Speicher, Tests)
 - `docs/PROJEKT.md`: Projektstand, Entscheidungen und Arbeitsweise (Einstieg für Weiterentwicklung)
+- `docs/VEROEFFENTLICHUNG.md`: Grundlagen für Veröffentlichung und Vermarktung (Lizenzen, Dienste Dritter, Datenschutz, offene Punkte)
 - `index.html`, `styles.css`, `app.js`: die App
 - `i18n.js`, `i18n-en.js`: Sprache (Deutsch/Englisch, Wörterbuch) und Darstellung (hell/dunkel), werden zuerst geladen
 - `tracks.js`: Seite *Tracks*, GPX-Import, lokale Speicherung, Track-Liste

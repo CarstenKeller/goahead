@@ -2,7 +2,9 @@
 
 Diese Datei ist der Einstieg für jede Weiterentwicklung (auch in einem neuen Chat). Sie fasst zusammen, **was
 GoAhead ist, wie es aufgebaut ist und welche Entscheidungen schon getroffen wurden – und warum**. Die verbindlichen
-Arbeitsregeln stehen in [`CLAUDE.md`](../CLAUDE.md), die Funktionsbeschreibung für Nutzer in [`README.md`](../README.md).
+Arbeitsregeln stehen in [`CLAUDE.md`](../CLAUDE.md), die Funktionsbeschreibung für Nutzer in [`README.md`](../README.md),
+Grundlagen für Veröffentlichung und Vermarktung (Lizenzen, Dienste, Datenschutz, offene Punkte) in
+[`VEROEFFENTLICHUNG.md`](VEROEFFENTLICHUNG.md) – Vermarktung bespricht der Nutzer in einem eigenen Chat.
 Bei Widersprüchen gilt: Code > CLAUDE.md > diese Datei. Beim Ändern bitte hier mitpflegen.
 
 Stand: Version 60 (App-Version in `app.js`), November 2026.
