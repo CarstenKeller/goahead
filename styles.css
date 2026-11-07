@@ -1741,13 +1741,7 @@ a[role="button"] {
   flex: 1 1 0;
   min-width: 0;
 }
-/* Hinterlegte Wegzeichen */
-.mk-syms .trk-item {
-  padding: 6px 8px;
-}
-.mk-syms .trk-item.on {
-  border: 2px solid var(--c-accent);
-}
+/* Hinterlegte Wegzeichen (Seite „Ebenen“) */
 .mk-sym-box {
   width: 40px;
   height: 40px;
@@ -1762,9 +1756,6 @@ a[role="button"] {
 .mk-sym-box img {
   max-width: 100%;
   max-height: 100%;
-}
-.sheet .mk-syms .trk-actions .icon-btn {
-  background: transparent;
 }
 /* Infofenster: Wegzeichen übernehmen */
 .sheet .fi-add {
@@ -1821,14 +1812,29 @@ a[role="button"] {
 .mk-detail {
   display: flex;
   align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+.mk-detail-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
   gap: 10px;
-  padding: 6px 0;
   cursor: pointer;
 }
-.mk-detail-btns {
-  justify-content: flex-end;
+.page .mk-detail > .icon-btn {
+  background: transparent;
 }
-.page .mk-detail-btns .icon-btn {
+.mk-detail-btns {
+  align-items: center;
+  margin-top: 4px;
+}
+.mk-detail-gap {
+  flex: 1;
+}
+.page .mk-detail-btns [data-act="rename"],
+.page .mk-detail-btns [data-act="delete"] {
   background: transparent;
 }
 .page .mk-detail-btns .trk-del {

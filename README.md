@@ -97,7 +97,7 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
 - **Ebenen** (Knopf mit Wegzeichen-Schild im Menü), Modul `marks.js`: eigene Markierungsebenen, z. B. für die
   eigene Wabe. Seite *Ebenen*: neue Ebene anlegen, Ebenen ein-/ausblenden, umbenennen, löschen. Eine Ebene öffnen
   zeigt sie mit einer Leiste über der Karte:
-  - **Wegzeichen hinterlegen:** Lupe öffnet die Seite *Wegzeichen wählen* mit allen amtlichen TFIS-Wegzeichen als
+  - **Wegzeichen hinterlegen** (Seite *Ebenen*, „…“ bei der Ebene): Lupe öffnet die Seite *Wegzeichen wählen* mit allen amtlichen TFIS-Wegzeichen als
     Bilder; Filter nach Verein (vorbelegt mit dem Verein der schon hinterlegten Wegzeichen) und Kategorie, Lupe
     blendet die Namenssuche ein (Name, Bezeichnung oder Signaturnummer, davor optional die eigene Wegenummer des
     Vereins, z. B. „01-0A0-00 Eggeweg“ – sie steht nicht in TFIS und wird beim Wegzeichen angezeigt). Bild antippen
@@ -120,8 +120,10 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   - **Filter** nach Wegzeichen und Zustand mit Anzahl der Positionen und Wegzeichen; auf der Karte erscheinen dann nur
     die passenden Wegzeichen (nicht passende werden ausgeblendet). Je hinterlegtem Wegzeichen die Anzahl nach Zustand.
   - **Zählung:** „Wegzeichen“ = vorhandene (gut + erneuern), fehlende werden getrennt gezählt („… · 2 fehlen“).
-  - **Seite *Ebenen*, „…“:** klappt die Wegzeichen der Ebene mit Anzahl (zugeordnet, gut, erneuern, fehlen) auf;
-    Antippen öffnet die Ebene gefiltert auf dieses Wegzeichen. Dort auch Umbenennen und Löschen.
+  - **Seite *Ebenen*, „…“:** klappt die hinterlegten Wegzeichen der Ebene mit Anzahl (zugeordnet, gut, erneuern,
+    fehlen) auf; Antippen öffnet die Ebene gefiltert auf dieses Wegzeichen, „…“ beim Wegzeichen = Umbenennen/Entfernen.
+    Darunter: Wegzeichen hinzufügen (Lupe = Auswahl der TFIS-Wegzeichen, Bild-Symbol = eigenes Bild) sowie Ebene
+    umbenennen und löschen. Die Leiste auf der Karte zeigt die hinterlegten Wegzeichen nicht mehr (nur Filter).
   - **PDF** (Knopf mit Dokument-Symbol in der Kopfzeile): erzeugt eine A4-Seite mit allen gefilterten Positionen,
     Kopf (Ebene, Filter, Anzahl, Datum), Maßstab, Legende (Wegzeichen mit Anzahl, Zustände) und Quellenangabe.
     Ausschnitt = äußerste Positionen plus Rand (*Einstellungen → Ebenen → PDF: Rand um die Positionen*, Standard

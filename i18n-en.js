@@ -510,7 +510,7 @@ window.GOAHEAD_I18N_EN = {
   "1 Wegzeichen hinterlegt": "1 waymark added",
   "{0} Wegzeichen hinterlegt": "{0} waymarks added",
   "Eigenes Wegzeichen-Bild hinzufügen": "Add own waymark image",
-  "Zuerst Wegzeichen für diese Ebene hinterlegen.": "First add waymarks to this layer.",
+  "Zuerst Wegzeichen hinterlegen: Seite „Ebenen“ → „…“ bei dieser Ebene.": "First add waymarks: page “Layers” → “…” for this layer.",
   "Keine GPS-Position – Position in der Kartenmitte angelegt. Zum Verschieben ziehen.": "No GPS position – position created in the map centre. Drag to move.",
   "Position löschen?": "Delete position?",
   "1 Wegzeichen und die Fotos dieser Stelle werden entfernt.": "1 waymark and the photos of this spot will be removed.",

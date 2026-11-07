@@ -5,7 +5,7 @@ GoAhead ist, wie es aufgebaut ist und welche Entscheidungen schon getroffen wurd
 Arbeitsregeln stehen in [`CLAUDE.md`](../CLAUDE.md), die Funktionsbeschreibung für Nutzer in [`README.md`](../README.md).
 Bei Widersprüchen gilt: Code > CLAUDE.md > diese Datei. Beim Ändern bitte hier mitpflegen.
 
-Stand: Version 58 (App-Version in `app.js`), November 2026.
+Stand: Version 59 (App-Version in `app.js`), November 2026.
 
 ---
 
@@ -173,6 +173,9 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
   Getestet mit Chromium und nachgebildeten Kacheln (PDF eine Seite A4, Inhalt angesehen); am Gerät ungeprüft.
 - Version 57 (Wunsch des Nutzers): Einstellung *Wegemarkierungen* (Faktor 1–3) gilt auch für die Marker der eigenen
   Ebenen (`G.symbolScale()`, `G.onSymbolScale(fn)`; CSS-Variable `--mk-s` am Marker) und, auf das Doppelte begrenzt, im PDF.
+- Version 59 (Wunsch des Nutzers): hinterlegte Wegzeichen werden nur noch auf der Seite *Ebenen* verwaltet
+  (aufgeklappte Ebene: hinzufügen per Lupe/Bild, „…“ je Wegzeichen = Umbenennen/Entfernen); die Leiste auf der Karte
+  hat dafür keine Liste mehr (mehr Platz für die Karte).
 - Schritt 2 (offen): Foto mit den hinterlegten Wegzeichen vergleichen, beste Treffer zuerst anbieten; bestätigte Fotos
   als weitere Vergleichsbilder. Braucht echte Fotos von Markierungen zum Prüfen. Ob ein Vergleich auf dem Gerät
   verwitterte, schräg fotografierte Markierungen zuverlässig erkennt, ist **ungeprüft**.
