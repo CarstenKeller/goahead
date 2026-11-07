@@ -56,7 +56,7 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
       (OSRM, direkte Linien) werden zwischen bekannten Höhen linear aufgefüllt. Höhenmeter zählen ab 3 m Änderung.
     - Gehzeit: Route im 25-m-Raster; je Schritt Steigung (> Schwelle), Gefälle (< −Schwelle) oder Ebene mit der
       jeweiligen Geschwindigkeit aus den **Einstellungen** (Startwerte als Annahme: 4,5 / 3,0 / 4,0 km/h, Schwelle 5 %).
-  - Suche: Adresse (Nominatim/OpenStreetMap) oder Koordinaten: Dezimalgrad (`51.758, 9.030`, auch mit
+  - Suche (Lupe blendet das Feld ein/aus, Eingabetaste sucht): Adresse (Nominatim/OpenStreetMap) oder Koordinaten: Dezimalgrad (`51.758, 9.030`, auch mit
     Dezimalkomma oder vertauscht) oder UTM Zone 32 wie in TIM-online (`32U 494000 5735000` oder `494000 5735000`).
     Koordinaten setzen direkt einen Vorschlagspunkt.
   - Findet kein Routing-Dienst einen Weg, wird die gerade Linie genommen und mit ⚠ markiert.
@@ -94,6 +94,45 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   - Begleiten zeichnet nicht auf, hält den Bildschirm nicht an und speichert beim Beenden nichts.
   - Daten: JSON, deflate (`CompressionStream`, Safari ab 16.4), base64url im Link-Teil `#g=`; Linien als
     Polyline-Zeichenkette (Google-Verfahren, Höhe als dritter Wert).
+- **Ebenen** (Knopf mit Wegzeichen-Schild im Menü), Modul `marks.js`: eigene Markierungsebenen, z. B. für die
+  eigene Wabe. Seite *Ebenen*: neue Ebene anlegen, Ebenen ein-/ausblenden, umbenennen, löschen. Eine Ebene öffnen
+  zeigt sie mit einer Leiste über der Karte:
+  - **Wegzeichen hinterlegen** (Seite *Ebenen*, „…“ bei der Ebene): Lupe öffnet die Seite *Wegzeichen wählen* mit allen amtlichen TFIS-Wegzeichen als
+    Bilder; Filter nach Verein (vorbelegt mit dem Verein der schon hinterlegten Wegzeichen) und Kategorie, Lupe
+    blendet die Namenssuche ein (Name, Bezeichnung oder Signaturnummer, davor optional die eigene Wegenummer des
+    Vereins, z. B. „01-0A0-00 Eggeweg“ – sie steht nicht in TFIS und wird beim Wegzeichen angezeigt). Bild antippen
+    übernimmt es; übernommene sind markiert. Auch direkt aus dem Infofenster (Weg antippen, *+* neben dem Wegzeichen).
+    Dazu eigene Bilder (Knopf mit Bild-Symbol): Foto oder Bild wählen, Ausschnitt mit dem Finger aufziehen (danach
+    im Rahmen ziehen = verschieben, an einer Ecke = Größe ändern) – z. B. wenn die echte Markierung anders aussieht
+    als das TFIS-Bild (E1: TFIS zeigt weißes „E1“ auf Schwarz, vor Ort hängt das blaue Schild mit Sternen). Das Wegeverzeichnis (`symbols/tfis/index.json`) erzeugt der
+    Pages-Workflow aus dem TFIS-GeoPackage (`.github/scripts/tfis_index.py`, Aufbau dort mit Prüfweg beschrieben).
+  - **Erfassen:** Kamera in der Kopfzeile fotografiert die Markierung an der GPS-Position und legt eine Position an;
+    danach das passende Wegzeichen antippen. Ist eine Position ausgewählt, ergänzt das nächste Foto dieselbe Stelle
+    (mehrere Wegzeichen nacheinander). *+* erfasst ein Wegzeichen ohne Foto (z. B. wenn es fehlt).
+    Jedes Wegzeichen zählt an einer Position nur einmal; ein weiteres Foto desselben Wegzeichens (z. B. Markierung für
+    die Gegenrichtung auf der Rückseite des Baums) wird dort ergänzt. Positionen ohne Wegzeichen werden entfernt.
+  - **Position antippen:** Fotos, Wegzeichen in ihrer Reihenfolge (Pfeile ändern sie), Zustand je Wegzeichen
+    (*gut*, *erneuern*, *fehlt*); die ausgewählte Position lässt sich auf der Karte verschieben (GPS ist im Wald oft
+    einige Meter ungenau).
+  - **Karte:** an jeder Position die Wegzeichen untereinander, Rahmen nach Zustand (grün, orange, rot gestrichelt);
+    unter Zoomstufe 14 nur farbige Punkte. Die Ebenen stehen auch in der Kartenwahl. Die Größe folgt der Einstellung
+    *Karte → Wegemarkierungen* (100–300 %, im PDF höchstens doppelt).
+  - **Filter** nach Wegzeichen und Zustand mit Anzahl der Positionen und Wegzeichen; auf der Karte erscheinen dann nur
+    die passenden Wegzeichen (nicht passende werden ausgeblendet). Je hinterlegtem Wegzeichen die Anzahl nach Zustand.
+  - **Zählung:** „Wegzeichen“ = vorhandene (gut + erneuern), fehlende werden getrennt gezählt („… · 2 fehlen“).
+  - **Seite *Ebenen*, „…“:** klappt die hinterlegten Wegzeichen der Ebene mit Anzahl (zugeordnet, gut, erneuern,
+    fehlen) auf; Antippen öffnet die Ebene gefiltert auf dieses Wegzeichen, „…“ beim Wegzeichen = Umbenennen/Entfernen.
+    Darüber: Wegzeichen hinzufügen (Lupe = Auswahl der TFIS-Wegzeichen, Bild-Symbol = eigenes Bild) sowie Ebene
+    umbenennen und löschen. In der Auswahl entfernt ein Tipp auf ein schon übernommenes (markiertes) Wegzeichen es
+    wieder (mit Rückfrage). Die Leiste auf der Karte zeigt die hinterlegten Wegzeichen nicht mehr (nur Filter).
+  - **PDF** (Knopf mit Dokument-Symbol in der Kopfzeile): erzeugt eine A4-Seite mit allen gefilterten Positionen,
+    Kopf (Ebene, Filter, Anzahl, Datum), Maßstab, Legende (Wegzeichen mit Anzahl, Zustände) und Quellenangabe.
+    Ausschnitt = äußerste Positionen plus Rand (*Einstellungen → Ebenen → PDF: Rand um die Positionen*, Standard
+    100 m); Querformat, wenn breiter als hoch. Android-App: Datei unter „Downloads“, wird gleich im PDF-Viewer
+    geöffnet (App-Methode `openFile`, neue App-Version nötig); Browser: Download. Gedruckt wird aus dem PDF-Viewer.
+    Die Karte wird dafür mit CORS geladen; Kartenebenen, deren Dienst das nicht erlaubt, fehlen und werden gemeldet.
+  - Gespeichert in IndexedDB (Speicher `marklayers`, Fotos im Speicher `photos`), in der Sicherung enthalten.
+  - Noch offen (Schritt 2): automatische Erkennung des Wegzeichens im Foto als Vorschlag.
 - **Fotos unterwegs** (Kamera-Knopf in der Kopfzeile von *Unterwegs*), Modul `photos.js`: Das Foto wird an der
   aktuellen Position der Tour zugeordnet und als Kamera-Marker auf der Karte gezeigt; Antippen zeigt das Bild
   (dort auch löschen). In der **Android-App** speichert die Kamera das Bild in voller Größe in der Galerie,
@@ -338,6 +377,7 @@ Einmalig nötig: unter *Settings → Pages → Build and deployment → Source* 
 
 - `CLAUDE.md`: Arbeitsregeln für Änderungen (UI-Grundregeln, Versionen, Speicher, Tests)
 - `docs/PROJEKT.md`: Projektstand, Entscheidungen und Arbeitsweise (Einstieg für Weiterentwicklung)
+- `docs/VEROEFFENTLICHUNG.md`: Grundlagen für Veröffentlichung und Vermarktung (Lizenzen, Dienste Dritter, Datenschutz, offene Punkte)
 - `index.html`, `styles.css`, `app.js`: die App
 - `i18n.js`, `i18n-en.js`: Sprache (Deutsch/Englisch, Wörterbuch) und Darstellung (hell/dunkel), werden zuerst geladen
 - `tracks.js`: Seite *Tracks*, GPX-Import, lokale Speicherung, Track-Liste
@@ -347,6 +387,7 @@ Einmalig nötig: unter *Settings → Pages → Build and deployment → Source* 
 - `nav.js`: Unterwegs-Modus, Aufzeichnung, Abbiegungen, Liste *Erwandert*
 - `tourview.js`: Leiste mit Tour-Details, Listenkopf (Anzahl, km, Jahr, Suche)
 - `photos.js`: Fotos unterwegs (Kamera, Speicher, Marker, Anzeige)
+- `marks.js`: Seite *Ebenen*, eigene Markierungsebenen (Wegzeichen, Positionen, Zustand, Filter)
 - `share.js`: Tour und Stand für die Begleitung teilen und einfügen
 - `backup.js`: Sicherung/Wiederherstellen, Sammel-Import (GPX, ZIP) nach *Geplant*/*Erwandert*
 - `android/`: Android-App (WebView + Aufzeichnung im Hintergrund), Build im Pages-Workflow

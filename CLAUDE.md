@@ -7,6 +7,8 @@ schon einmal falsch gemacht wurde.
 
 **Vor jeder Erweiterung `docs/PROJEKT.md` lesen** (Projektstand, Nutzer, getroffene Entscheidungen, offene Punkte)
 und nach der Änderung dort mitpflegen.
+Für Fragen zu **Veröffentlichung und Vermarktung** (Lizenzen, Dienste Dritter, Datenschutz, Stores, Marke):
+`docs/VEROEFFENTLICHUNG.md` – bei neuen Diensten, Berechtigungen oder Datenflüssen dort mitpflegen.
 
 ## Sprache und Haltung
 
@@ -109,7 +111,10 @@ Platz wie möglich:
   (Quellen in `config.js`, unten = überall → oben = genaueste, `region` = Länderkürzel). Neue Kartendienste erst
   im Workflow „Kartendienste prüfen“ (`.github/scripts/probe_maps.py`) testen. Overlays mit Inhalt nur in einem Gebiet
   bekommen `region` (keine Anfragen außerhalb, auch nicht offline). Reihenfolge der Skripte in `index.html` beachten
-  (im `<head>`: i18n-en → i18n; dann config → regions → mosaic → app → tracks → planner → tourview → offline → photos → nav → share → backup).
+  (im `<head>`: i18n-en → i18n; dann config → regions → mosaic → app → tracks → planner → tourview → offline → photos → marks → nav → share → backup).
+- `marks.js`: Seite *Ebenen* und eigene Markierungsebenen (Speicher `marklayers`). Fotos über `G.photos.take` mit
+  walkId `mark:<ebene>:<position>` (übersteht das Neuladen beim Kamera-Aufruf der App). Ebenen in der Kartenwahl über
+  `G.addOverlay`/`G.removeOverlay` (erst aus der Kartenwahl nehmen, dann von der Karte). Modus `mode-marks`.
 - `share.js`: Teilen ohne Server (Link `#g=` mit gepacktem JSON). Begleiten ist ein Modus in `nav.js`
   (`walk.companion`): nie aufzeichnen, nie die App-Aufzeichnung (`G.native`) anfassen, nichts speichern.
 

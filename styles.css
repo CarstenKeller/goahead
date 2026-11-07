@@ -45,6 +45,8 @@
   --c-arrow: #ffffff;                          /* Richtungspfeile auf geplanten Strecken */
   --glass-border: rgba(255, 255, 255, 0.55);
   --glass-blur: blur(18px) saturate(170%);
+  --glass-page: rgba(255, 255, 255, 0.6);      /* Vollbildseiten (Tracks, Ebenen, Einstellungen): Karte schimmert durch */
+  --glass-page-blur: blur(6px) saturate(140%);
   --btn-soft: rgba(0, 0, 0, 0.06);
   --btn-soft-hover: rgba(0, 0, 0, 0.1);
   --c-bg: #e8e8e8;                             /* hinter der Karte */
@@ -83,6 +85,17 @@
   --z-dialog: 3000;
   --z-photo: 2900;              /* Foto-Anzeige (über Seiten, unter Dialogen) */
   --c-photo: #7048e8;           /* Foto-Marker */
+  /* Markierungsebenen (marks.js): Zustand der Wegzeichen */
+  --c-mk-ok: #2f9e44;           /* Rahmen „gut“ */
+  --c-mk-renew: #f08c00;        /* Rahmen „erneuern“ */
+  --c-mk-missing: #c62828;      /* Rahmen „fehlt“ */
+  --c-mk-renew-text: #9a4d00;   /* Text „erneuern“ (Kontrast ≥ 4,5 : 1) */
+  --c-mk-plate: #ffffff;        /* Untergrund der Wegzeichen (Symbole sind für Weiß gezeichnet) */
+  --c-mk-sel: #1c6dd0;          /* ausgewählte Position */
+  --c-mk-plate-text: #5f6b75;   /* „?“ auf dem Wegzeichen-Untergrund */
+  --c-crop-dim: rgba(0, 0, 0, 0.5);   /* Zuschnitt: abgedunkelt außerhalb des Rahmens */
+  --c-print-paper: #ffffff;     /* PDF einer Ebene: Papier */
+  --c-print-ink: #1d2125;       /* PDF einer Ebene: Schrift */
 
   --info-height: 34vh;          /* Standardhöhe Infofenster (per Ziehen änderbar) */
 }
@@ -122,11 +135,22 @@
      farbige Symbolteile heller; Flächen mit weißer Schrift bleiben dunkelgrün (Kontrast ≥ 4,5 : 1) */
   --glass: rgba(38, 42, 47, 0.92);
   --glass-strong: rgba(38, 42, 47, 0.96);
+  --glass-page: rgba(30, 34, 38, 0.72);
   --glass-border: rgba(255, 255, 255, 0.18);
   --c-accent-fill: #2e7d32;
   --c-icon-blue: #74b5ff;
   --c-icon-route: #f783ac;
   --c-icon-start: #69db7c;
+  --c-mk-ok: #40c057;
+  --c-mk-renew: #ffa94d;
+  --c-mk-missing: #ff8a80;
+  --c-mk-renew-text: #ffb74d;
+  --c-mk-plate: #ffffff;
+  --c-mk-sel: #74b5ff;
+  --c-mk-plate-text: #5f6b75;
+  --c-crop-dim: rgba(0, 0, 0, 0.6);
+  --c-print-paper: #ffffff;
+  --c-print-ink: #1d2125;
 }
 
 /* Ohne Unschärfe-Unterstützung: Flächen weniger durchsichtig, damit Text lesbar bleibt */
@@ -134,6 +158,7 @@
   :root {
     --glass: rgba(255, 255, 255, 0.94);
     --glass-strong: rgba(255, 255, 255, 0.97);
+    --glass-page: rgba(255, 255, 255, 0.95);
     --glass-dark: rgba(28, 31, 35, 0.92);
     --glass-sheet: rgba(228, 243, 228, 0.95);
   }
@@ -142,6 +167,7 @@
   :root[data-theme="dark"] {
     --glass: rgba(32, 36, 40, 0.95);
     --glass-strong: rgba(32, 36, 40, 0.98);
+    --glass-page: rgba(32, 36, 40, 0.96);
     --glass-sheet: rgba(26, 40, 29, 0.96);
   }
 }
@@ -238,10 +264,20 @@ button {
   background: var(--c-blue-soft) !important;
   color: var(--c-blue) !important;
 }
-.plan-round.on,
-.plan-find.on {
+.plan-round.on {
   background: var(--c-route) !important;
   color: #ffffff !important;
+}
+/* Lupe eingeschaltet: wie bei „Tracks“ (.list-find.on) */
+.plan-find.on {
+  background: var(--c-accent-soft) !important;
+  color: var(--c-accent) !important;
+}
+/* Planen: alle Werkzeuge in einer Reihe (6 × 44 px + Abstände passen ab ca. 320 px Bildschirmbreite) */
+.icon-row.plan-tools {
+  flex-wrap: nowrap;
+  gap: 4px;
+  justify-content: space-between;
 }
 
 /* Symbolknöpfe (Beschriftung steht im title, langer Druck zeigt sie) */
@@ -407,7 +443,8 @@ a[role="button"] {
 }
 /* Im Planungs- und Unterwegs-Modus bleibt nur die Kartenwahl */
 .mode-plan .toolbar > :not(.maps-control),
-.mode-nav .toolbar > :not(.maps-control) {
+.mode-nav .toolbar > :not(.maps-control),
+.mode-marks .toolbar > :not(.maps-control) {
   display: none;
 }
 
@@ -638,6 +675,7 @@ a[role="button"] {
 .info-title,
 .plan-title,
 .tour-title,
+.mk-title,
 .nav-title {
   font-weight: 650;
   font-size: 16px;
@@ -738,7 +776,8 @@ a[role="button"] {
   vertical-align: middle;
 }
 .plan-sum,
-.tour-sub {
+.tour-sub,
+.mk-sub {
   font-size: 13px;
   color: var(--c-muted);
 }
@@ -751,7 +790,6 @@ a[role="button"] {
 }
 .plan-search {
   display: flex;
-  gap: 6px;
   margin-top: 8px;
 }
 .plan-search input {
@@ -821,7 +859,10 @@ a[role="button"] {
   position: absolute;
   inset: 0;
   z-index: var(--z-page);
-  background: var(--glass-strong);
+  /* leicht durchscheinend: die Karte bleibt erkennbar (schwächere Unschärfe als bei den Leisten) */
+  background: var(--glass-page);
+  -webkit-backdrop-filter: var(--glass-page-blur);
+  backdrop-filter: var(--glass-page-blur);
   color: var(--c-text);
   display: flex;
   flex-direction: column;
@@ -1483,13 +1524,15 @@ a[role="button"] {
 #maps-panel {
   z-index: var(--z-settings);
 }
-.maps-toggle {
+.maps-toggle,
+.mk-toggle {
   display: flex !important;
   align-items: center;
   justify-content: center;
   color: var(--c-text) !important;
 }
-.maps-toggle svg {
+.maps-toggle svg,
+.mk-toggle svg {
   width: 26px;
   height: 26px;
 }
@@ -1530,3 +1573,280 @@ a[role="button"] {
 :root[data-theme="dark"] .leaflet-control-attribution a,
 :root[data-theme="dark"] .page a,
 :root[data-theme="dark"] .sheet-body a { color: var(--c-blue); }
+
+/* ---------- Markierungsebenen (marks.js) ---------- */
+/* Marker: Wegzeichen der Position untereinander (Reihenfolge wie erfasst), Spitze = Ort */
+.mk-pin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.mk-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--c-mk-plate);
+  box-shadow: var(--shadow);
+}
+.mk-pin.sel .mk-stack {
+  outline: 3px solid var(--c-mk-sel);
+}
+/* Größe der Wegzeichen im Marker: --mk-s (marks.js, nach Einstellung „Wegemarkierungen“) */
+.mk-pin .mk-sign {
+  width: var(--mk-s, 28px);
+  height: var(--mk-s, 28px);
+  font-size: calc(var(--mk-s, 28px) * 0.55);
+}
+.mk-tail {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid var(--c-mk-plate);
+}
+.mk-sign {
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border: 2px solid var(--c-mk-ok);
+  border-radius: 4px;
+  background: var(--c-mk-plate);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  overflow: hidden;
+  font-weight: 700;
+  color: var(--c-mk-plate-text);
+}
+/* Bild ins Kästchen einpassen. Leaflet setzt für Bilder im Marker-Bereich „max-width: none !important“ und
+   „width: auto“ (vendor/leaflet/leaflet.css) – daher feste Maße mit object-fit und stärkerem Selektor. */
+.mk-sign img,
+.leaflet-container .leaflet-marker-pane .mk-sign img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.mk-sign.mk-renew { border-color: var(--c-mk-renew); }
+.mk-sign.mk-missing { border: 2px dashed var(--c-mk-missing); }
+.mk-sign.mk-missing img { opacity: 0.4; }
+.mk-sign.mk-none { border-color: var(--c-line); }
+.mk-dot {
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid var(--c-mk-plate);
+  background: var(--c-mk-ok);
+  box-shadow: var(--shadow);
+}
+.mk-dot.mk-renew { background: var(--c-mk-renew); }
+.mk-dot.mk-missing { background: var(--c-mk-missing); }
+.mk-dot.mk-none { background: var(--c-muted); }
+
+/* Leiste „Ebene“: ausgewählte Position */
+.mk-point {
+  margin: 0 0 8px;
+  padding: 6px 8px 8px;
+  border-radius: var(--r-md);
+  background: var(--c-item);
+  border: 2px solid var(--c-mk-sel);
+}
+.mk-point-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.mk-point-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 14px;
+}
+.sheet .mk-point-head .icon-btn {
+  background: transparent;
+}
+.mk-photos {
+  margin: 2px 0 6px;
+}
+.mk-sign-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+  border-top: 1px solid var(--c-line);
+}
+.mk-sign-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.mk-sign-main .mk-sign {
+  width: 40px;
+  height: 40px;
+}
+.sheet .mk-sign-row .icon-btn {
+  background: transparent;
+}
+.mk-st-renew { color: var(--c-mk-renew-text); font-weight: 600; }
+.mk-st-missing { color: var(--c-danger); font-weight: 600; }
+/* Wegzeichen wählen (nach dem Foto) */
+.mk-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--c-line);
+}
+.sheet .mk-pick-btn,
+.page .mk-pick-btn {
+  width: 72px;
+  padding: 6px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--c-item-active);
+  border: 1px solid var(--c-line);
+}
+.mk-pick-btn img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  background: var(--c-mk-plate);
+  border-radius: 4px;
+}
+.mk-pick-btn span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sheet .mk-pick-cancel {
+  background: transparent;
+  margin-left: auto;
+}
+/* Filter wie bei den Tour-Listen */
+.mk-filter .list-kind,
+.mk-filter .list-year {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* Hinterlegte Wegzeichen (Seite „Ebenen“) */
+.mk-sym-box {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 4px;
+  background: var(--c-mk-plate);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.mk-sym-box img {
+  max-width: 100%;
+  max-height: 100%;
+}
+/* Infofenster: Wegzeichen übernehmen */
+.sheet .fi-add {
+  margin-left: auto;
+  background: transparent;
+}
+/* Seite „Wegzeichen wählen“: Raster aller TFIS-Wegzeichen */
+.mk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+}
+.page .mk-grid .mk-pick-btn {
+  width: auto;
+}
+.sheet .mk-pick-btn.on,
+.page .mk-pick-btn.on {
+  border: 2px solid var(--c-accent);
+  background: var(--c-accent-soft);
+}
+.mk-pick-head .list-kind,
+.mk-pick-head .list-year {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* Eigenes Wegzeichen-Bild zuschneiden */
+.mk-crop-box {
+  position: relative;
+  margin: 8px auto 14px;
+  max-width: 100%;
+  overflow: hidden;
+  touch-action: none;
+  border-radius: var(--r-sm);
+}
+.mk-crop-box canvas {
+  display: block;
+}
+.mk-crop-sel {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--c-mk-plate);
+  box-shadow: 0 0 0 9999px var(--c-crop-dim);
+  pointer-events: none;
+}
+/* Seite „Ebenen“: aufgeklappte Wegzeichen einer Ebene mit Anzahl */
+.mk-layer-item {
+  flex-wrap: wrap;
+}
+.mk-details {
+  flex: 1 1 100%;
+  min-width: 0;   /* lange, einzeilig gekürzte Namen dürfen die Liste nicht verbreitern */
+  margin-top: 6px;
+  border-top: 1px solid var(--c-line);
+}
+.mk-detail {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+.mk-detail-main {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.page .mk-detail > .icon-btn {
+  background: transparent;
+}
+.mk-detail-btns {
+  align-items: center;
+  margin: 6px 0 2px;
+}
+.mk-detail-main .trk-text {
+  flex: 1;
+  min-width: 0;
+}
+.mk-detail-gap {
+  flex: 1;
+}
+.page .mk-detail-btns [data-act="rename"],
+.page .mk-detail-btns [data-act="delete"] {
+  background: transparent;
+}
+.page .mk-detail-btns .trk-del {
+  color: var(--c-danger);
+}
+.page .mk-layer-item .trk-actions .icon-btn.on {
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+}

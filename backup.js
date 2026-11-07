@@ -26,7 +26,7 @@
   var T = window.GOAHEAD_I18N.t;
   if (!G || !G.map) return;
 
-  var STORES = ["tracks", "routes", "walks", "photos"];
+  var STORES = ["tracks", "routes", "walks", "photos", "marklayers"];
   var POINT_SPACING = 1000;   // m: Abstand der Wegpunkte bei importierten Routen
   var CLIMB_THRESHOLD = 3;    // m: wie planner.js
   // Nicht wiederherstellen: laufende Tour und Planungsentwurf des Geräts (sonst gingen diese verloren)

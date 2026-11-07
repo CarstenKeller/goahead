@@ -2,10 +2,12 @@
 
 Diese Datei ist der Einstieg für jede Weiterentwicklung (auch in einem neuen Chat). Sie fasst zusammen, **was
 GoAhead ist, wie es aufgebaut ist und welche Entscheidungen schon getroffen wurden – und warum**. Die verbindlichen
-Arbeitsregeln stehen in [`CLAUDE.md`](../CLAUDE.md), die Funktionsbeschreibung für Nutzer in [`README.md`](../README.md).
+Arbeitsregeln stehen in [`CLAUDE.md`](../CLAUDE.md), die Funktionsbeschreibung für Nutzer in [`README.md`](../README.md),
+Grundlagen für Veröffentlichung und Vermarktung (Lizenzen, Dienste, Datenschutz, offene Punkte) in
+[`VEROEFFENTLICHUNG.md`](VEROEFFENTLICHUNG.md) – Vermarktung bespricht der Nutzer in einem eigenen Chat.
 Bei Widersprüchen gilt: Code > CLAUDE.md > diese Datei. Beim Ändern bitte hier mitpflegen.
 
-Stand: Version 44 (App-Version in `app.js`), November 2026.
+Stand: Version 60 (App-Version in `app.js`), November 2026.
 
 ---
 
@@ -42,7 +44,8 @@ Stand: Version 44 (App-Version in `app.js`), November 2026.
 - **Bedienung auf der Karte vor Knöpfen** (antippen, erneut antippen, ziehen).
 - **Dialoge** nur über `G.actionSheet` / `G.askText` – nie `alert/confirm/prompt` (zeigen die Web-Adresse).
   Meldungen für Wanderer formuliert: keine HTTP-Codes, Fehlertexte oder Technikbegriffe.
-- **Design:** „Glas“ (leicht transparent), untere Leisten leicht grünlich; Farben nur über CSS-Variablen.
+- **Design:** „Glas“ (leicht transparent), untere Leisten leicht grünlich; Vollbildseiten (`.page`) durchscheinend
+  (`--glass-page`, schwache Unschärfe `--glass-page-blur`), damit die Karte durchschimmert; Farben nur über CSS-Variablen.
 - **Hell/Dunkel** über `:root[data-theme="dark"]`; Kontrast ≥ 4,5 : 1; Symbole ohne feste Farben.
 - **Einstellungen** sind eine eigene Seite, Bereich **App (Sprache, Darstellung) immer ganz oben**.
 - **Sprache:** Deutsch ist Ausgangssprache, Englisch über Wörterbuch (`i18n-en.js`).
@@ -51,7 +54,7 @@ Stand: Version 44 (App-Version in `app.js`), November 2026.
 
 | Datei | Aufgabe |
 |---|---|
-| `index.html` | Gerüst; im `<head>` `i18n-en.js`, `i18n.js`; danach config → regions → mosaic → app → tracks → planner → tourview → offline → photos → nav → share → backup |
+| `index.html` | Gerüst; im `<head>` `i18n-en.js`, `i18n.js`; danach config → regions → mosaic → app → tracks → planner → tourview → offline → photos → marks → nav → share → backup |
 | `i18n.js`, `i18n-en.js` | Sprache (T(), automatische Übersetzung fester Texte per MutationObserver), Darstellung (data-theme) |
 | `app.js` | Karte, Ebenen, Kartenwahl-Leiste, Position, Menü, Einstellungen, Infofenster, Dialoge, Tooltips, Brücke zur App; Schnittstelle `window.GOAHEAD` (G) |
 | `tracks.js` | Seite *Tracks* (Reiter GPX/Geplant/Erwandert), GPX-Import, **einzige Stelle, die IndexedDB öffnet** (`G.db`) |
@@ -59,6 +62,7 @@ Stand: Version 44 (App-Version in `app.js`), November 2026.
 | `tourview.js` | Tour-Details als Leiste (`G.tourView`), Listenkopf mit Anzahl/km/Jahr/Suche (`G.listTools`) |
 | `offline.js` | Kacheln im Korridor um eine Route offline speichern (`G.offline`) |
 | `photos.js` | Fotos unterwegs (`G.photos`) |
+| `marks.js` | Seite *Ebenen*, eigene Markierungsebenen (`G.marks`) |
 | `nav.js` | Unterwegs-Modus, Aufzeichnung, Abbiegungen, Begleiten, Liste *Erwandert* (`G.nav`) |
 | `share.js` | Tour/Stand teilen und einfügen (`G.share`) |
 | `backup.js` | Sicherung/Wiederherstellen, Sammel-Import GPX/ZIP (`G.backup`) |
@@ -75,8 +79,8 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
 
 ## 5. Daten
 
-- **IndexedDB „goahead“, Version 4**, Speicher (alle `keyPath: "id"`): `tracks` (GPX-Original), `routes` (geplant),
-  `walks` (erwandert), `photos` (Blob). Neue Speicher: `DB_VERSION` erhöhen (Nutzer auf andere offene Fenster hinweisen).
+- **IndexedDB „goahead“, Version 5**, Speicher (alle `keyPath: "id"`): `tracks` (GPX-Original), `routes` (geplant),
+  `walks` (erwandert), `photos` (Blob), `marklayers` (eigene Ebenen: Wegzeichen, Positionen, Zustand). Neue Speicher: `DB_VERSION` erhöhen (Nutzer auf andere offene Fenster hinweisen).
 - **localStorage** (`goahead.*`): `settings.v1` (alle Einstellungen), `view.v1` (Kartenausschnitt, Ebenen),
   `plan.v1` (Planungsentwurf), `walk.v1` (laufende Tour), `symbolScale.v1`, `loopKm.v1`, `tracksTab.v1`,
   `photoPending.v1`, Leistenhöhen (`*Height.v1`).
@@ -92,7 +96,7 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
 - **Luftbild (Mosaik):** DOP NRW, DOP von 12 weiteren Ländern, basemap.at Orthofoto, sonst Esri World Imagery.
 - **Overlays:** Wanderwege NRW (TFIS, WMS, nur NRW), Wanderwege OSM (Waymarked Trails).
 - **Routing:** BRouter (Standard, mit Höhen; Rundtour über `engineMode=4`), OSRM (FOSSGIS) als Alternative.
-- **Suche:** Nominatim; Koordinaten auch UTM 32.
+- **Suche:** Nominatim; Koordinaten auch UTM 32. Bedienung wie bei *Tracks*: Lupe in der Werkzeugreihe blendet das Feld ein/aus, gesucht wird mit der Eingabetaste (kein zweiter Suchknopf).
 - Neue Dienste erst im Workflow „Kartendienste prüfen“ testen; Overlays mit Gebietsinhalt bekommen `region`.
 
 ## 7. Funktionen und die Entscheidungen dahinter
@@ -130,6 +134,59 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
   „Stand teilen“ (unterwegs: Zeit, km, Spur). Empfang: Link öffnen oder Nachricht kopieren → Einfügen.
 - Begleiten (`walk.companion`) zeichnet nie auf, fasst die App-Aufzeichnung nie an, speichert nichts.
 
+**Markierungsebenen (Wegemarkierer, `marks.js`)**
+- Ziel: Markierungszustand der eigenen Wabe festhalten und auf der Karte zeigen. Entscheidungen des Nutzers (11/2026):
+  Wegzeichen aus **TFIS und eigene Bilder**; Erkennung als **Vorschlag mit Bestätigung**; **Zustand je Wegzeichen**
+  (gut / erneuern / fehlt); Umsetzung **in zwei Schritten**.
+- Schritt 1 (Version 46): Seite *Ebenen*, Leiste je Ebene (Modus `mode-marks`), Kamera in der Kopfzeile → Position an
+  der GPS-Stelle → Wegzeichen antippen; ausgewählte Position = nächstes Foto ergänzt sie; Reihenfolge per Pfeilen;
+  Zustand per Tipp auf das Wegzeichen; Position verschiebbar; Filter nach Wegzeichen/Zustand mit Anzahl;
+  TFIS-Wegzeichen per Signaturnummer oder aus dem Infofenster (*+*).
+- Version 47–49: Wegenummern des Nutzers (z. B. `01-0A0-00` Eggeweg, `00-0A8-00` E1) wurden nicht erkannt. Befund
+  aus dem Protokoll der Pages-Läufe: Sie stehen **nicht** in den offenen TFIS-Daten. GeoPackage
+  `Freizeitdaten_NRW_GeoPackage.gpkg`, Tabelle `wanderwege` (8396 Zeilen), Spalten u. a. `scl` (Form
+  `H0001072_200013`), `snr`, `kat`, `nam`, `bez`, `wvi`. Eggeweg = `nam` „Eggeweg“, `bez` „X“, `snr` 200013;
+  E1 = `nam` „Europäischer Fernwanderweg E1“, `snr` 100055. Lösung: Suche nach Name/Bezeichnung
+  (`symbols/tfis/index.json` = Liste [snr, nam, bez, wvi, kat]); die eigene Wegenummer davor wird als `key` beim
+  Wegzeichen gespeichert und angezeigt. Herkunft der Wegenummern unbekannt (vermutlich Vereinsnummerierung – ungeprüft).
+- Version 50: Seite *Wegzeichen wählen* – alle TFIS-Wegzeichen als Bildraster (je Signaturnummer eins), Filter Verein
+  (Vorgabe: Verein der schon hinterlegten TFIS-Wegzeichen) und Kategorie, Namenssuche per Lupe wie bei *Tracks*.
+  Rückmeldung über Markierung der Kachel (Statusmeldungen liegen unter Vollbildseiten). Ersetzt die Textsuche mit
+  Auswahlliste aus Version 49.
+- Version 51: eigene Wegzeichen-Bilder zuschneiden (Rahmen aufziehen; erster Zug immer neu, danach verschieben bzw.
+  Ecke ziehen). Anlass: TFIS-Bild des E1 (100055.svg, per Protokoll geprüft: weißes „E1“ auf schwarzem Rechteck)
+  entspricht nicht dem Schild vor Ort (blau mit gelben Sternen). E1 steht in TFIS u. a. beim Eggegebirgsverein.
+- Version 52: Wegzeichen im Kartenmarker wurden abgeschnitten statt verkleinert – Leaflet setzt für Bilder im
+  Marker-Bereich `max-width: none !important` und `width: auto`. Lösung: feste Maße + `object-fit: contain` mit
+  stärkerem Selektor (`.leaflet-container .leaflet-marker-pane .mk-sign img`). Bei Marker-Bildern immer beachten.
+- Version 53 (Wunsch des Nutzers): Filter blendet nicht passende Wegzeichen auf der Karte aus (vorher ausgegraut;
+  die ausgewählte Position zeigt weiter alle); fehlende Wegzeichen werden getrennt gezählt – Auslegung: „Wegzeichen“ =
+  gut + erneuern, „fehlen“ extra; „…“ auf der Seite *Ebenen* klappt die Wegzeichen mit Anzahl auf.
+- Version 54 (Wunsch des Nutzers): je Position jedes Wegzeichen nur einmal (Daten: `sign.photos` statt `sign.photo`,
+  Altdaten werden beim Laden zusammengeführt); zweites Foto desselben Wegzeichens = Gegenrichtung, wird ergänzt.
+  Positionen ohne Wegzeichen bleiben nur, solange sie ausgewählt sind (gerade erfasst), sonst werden sie samt Fotos
+  gelöscht (auch beim Laden – vorher blieb nach dem Entfernen aller Wegzeichen ein „?“ stehen).
+- Version 55/56: PDF der Ebene. Nutzer wollte kein Drucken aus GoAhead, sondern eine PDF-Datei erzeugen und öffnen
+  (drucken aus dem PDF-Viewer). Umsetzung: Seite (A4, 150 dpi) auf einer Leinwand zusammensetzen – Karte aus den
+  sichtbaren Ebenen (Kacheln mit CORS; Mosaik über `renderTile`), gefilterte Positionen mit Wegzeichen, Kopf, Maßstab,
+  Legende, Quellenangabe – als JPEG in ein selbst geschriebenes einseitiges PDF. Ausschnitt = gefilterte Positionen +
+  Rand (`printMarginM`, Standard 100 m), Querformat, wenn breiter als hoch. App: `openFile` (neue APK nötig);
+  Browser: Download. Ebenen ohne CORS fehlen und werden gemeldet (Waymarked Trails: CORS ungeprüft).
+  Getestet mit Chromium und nachgebildeten Kacheln (PDF eine Seite A4, Inhalt angesehen); am Gerät ungeprüft.
+- Version 57 (Wunsch des Nutzers): Einstellung *Wegemarkierungen* (Faktor 1–3) gilt auch für die Marker der eigenen
+  Ebenen (`G.symbolScale()`, `G.onSymbolScale(fn)`; CSS-Variable `--mk-s` am Marker) und, auf das Doppelte begrenzt, im PDF.
+- Version 59 (Wunsch des Nutzers): hinterlegte Wegzeichen werden nur noch auf der Seite *Ebenen* verwaltet
+  (aufgeklappte Ebene: hinzufügen per Lupe/Bild, „…“ je Wegzeichen = Umbenennen/Entfernen); die Leiste auf der Karte
+  hat dafür keine Liste mehr (mehr Platz für die Karte).
+- Version 60: Layoutfehler behoben (lange, einzeilig gekürzte Namen verbreiterten die aufgeklappte Ebene, „…“ und
+  Papierkorb lagen außerhalb → Wegzeichen ließen sich nicht entfernen; Lösung `min-width: 0` am Flex-Element).
+  Knopfleiste über der Wegzeichen-Liste; in der Bildauswahl entfernt erneutes Antippen ein übernommenes Wegzeichen.
+- Schritt 2 (offen): Foto mit den hinterlegten Wegzeichen vergleichen, beste Treffer zuerst anbieten; bestätigte Fotos
+  als weitere Vergleichsbilder. Braucht echte Fotos von Markierungen zum Prüfen. Ob ein Vergleich auf dem Gerät
+  verwitterte, schräg fotografierte Markierungen zuverlässig erkennt, ist **ungeprüft**.
+- Grenzen: Position = GPS des Handys (im Wald einige Meter ungenau) → verschiebbar. Ebenen-Modus und Unterwegs-Modus
+  schließen sich aus (beide sind untere Leisten mit eigenem Modus).
+
 **Sprache und Darstellung**
 - `T("Satz mit {0}", wert)` für Texte mit Werten; feste Texte übersetzt der Observer automatisch (nur bei Englisch).
   Nutzernamen in `data-noi18n`. Sprachwechsel lädt neu; Darstellung wirkt sofort.
@@ -142,7 +199,8 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
   im Secret `GOAHEAD_KEYSTORE_PASSWORD`. **Schlüssel und applicationId nie ändern** (sonst kein Update möglich).
 - Brücke `window.GoAheadNative` (nur über `G.native.call`): `appVersion, recordingState, startRecording,
   pauseRecording, stopRecording, pointCount, getPoints, setTurns, hasCamera, takePhoto, batteryOptimized,
-  requestBatteryExemption, openAppSettings, saveFile, shareText, shareFile`. **Nur ergänzen, nie umbenennen**
+  requestBatteryExemption, openAppSettings, saveFile, shareText, shareFile, printPage, openFile` (printPage: Android-Druckdienst, seit Version 56 ungenutzt;
+  openFile(name, mime, base64) ab Version 56: unter „Downloads“ speichern und öffnen → "opened"/"saved"/""). **Nur ergänzen, nie umbenennen**
   (installierte Apps aktualisieren sich nicht selbst). Web-Änderungen brauchen keinen neuen App-Build.
 - Aufzeichnung: Vordergrunddienst sammelt Punkte in `track.jsonl`, `nav.js` holt sie ab (`pullNative`).
 - Samsung: Akku-Optimierung ausschalten (Dialog in *Einstellungen → Android-App*).
@@ -158,6 +216,13 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
    Langer Druck: CDP `Input.dispatchTouchEvent`.
 4. Commit auf Deutsch, Push auf den Entwicklungs-Branch → `pages.yml` läuft → Lauf prüfen (bei 502 im
    Deploy-Schritt einen neuen Lauf per workflow_dispatch starten, nicht „Re-run failed jobs“).
+   „Re-run“ legt ein zweites Paket `github-pages` an → Fehler „Multiple artifacts“.
+   **Neuer Entwicklungs-Branch:** in `pages.yml` (`on.push.branches`) eintragen **und** vom Nutzer in den
+   Repository-Einstellungen (Environments → `github-pages` → Deployment branches) freigeben lassen.
+   Hängt eine Veröffentlichung („deployment_queued“, dann „Deployment failed, try again later“), scheitern weitere
+   Läufe zum selben Commit offenbar ebenso (Vermutung, Kennung = Commit) – dann mit einem neuen Commit veröffentlichen.
+   **Nie einen Lauf abbrechen, dessen Android-Job noch läuft:** der Deploy-Job veröffentlicht trotzdem – dann ohne APK,
+   und `app/goahead.apk` liefert 404 (passiert am 6.11.2026). Laufende Läufe zu Ende laufen lassen.
 
 ## 10. Offen, ungeprüft, bekannte Grenzen
 
@@ -168,3 +233,5 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
 - Kartenkacheln werden im Dunkelmodus nicht abgedunkelt (bewusst: Farben/Wegzeichen bleiben lesbar).
 - Automatisch vergebene Namen („Route vom …“) bleiben in der Sprache, in der sie entstanden.
 - Benachrichtigung der Android-App („GoAhead – Aufnahme läuft“) ist nur deutsch (bräuchte neuen App-Build).
+- Markierungsebenen: nur mit nachgebildeten Bildern/GPS getestet; TFIS-Wegzeichen erst nach dem ersten Anzeigen offline
+  verfügbar (Service Worker speichert sie beim Laden). Wiederherstellen-Meldung nennt die Zahl der Ebenen nicht.
