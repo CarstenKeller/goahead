@@ -5,7 +5,7 @@ GoAhead ist, wie es aufgebaut ist und welche Entscheidungen schon getroffen wurd
 Arbeitsregeln stehen in [`CLAUDE.md`](../CLAUDE.md), die Funktionsbeschreibung für Nutzer in [`README.md`](../README.md).
 Bei Widersprüchen gilt: Code > CLAUDE.md > diese Datei. Beim Ändern bitte hier mitpflegen.
 
-Stand: Version 59 (App-Version in `app.js`), November 2026.
+Stand: Version 60 (App-Version in `app.js`), November 2026.
 
 ---
 
@@ -176,6 +176,9 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
 - Version 59 (Wunsch des Nutzers): hinterlegte Wegzeichen werden nur noch auf der Seite *Ebenen* verwaltet
   (aufgeklappte Ebene: hinzufügen per Lupe/Bild, „…“ je Wegzeichen = Umbenennen/Entfernen); die Leiste auf der Karte
   hat dafür keine Liste mehr (mehr Platz für die Karte).
+- Version 60: Layoutfehler behoben (lange, einzeilig gekürzte Namen verbreiterten die aufgeklappte Ebene, „…“ und
+  Papierkorb lagen außerhalb → Wegzeichen ließen sich nicht entfernen; Lösung `min-width: 0` am Flex-Element).
+  Knopfleiste über der Wegzeichen-Liste; in der Bildauswahl entfernt erneutes Antippen ein übernommenes Wegzeichen.
 - Schritt 2 (offen): Foto mit den hinterlegten Wegzeichen vergleichen, beste Treffer zuerst anbieten; bestätigte Fotos
   als weitere Vergleichsbilder. Braucht echte Fotos von Markierungen zum Prüfen. Ob ein Vergleich auf dem Gerät
   verwitterte, schräg fotografierte Markierungen zuverlässig erkennt, ist **ungeprüft**.

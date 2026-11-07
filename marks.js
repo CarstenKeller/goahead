@@ -593,11 +593,11 @@
   function refreshLayer(layer) {
     if (layer === current) renderSheet();
     renderPage();
+    if (!pickEl.hidden && picker.layer === layer) renderPickGrid();
   }
 
   // Menü eines hinterlegten Wegzeichens (Seite „Ebenen“, aufgeklappte Ebene): Umbenennen, Entfernen
   function symbolMenu(layer, sym) {
-    var used = symCounts(layer, sym.id).all;
     G.actionSheet(sym.name, sym.key || (sym.tfis ? "TFIS " + sym.tfis : ""), [
       { label: "Umbenennen", onClick: function () {
         G.askText("Name des Wegzeichens", sym.name, function (v) {
@@ -608,28 +608,32 @@
           refreshLayer(layer);
         });
       } },
-      { label: "Entfernen", danger: true, onClick: function () {
-        function doRemove() {
-          layer.symbols = layer.symbols.filter(function (x) { return x !== sym; });
-          layer.points.forEach(function (p) {
-            p.signs = p.signs.filter(function (s) {
-              if (s.sym !== sym.id) return true;
-              p.photos = p.photos.filter(function (id) { return s.photos.indexOf(id) < 0; });
-              deletePhotos(s.photos);
-              return false;
-            });
-          });
-          pruneEmpty(layer, current === layer ? selId : null);
-          if (current === layer && filter.sym === sym.id) filter.sym = "";
-          save(layer);
-          refreshLayer(layer);
-        }
-        if (!used) { doRemove(); return; }
-        G.actionSheet(T("„{0}“ entfernen?", sym.name),
-          T(used === 1 ? "Es ist an 1 Stelle zugeordnet; dort wird es ebenfalls entfernt." : "Es ist an {0} Stellen zugeordnet; dort wird es ebenfalls entfernt.", used),
-          [{ label: "Entfernen", danger: true, onClick: doRemove }]);
-      } }
+      { label: "Entfernen", danger: true, onClick: function () { removeSymbol(layer, sym); } }
     ]);
+  }
+
+  // Wegzeichen aus der Ebene entfernen; ist es zugeordnet, vorher nachfragen (es verschwindet dann auch dort)
+  function removeSymbol(layer, sym, ask) {
+    var used = symCounts(layer, sym.id).all;
+    function doRemove() {
+      layer.symbols = layer.symbols.filter(function (x) { return x !== sym; });
+      layer.points.forEach(function (p) {
+        p.signs = p.signs.filter(function (s) {
+          if (s.sym !== sym.id) return true;
+          p.photos = p.photos.filter(function (id) { return s.photos.indexOf(id) < 0; });
+          deletePhotos(s.photos);
+          return false;
+        });
+      });
+      pruneEmpty(layer, current === layer ? selId : null);
+      if (current === layer && filter.sym === sym.id) filter.sym = "";
+      save(layer);
+      refreshLayer(layer);
+    }
+    if (!used && !ask) { doRemove(); return; }
+    G.actionSheet(T("„{0}“ entfernen?", sym.name),
+      used ? T(used === 1 ? "Es ist an 1 Stelle zugeordnet; dort wird es ebenfalls entfernt." : "Es ist an {0} Stellen zugeordnet; dort wird es ebenfalls entfernt.", used) : "",
+      [{ label: "Entfernen", danger: true, onClick: doRemove }]);
   }
 
   // ---------- PDF der Ebene (A4): gefilterte Positionen auf der Karte, Kopf und Legende ----------
@@ -1205,8 +1209,15 @@
   });
   pickGrid.addEventListener("click", function (e) {
     var b = e.target.closest("[data-nr]");
-    if (!b || b.classList.contains("on") || !picker.layer) return;
+    if (!b || !picker.layer) return;
     var nr = b.getAttribute("data-nr"), g = null;
+    if (b.classList.contains("on")) {
+      // schon übernommen: erneut antippen = aus der Ebene entfernen (mit Rückfrage)
+      var have = null;
+      picker.layer.symbols.forEach(function (x) { if (x.tfis === nr) have = x; });
+      if (have) removeSymbol(picker.layer, have, true);
+      return;
+    }
     signGroups.forEach(function (x) { if (x.nr === nr) g = x; });
     addTfisTo(picker.layer, nr, g ? wayName(g) : "", pickQuery().own);
   });
@@ -1388,20 +1399,22 @@
       var open = !!expanded[l.id];
       var details = "";
       if (open) {
-        details = '<div class="mk-details">' + (l.symbols.length ? l.symbols.map(function (sym) {
-          return '<div class="mk-detail" data-sym="' + esc(sym.id) + '">' +
-            '<span class="mk-detail-main" data-act="sym"><span class="mk-sym-box"><img alt="" src="' + esc(symUrl(sym)) + '"></span>' +
-            '<span class="trk-text"><span class="trk-name" data-noi18n>' + esc(sym.name) + "</span>" +
-            '<span class="trk-info">' + esc((sym.key ? sym.key + " · " : sym.tfis ? "TFIS " + sym.tfis + " · " : "") + symCountText(symCounts(l, sym.id))) + "</span></span></span>" +
-            '<button type="button" class="icon-btn" data-act="symmore" title="Weitere Aktionen" aria-label="Weitere Aktionen">' + G.icon("more") + "</button></div>";
-        }).join("") : '<p class="trk-empty">Noch keine Wegzeichen hinterlegt.</p>') +
+        details = '<div class="mk-details">' +
           '<div class="icon-row mk-detail-btns">' +
             '<button type="button" class="icon-btn" data-act="addtfis" title="TFIS-Wegzeichen hinzufügen" aria-label="TFIS-Wegzeichen hinzufügen">' + G.icon("search") + "</button>" +
             '<button type="button" class="icon-btn" data-act="addimg" title="Eigenes Wegzeichen-Bild hinzufügen" aria-label="Eigenes Wegzeichen-Bild hinzufügen">' + G.icon("image") + "</button>" +
             '<span class="mk-detail-gap"></span>' +
             '<button type="button" class="icon-btn" data-act="rename" title="Umbenennen" aria-label="Umbenennen">' + G.icon("edit") + "</button>" +
             '<button type="button" class="icon-btn trk-del" data-act="delete" title="Löschen" aria-label="Löschen">' + G.icon("trash") + "</button>" +
-          "</div></div>";
+          "</div>" +
+          (l.symbols.length ? l.symbols.map(function (sym) {
+          return '<div class="mk-detail" data-sym="' + esc(sym.id) + '">' +
+            '<span class="mk-detail-main" data-act="sym"><span class="mk-sym-box"><img alt="" src="' + esc(symUrl(sym)) + '"></span>' +
+            '<span class="trk-text"><span class="trk-name" data-noi18n>' + esc(sym.name) + "</span>" +
+            '<span class="trk-info">' + esc((sym.key ? sym.key + " · " : sym.tfis ? "TFIS " + sym.tfis + " · " : "") + symCountText(symCounts(l, sym.id))) + "</span></span></span>" +
+            '<button type="button" class="icon-btn" data-act="symmore" title="Weitere Aktionen" aria-label="Weitere Aktionen">' + G.icon("more") + "</button></div>";
+        }).join("") : '<p class="trk-empty">Noch keine Wegzeichen hinterlegt.</p>') +
+          "</div>";
       }
       return '<div class="trk-item mk-layer-item" data-id="' + esc(l.id) + '">' +
         '<input type="checkbox" class="mk-vis" data-act="toggle" aria-label="Auf der Karte zeigen" title="Auf der Karte zeigen"' + (l.visible ? " checked" : "") + ">" +

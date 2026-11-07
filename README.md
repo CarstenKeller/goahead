@@ -122,8 +122,9 @@ Web-App (PWA) für Android und iOS. Sie zeigt die eigene Position auf den Karten
   - **Zählung:** „Wegzeichen“ = vorhandene (gut + erneuern), fehlende werden getrennt gezählt („… · 2 fehlen“).
   - **Seite *Ebenen*, „…“:** klappt die hinterlegten Wegzeichen der Ebene mit Anzahl (zugeordnet, gut, erneuern,
     fehlen) auf; Antippen öffnet die Ebene gefiltert auf dieses Wegzeichen, „…“ beim Wegzeichen = Umbenennen/Entfernen.
-    Darunter: Wegzeichen hinzufügen (Lupe = Auswahl der TFIS-Wegzeichen, Bild-Symbol = eigenes Bild) sowie Ebene
-    umbenennen und löschen. Die Leiste auf der Karte zeigt die hinterlegten Wegzeichen nicht mehr (nur Filter).
+    Darüber: Wegzeichen hinzufügen (Lupe = Auswahl der TFIS-Wegzeichen, Bild-Symbol = eigenes Bild) sowie Ebene
+    umbenennen und löschen. In der Auswahl entfernt ein Tipp auf ein schon übernommenes (markiertes) Wegzeichen es
+    wieder (mit Rückfrage). Die Leiste auf der Karte zeigt die hinterlegten Wegzeichen nicht mehr (nur Filter).
   - **PDF** (Knopf mit Dokument-Symbol in der Kopfzeile): erzeugt eine A4-Seite mit allen gefilterten Positionen,
     Kopf (Ebene, Filter, Anzahl, Datum), Maßstab, Legende (Wegzeichen mit Anzahl, Zustände) und Quellenangabe.
     Ausschnitt = äußerste Positionen plus Rand (*Einstellungen → Ebenen → PDF: Rand um die Positionen*, Standard

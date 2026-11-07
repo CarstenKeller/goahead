@@ -1806,6 +1806,7 @@ a[role="button"] {
 }
 .mk-details {
   flex: 1 1 100%;
+  min-width: 0;   /* lange, einzeilig gekürzte Namen dürfen die Liste nicht verbreitern */
   margin-top: 6px;
   border-top: 1px solid var(--c-line);
 }
@@ -1818,6 +1819,7 @@ a[role="button"] {
 .mk-detail-main {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1828,7 +1830,11 @@ a[role="button"] {
 }
 .mk-detail-btns {
   align-items: center;
-  margin-top: 4px;
+  margin: 6px 0 2px;
+}
+.mk-detail-main .trk-text {
+  flex: 1;
+  min-width: 0;
 }
 .mk-detail-gap {
   flex: 1;
