@@ -5,7 +5,7 @@ GoAhead ist, wie es aufgebaut ist und welche Entscheidungen schon getroffen wurd
 Arbeitsregeln stehen in [`CLAUDE.md`](../CLAUDE.md), die Funktionsbeschreibung für Nutzer in [`README.md`](../README.md).
 Bei Widersprüchen gilt: Code > CLAUDE.md > diese Datei. Beim Ändern bitte hier mitpflegen.
 
-Stand: Version 44 (App-Version in `app.js`), November 2026.
+Stand: Version 45 (App-Version in `app.js`), November 2026.
 
 ---
 
@@ -134,6 +134,19 @@ Nach Datenänderungen `window.dispatchEvent(new Event("goahead:data"))` → List
 - `T("Satz mit {0}", wert)` für Texte mit Werten; feste Texte übersetzt der Observer automatisch (nur bei Englisch).
   Nutzernamen in `data-noi18n`. Sprachwechsel lädt neu; Darstellung wirkt sofort.
 - Nicht übersetzt: Quellenangaben, Diagnose-Seite, Benachrichtigung der Android-App.
+
+## 7a. Akku (Stand Version 45)
+
+- **Web-GPS** (blauer Punkt) läuft nur, solange die Seite sichtbar ist (`visibilitychange` → `clearWatch`).
+- **Aufzeichnung in der App:** Vordergrunddienst, GPS alle 2 s, `PARTIAL_WAKE_LOCK` nur während „rec“ (nicht in
+  der Pause). Der Wake Lock hält die CPU wach – bewusst beibehalten, weil Samsung sonst Punkte verzögern/verwerfen
+  könnte (am Gerät nicht verglichen). Ohne offene Tour beendet die Web-App einen noch laufenden Dienst beim Start.
+- **Unterwegs:** Sekundentakt zeichnet nur bei sichtbarer Seite; neue Punkte verlängern die Linie (kein Neuzeichnen);
+  die laufende Tour wird höchstens alle 15 s gespeichert, beim Verlassen der Seite sofort.
+- **Bildschirm:** im Browser hält ein Wake Lock während einer Tour den Bildschirm an (nötig, sonst stoppt GPS);
+  in der App nicht. Der Bildschirm ist auf dem Handy in der Regel der größte Verbraucher.
+- Ungeprüft/offen: Wirkung der Glas-Unschärfe (`backdrop-filter`) auf den Verbrauch; GPS-Takt 2 s vs. größer
+  (bräuchte neuen App-Build und Vergleich am Gerät).
 
 ## 8. Android-App
 

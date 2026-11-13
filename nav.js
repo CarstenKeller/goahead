@@ -58,7 +58,25 @@
     return end - w.startedAt - (w.pausedTotal || 0);
   }
 
+  // Häufige Stellen (jeder GPS-Punkt) speichern höchstens alle 15 s – die ganze Tour als JSON zu schreiben kostet
+  // bei langen Touren spürbar Rechenzeit. In der App hält der Dienst die Punkte ohnehin; beim Verlassen der Seite
+  // (Hintergrund, Schließen) wird sofort gespeichert.
+  var saveTimer = null;
+  function saveWalkSoon() {
+    if (saveTimer) return;
+    saveTimer = setTimeout(function () { saveTimer = null; saveWalk(); }, 15000);
+  }
+  function flushWalk() {
+    if (!saveTimer) return;
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    saveWalk();
+  }
+  document.addEventListener("visibilitychange", function () { if (document.hidden) flushWalk(); });
+  window.addEventListener("pagehide", flushWalk);
+
   function saveWalk() {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
     try {
       if (walk) {
         walk.savedAt = Date.now();
@@ -426,7 +444,7 @@
     try { pts = JSON.parse(raw || "[]"); } catch (e) { return 0; }
     if (!pts.length) return 0;
     walk.nativeIdx = (walk.nativeIdx || 0) + pts.length;
-    pts.forEach(function (q) { addPoint([q[0], q[1], q[2], q[3]], false); });
+    pts.forEach(function (q) { addPoint([q[0], q[1], q[2], q[3]], true); });   // Linie verlängern statt neu zeichnen
     setTimeout(checkAutoEnd, 0);
     walk.lastFix = Date.now();
     var q = pts[pts.length - 1];
@@ -438,8 +456,7 @@
     });
     progress = locateOnRoute(q[0], q[1]) || progress;
     checkTurns();   // markiert Abbiegungen, die der Dienst inzwischen gemeldet hat (vibriert hier nicht)
-    saveWalk();
-    drawWalk();
+    saveWalkSoon();
     sendTurns();
     renderPanel();
     return pts.length;
@@ -530,7 +547,7 @@
     var p = [Math.round(c.latitude * 1e6) / 1e6, Math.round(c.longitude * 1e6) / 1e6,
       c.altitude != null ? Math.round(c.altitude * 10) / 10 : null, pos.timestamp || Date.now()];
     if (!addPoint(p, true)) return;
-    saveWalk();
+    saveWalkSoon();
     checkAutoEnd();
     if (!walk) return;
     renderPanel();
@@ -786,7 +803,7 @@
     clearInterval(ticker);
     var tick = 0;
     ticker = setInterval(function () {
-      if (!walk) return;
+      if (!walk || document.hidden) return;   // im Hintergrund nichts zeichnen (spart Akku)
       if (NATIVE && !walk.companion && !document.hidden && ++tick % 3 === 0 && !walk.paused) pullNative();
       if (!walk.paused) renderPanel();
     }, 1000);
@@ -1510,6 +1527,13 @@
       enter();
     }
   } catch (e) { /* keine laufende Tour */ }
+
+  // App: Läuft der Aufnahme-Dienst, obwohl keine Tour offen ist (z. B. Seite zwischendurch neu aufgesetzt),
+  // würde er unbemerkt weiter GPS nutzen – dann beenden.
+  if (NATIVE && !walk) {
+    var orphan = NATIVE.call("recordingState");
+    if (orphan === "rec" || orphan === "pause") NATIVE.call("stopRecording");
+  }
 
   loadWalks();
   window.addEventListener("goahead:data", loadWalks);
