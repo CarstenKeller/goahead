@@ -5,7 +5,7 @@
   "use strict";
 
   var cfg = window.GOAHEAD_CONFIG;
-  var APP_VERSION = "45";
+  var APP_VERSION = "61";
 
   // ---------- Symbole für Knöpfe (einheitlicher Strich-Stil; früh definiert, damit alle Teile sie nutzen können) ----------
   var ICONS = {
@@ -43,7 +43,14 @@
     layers: '<path d="M12 4l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 16l8 4 8-4"/>',
     paste: '<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M9 11h6M9 15h4"/>',
     scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.5 7.5L20 18M8.5 16.5L20 6"/>',
-    warn: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>'
+    warn: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>',
+    // Markierungsebenen (marks.js): Wegzeichen-Schild am Pfosten, Pfeile für die Reihenfolge, Bild
+    marks: '<rect x="5" y="3" width="14" height="11" rx="1.5"/><path d="M12 14v7"/><path d="M9 6l6 5M15 6l-6 5"/>',
+    up: '<path d="M6 15l6-6 6 6"/>',
+    down: '<path d="M6 9l6 6 6-6"/>',
+    pdf: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>',
+    edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
+    image: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/>'
   };
   function icon(name) {
     return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" ' +
@@ -309,7 +316,7 @@
       if (o.overlay && !subOv) { html += '<div class="settings-sub">Ebenen</div>'; subOv = true; }
       var on = map.hasLayer(o.layer);
       html += '<label class="settings-row"><input type="' + (o.overlay ? "checkbox" : "radio") + '" name="maps-base" data-i="' + i + '"' +
-        (on ? " checked" : "") + "> " + escapeHtml(o.name) + "</label>";
+        (on ? " checked" : "") + "> " + (o.layer._goaheadMark ? '<span data-noi18n>' + escapeHtml(o.name) + "</span>" : escapeHtml(o.name)) + "</label>";
     });
     body.innerHTML = '<div class="settings-sub">Hintergrund</div>' + html;
   }
@@ -354,6 +361,7 @@
     if (storedScale >= 1 && storedScale <= 3) symbolScale = storedScale;
   } catch (e) { /* ohne Speicher */ }
 
+  var symbolScaleListeners = [];   // z. B. marks.js: Wegzeichen der eigenen Ebenen
   function applySymbolScale(f) {
     symbolScale = f;
     (cfg.overlays || []).forEach(function (def) {
@@ -361,6 +369,7 @@
       if (def.type === "wms") layer.setSymbolScale(f);
       else setXyzSymbolScale(layer, f);
     });
+    symbolScaleListeners.forEach(function (fn) { try { fn(f); } catch (e) { console.warn(e); } });
   }
 
   // ---------- Einstellungen ----------
@@ -383,6 +392,7 @@
     autoEndKmh: 80,      // Unterwegs: ab dieser Spitzengeschwindigkeit (über 20 s) Fahrt erkannt → Tour beenden
     reversePct: 1,       // Unterwegs: Richtung umdrehen, wenn so viel % der Strecke entgegen der Richtung gegangen (0 = aus)
     listCheck: false,    // Erwandert: Knopf „Liste prüfen“ anzeigen
+    printMarginM: 100,   // Ebene als PDF: Rand um die äußersten Positionen (m)
     loopPrefer: "longer", // Rundtour nach Länge: passt die Länge nicht, die nächstlängere ("longer") oder -kürzere ("shorter")
     loopOverlapPct: 0,   // Rundtour: erlaubter Anteil doppelt gegangener Strecke in %
     loopWarnPct: 20,     // Rundtour: Warnung, wenn die Länge um mehr als … % von der Vorgabe abweicht
@@ -464,6 +474,8 @@
           numRow("runMaxKmh", "Laufen bis", "km/h", 4, 30, 0.5) +
           numRow("bikeMaxKmh", "Rad bis", "km/h", 8, 80, 1) +
           '<label class="settings-row"><input type="checkbox" data-setting="listCheck"> Listenprüfung (Erwandert)</label>') +
+        group("Ebenen",
+          numRow("printMarginM", "PDF: Rand um die Positionen", "m", 0, 5000, 10)) +
         group("Daten",
           '<div class="settings-act"><span>Sicherung</span><span class="icon-row">' +
             '<button type="button" class="icon-btn settings-backup" title="Sichern (alle Touren, Routen, Tracks, Einstellungen)" aria-label="Sichern">' + icon("download") + "</button>" +
@@ -606,6 +618,7 @@
   map.on("overlayadd", function (e) {
     if (e.layer._rescaling) return;
     var def = e.layer._goaheadDef;
+    if (!def) return;   // eigene Ebenen (marks.js) merken sich ihre Sichtbarkeit selbst
     activeOverlays[def.id] = true;
     if (def.type === "wms" && !def.layers) {
       showStatus(T("„{0}“ ist gerade nicht verfügbar.", T(def.name)), 8000);
@@ -613,7 +626,7 @@
     saveView();
   });
   map.on("overlayremove", function (e) {
-    if (e.layer._rescaling) return;
+    if (e.layer._rescaling || !e.layer._goaheadDef) return;
     delete activeOverlays[e.layer._goaheadDef.id];
     saveView();
   });
@@ -982,7 +995,8 @@
     return {
       type: byKey.name || f.type,
       props: out,
-      symbol: symbol
+      symbol: symbol,
+      tfis: symbol && byKey.signaturnummer ? String(byKey.signaturnummer).trim() : null
     };
   }
 
@@ -1224,7 +1238,13 @@
       (res.features || []).forEach(function (f) {
         html += '<div class="fi-feature"><div class="fi-type">' +
           (f.symbol ? '<img class="fi-symbol" alt="" src="' + escapeHtml(f.symbol) + '" onerror="this.remove()">' : "") +
-          "<span>" + escapeHtml(f.type) + "</span></div>";
+          "<span>" + escapeHtml(f.type) + "</span>" +
+          // TFIS-Wegzeichen in eine eigene Ebene übernehmen (marks.js)
+          (f.tfis && window.GOAHEAD && window.GOAHEAD.marks
+            ? '<button type="button" class="icon-btn fi-add" data-tfis="' + escapeHtml(f.tfis) + '" data-name="' + escapeHtml(f.type) +
+              '" title="Wegzeichen in eine Ebene übernehmen" aria-label="Wegzeichen in eine Ebene übernehmen">' + icon("plus") + "</button>"
+            : "") +
+          "</div>";
         if (f.props.length) {
           html += table(f.props);
         } else if (!f.extra || !f.extra.length) {
@@ -1348,6 +1368,11 @@
     head.addEventListener("pointerup", end);
     head.addEventListener("pointercancel", end);
   })();
+
+  infoBody.addEventListener("click", function (e) {
+    var b = e.target.closest(".fi-add");
+    if (b && window.GOAHEAD.marks) window.GOAHEAD.marks.addTfis(b.getAttribute("data-tfis"), b.getAttribute("data-name"));
+  });
 
   // Gesten im Infofenster nicht an die Karte weitergeben
   L.DomEvent.disableClickPropagation(infoPanel);
@@ -1887,6 +1912,9 @@
     escapeHtml: escapeHtml,
     stopFollowing: stopFollowing,
     addToToolbar: addToToolbar,
+    // eigene Ebenen in der Kartenwahl (marks.js)
+    addOverlay: function (layer, name) { layersControl.addOverlay(layer, name); },
+    removeOverlay: function (layer) { layersControl.removeLayer(layer); },
     closeMenu: closeMenu,
     openMenu: openMenu,
     setMapClickHandler: setMapClickHandler,
@@ -1907,6 +1935,9 @@
     onSettingsChange: function (fn) { settingsListeners.push(fn); },
     shareGpx: shareGpx,
     icon: icon,
+    // Größe der Wegemarkierungen (Einstellungen → Karte), Faktor 1–3
+    symbolScale: function () { return symbolScale; },
+    onSymbolScale: function (fn) { symbolScaleListeners.push(fn); },
     directionArrows: directionArrows,
     version: APP_VERSION,
     i18n: I18N,

@@ -7,6 +7,7 @@
  *
  * Bilder werden ohne CORS-Anforderung geladen (die Leinwand wird nur angezeigt, nie ausgelesen) –
  * so funktioniert die Anzeige auch bei Diensten ohne CORS. Offline-Kacheln liefert der Service Worker.
+ * Ausnahme renderTile (PDF einer Ebene, marks.js): lädt mit CORS, damit das Ergebnis ins PDF darf.
  *
  * Quelle (config.js): { id, name, kind: "xyz"|"wms", url, layers, version, format,
  *   region: ["NW", …] (fehlt = überall), minZoom, maxNativeZoom, attribution, pad2 }
@@ -178,16 +179,28 @@
     },
 
     createTile: function (coords, done) {
+      return this._compose(coords.x, coords.y, coords.z, false, function (err, canvas) { done(err, canvas); });
+    },
+
+    // Kachel für das PDF einer Ebene (marks.js): Bilder mit CORS laden, damit die Leinwand ausgelesen werden darf.
+    // Quellen ohne CORS-Freigabe fallen dabei aus (Bild lädt nicht). → Promise {canvas, ok, total}
+    renderTile: function (x, y, z) {
+      var self = this;
+      return new Promise(function (resolve) {
+        self._compose(x, y, z, true, function (err, canvas, ok, total) { resolve({ canvas: canvas, ok: ok, total: total }); });
+      });
+    },
+
+    _compose: function (x, y, z, cors, done) {
       var canvas = document.createElement("canvas");
       canvas.width = TS;
       canvas.height = TS;
-      var x = coords.x, y = coords.y, z = coords.z;
       var n = Math.pow(2, z);
       x = ((x % n) + n) % n;   // über die Datumsgrenze
-      if (y < 0 || y >= n) { setTimeout(function () { done(null, canvas); }, 0); return canvas; }
+      if (y < 0 || y >= n) { setTimeout(function () { done(null, canvas, 0, 0); }, 0); return canvas; }
       var bb = tileBounds(x, y, z);
       var list = needed(this._def.sources, bb, z);
-      if (!list.length) { setTimeout(function () { done(null, canvas); }, 0); return canvas; }
+      if (!list.length) { setTimeout(function () { done(null, canvas, 0, 0); }, 0); return canvas; }
       var ctx = canvas.getContext("2d");
       var imgs = [];
       var left = list.length;
@@ -221,11 +234,12 @@
           else ctx.drawImage(im.el, 0, 0, TS, TS);
           ctx.restore();
         });
-        done(ok ? null : new Error("Keine Quelle lieferte ein Bild"), canvas);
+        done(ok ? null : new Error("Keine Quelle lieferte ein Bild"), canvas, ok, list.length);
       }
       list.forEach(function (item, i) {
         var t = sourceTile(item.src, x, y, z);
         var el = new Image();
+        if (cors) el.crossOrigin = "anonymous";
         var rec = { el: el, tile: t, ok: false };
         imgs[i] = rec;
         el.onload = function () { rec.ok = true; ok++; if (--left === 0) finish(); };

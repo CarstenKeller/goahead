@@ -2,7 +2,7 @@ name: GitHub Pages
 
 on:
   push:
-    branches: [main, ccr-a56f7acc-f6tzvw]
+    branches: [main, ccr-a56f7acc-f6tzvw, ccr-83c115d1-hn09z3]
   workflow_dispatch:
   # monatlich neu bauen, damit neue Wegzeichen (TFIS-Signaturen) übernommen werden
   schedule:
@@ -82,6 +82,17 @@ jobs:
           find /tmp/tfis/svg_Dateien/Wanderwege -name '*.svg' -exec cp {} symbols/tfis/ \;
           python3 .github/scripts/fix_svg_viewbox.py symbols/tfis
           echo "Wegzeichen: $(ls symbols/tfis | wc -l), Größe: $(du -sh symbols/tfis | cut -f1)"
+      # Verzeichnis Wegeschlüssel → Signaturnummer/Name (für „Wegzeichen hinzufügen“ in den Ebenen, marks.js)
+      - name: TFIS-Wegeschlüssel verzeichnen
+        continue-on-error: true
+        run: |
+          set -e
+          unzip -Z1 /tmp/tfis.zip | grep -i '\.gpkg$' > /tmp/gpkg.txt
+          cat /tmp/gpkg.txt
+          mkdir -p /tmp/tfis-gpkg
+          unzip -q -o -j /tmp/tfis.zip $(cat /tmp/gpkg.txt) -d /tmp/tfis-gpkg
+          python3 .github/scripts/tfis_index.py symbols/tfis/index.json /tmp/tfis-gpkg/*.gpkg
+          echo "Größe: $(du -h symbols/tfis/index.json | cut -f1)"
       - name: Android-APK übernehmen (falls gebaut)
         continue-on-error: true
         uses: actions/download-artifact@v4

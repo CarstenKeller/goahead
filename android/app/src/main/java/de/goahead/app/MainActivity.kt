@@ -18,6 +18,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.PowerManager
+import android.print.PrintAttributes
+import android.print.PrintManager
 import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Base64
@@ -323,6 +325,55 @@ class MainActivity : Activity() {
             }
             latch.await(3, java.util.concurrent.TimeUnit.SECONDS)
             return ok
+        }
+
+        /**
+         * Seite drucken (Android-Druckdienst; window.print() wirkt in der WebView nicht). Derzeit von der Web-App
+         * nicht genutzt (PDF entsteht jetzt in der Web-App, openFile) – bleibt für installierte Versionen erhalten.
+         */
+        @JavascriptInterface fun printPage(title: String, landscape: Boolean): Boolean {
+            runOnUiThread {
+                try {
+                    val pm = getSystemService(Context.PRINT_SERVICE) as PrintManager
+                    val size = if (landscape) PrintAttributes.MediaSize.ISO_A4.asLandscape()
+                               else PrintAttributes.MediaSize.ISO_A4.asPortrait()
+                    val name = "GoAhead " + title
+                    pm.print(name, web.createPrintDocumentAdapter(name),
+                        PrintAttributes.Builder().setMediaSize(size).build())
+                } catch (e: Exception) { }
+            }
+            return true
+        }
+
+        /**
+         * Datei (Base64) unter „Downloads“ speichern und mit einem passenden Programm öffnen (z. B. PDF der Ebene).
+         * Rückgabe: "opened" (gespeichert, Öffnen angestoßen), "saved" (gespeichert, Öffnen nicht möglich), "" (Fehler).
+         */
+        @JavascriptInterface fun openFile(name: String, mime: String, base64: String): String {
+            val uri = try {
+                val bytes = Base64.decode(base64, Base64.DEFAULT)
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, name)
+                    put(MediaStore.Downloads.MIME_TYPE, mime)
+                }
+                val u = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return ""
+                contentResolver.openOutputStream(u)?.use { it.write(bytes) } ?: return ""
+                u
+            } catch (e: Exception) {
+                return ""
+            }
+            return try {
+                val view = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, mime)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                runOnUiThread {
+                    try { startActivity(Intent.createChooser(view, "Öffnen")) } catch (e: Exception) { }
+                }
+                "opened"
+            } catch (e: Exception) {
+                "saved"
+            }
         }
 
         /** Punkte ab Index [from]: JSON [[lat, lon, höhe|null, zeit ms, genauigkeit m], …] */
